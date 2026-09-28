@@ -1,0 +1,49 @@
+{% extends "admin/base.html" %}
+{% block title %}Афиша{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Афиша</h1><p class="subtitle">Концерты, спектакли и программы</p></div>
+  <a class="btn btn--primary" href="{{ url_for('admin.event_form') }}">Добавить событие</a>
+</div>
+
+<div class="tabs">
+  <a href="{{ url_for('admin.events', scope='upcoming') }}" class="{{ 'is-active' if scope == 'upcoming' }}">Предстоящие</a>
+  <a href="{{ url_for('admin.events', scope='past') }}" class="{{ 'is-active' if scope == 'past' }}">Прошедшие</a>
+  <a href="{{ url_for('admin.events', scope='all') }}" class="{{ 'is-active' if scope == 'all' }}">Все</a>
+  <form method="get" style="margin-left:auto;display:flex;gap:8px">
+    <input type="hidden" name="scope" value="{{ scope }}">
+    <input type="text" name="q" value="{{ search }}" placeholder="Поиск по названию" style="width:240px">
+    <button class="btn btn--ghost btn--sm" type="submit">Найти</button>
+  </form>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>Дата</th><th>Название</th><th>Площадка</th><th>Цена</th><th>Отметки</th><th></th></tr>
+    {% for ev in items.items %}
+      <tr>
+        <td>{{ ev.starts_at | ru_datetime }}</td>
+        <td><a href="{{ url_for('admin.event_form', event_id=ev.id) }}">{{ ev.title }}</a></td>
+        <td>{{ ev.venue.name if ev.venue else '—' }}</td>
+        <td>{{ ev.price_label }}</td>
+        <td>
+          {% if ev.is_published %}<span class="badge badge--on">опубликовано</span>{% else %}<span class="badge badge--off">черновик</span>{% endif %}
+          {% if ev.show_pushkin %}<span class="badge">Пушкинская</span>{% endif %}
+          {% if ev.media %}<span class="badge">медиа: {{ ev.media | length }}</span>{% endif %}
+        </td>
+        <td><a href="{{ ev.url }}" target="_blank">на сайте</a></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="6">Событий нет.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+{% if items.pages > 1 %}
+  <p style="margin-top:16px">
+    {% for p in items.iter_pages() %}
+      {% if p %}<a href="{{ url_for('admin.events', page=p, scope=scope, q=search) }}" style="margin-right:8px">{{ p }}</a>{% else %}… {% endif %}
+    {% endfor %}
+  </p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "admin/base.html" %}
+{% from "admin/_media.html" import media_manager %}
+{% block title %}{{ item.title or 'Новая новость' }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{{ item.title or 'Новая новость' }}</h1></div>
+  <a class="btn btn--ghost" href="{{ url_for('admin.news') }}">К списку</a>
+</div>
+<form method="post" enctype="multipart/form-data">
+  <section class="panel">
+    <div class="field"><label for="title">Заголовок *</label>
+      <input id="title" type="text" name="title" value="{{ item.title or '' }}" required></div>
+    <div class="grid grid--2">
+      <div class="field"><label for="published_at">Дата публикации</label>
+        <input id="published_at" type="datetime-local" name="published_at"
+               value="{{ item.published_at.strftime('%Y-%m-%dT%H:%M') if item.published_at }}"></div>
+      <div class="field"><label for="image">Фотография</label><input id="image" type="file" name="image" accept="image/*">
+        {% if item.image %}<img src="/static/uploads/{{ item.image }}" alt="" style="max-width:150px;margin-top:8px">{% endif %}</div>
+    </div>
+    <div class="field"><label for="lead">Короткий анонс</label>
+      <textarea id="lead" name="lead" style="min-height:70px">{{ item.lead or '' }}</textarea></div>
+    <div class="field"><label for="content">Текст</label>
+      <textarea id="content" name="content" class="code">{{ item.content or '' }}</textarea></div>
+    <div class="checkline"><input id="is_published" type="checkbox" name="is_published" {{ 'checked' if item.is_published or not item.id }}>
+      <label for="is_published">Опубликовано</label></div>
+    <button class="btn btn--primary" type="submit">Сохранить</button>
+  </section>
+</form>
+{% if item.id %}
+  {{ media_manager('news', item.id, item.media) }}
+  <section class="panel">
+    <form method="post" action="{{ url_for('admin.news_delete', item_id=item.id) }}" onsubmit="return confirm('Удалить новость?')">
+      <button class="btn btn--danger" type="submit">Удалить новость</button></form>
+  </section>
+{% endif %}
+{% endblock %}

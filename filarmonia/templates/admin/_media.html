@@ -1,0 +1,63 @@
+{% macro media_manager(owner, owner_id, media) %}
+<section id="media" class="panel">
+  <h2 style="margin-top:0">Галерея: фото и видео</h2>
+  <p class="hint" style="margin-bottom:16px">
+    Фотографии можно выбрать пачкой. Видео — либо файлом .mp4, либо ссылкой на
+    VK Видео, RuTube, Дзен или YouTube: ссылка сама превращается в проигрыватель.
+  </p>
+
+  <div class="grid grid--2">
+    <form method="post" action="{{ url_for('admin.media_add') }}" enctype="multipart/form-data">
+      <input type="hidden" name="owner" value="{{ owner }}">
+      <input type="hidden" name="owner_id" value="{{ owner_id }}">
+      <input type="hidden" name="kind" value="photo">
+      <h3>Добавить фотографии</h3>
+      <div class="field"><label for="m-file-{{ owner }}">Файлы (jpg, png, webp)</label>
+        <input id="m-file-{{ owner }}" type="file" name="file" accept="image/*" multiple required></div>
+      <div class="field"><label>Подпись (необязательно)</label><input type="text" name="title"></div>
+      <button class="btn btn--primary" type="submit">Загрузить</button>
+    </form>
+
+    <form method="post" action="{{ url_for('admin.media_add') }}" enctype="multipart/form-data">
+      <input type="hidden" name="owner" value="{{ owner }}">
+      <input type="hidden" name="owner_id" value="{{ owner_id }}">
+      <input type="hidden" name="kind" value="video">
+      <h3>Добавить видео</h3>
+      <div class="field"><label>Ссылка на видео</label>
+        <input type="url" name="url" placeholder="https://rutube.ru/video/... или https://vk.com/video-123_456">
+        <div class="hint">Или загрузите файл ниже — что-то одно.</div></div>
+      <div class="field"><label>Файл .mp4 / .webm</label><input type="file" name="file" accept="video/mp4,video/webm"></div>
+      <div class="field"><label>Обложка видео</label><input type="file" name="preview" accept="image/*"></div>
+      <div class="field"><label>Подпись</label><input type="text" name="title"></div>
+      <button class="btn btn--primary" type="submit">Добавить видео</button>
+    </form>
+  </div>
+
+  {% if media %}
+    <h3 style="margin-top:26px">Загружено ({{ media | length }})</h3>
+    <div class="thumbs">
+      {% for m in media %}
+        <div class="thumb">
+          {% if m.kind == 'photo' %}
+            <img src="{{ m.src }}" alt="{{ m.title }}">
+          {% elif m.preview %}
+            <img src="/static/uploads/{{ m.preview }}" alt="{{ m.title }}">
+          {% elif m.file %}
+            <video src="/static/uploads/{{ m.file }}" preload="metadata"></video>
+          {% else %}
+            <div style="aspect-ratio:4/3;display:grid;place-items:center;background:#1e2430;color:#fff;font-size:.8rem">видео по ссылке</div>
+          {% endif %}
+          <div class="thumb__body">
+            {{ m.title or ('Фото' if m.kind == 'photo' else 'Видео') }}
+            {% if m.url %}<br><a href="{{ m.url }}" target="_blank">источник</a>{% endif %}
+            <form method="post" action="{{ url_for('admin.media_delete', media_id=m.id) }}"
+                  onsubmit="return confirm('Удалить этот материал?')">
+              <button class="btn btn--danger btn--sm" type="submit">Удалить</button>
+            </form>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+</section>
+{% endmacro %}

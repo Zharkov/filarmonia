@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{{ settings.get('site_name', 'Смоленская областная филармония') }}{% endblock %}</title>
+<meta name="description" content="{% block description %}{{ settings.get('site_description', 'Афиша концертов, коллективы, новости Смоленской областной филармонии.') }}{% endblock %}">
+{% if config.SITE_NOINDEX %}<meta name="robots" content="noindex, nofollow">{% endif %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Golos+Text:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/site.css') }}">
+{% block head %}{% endblock %}
+</head>
+<body>
+
+<div class="topbar">
+  <div class="wrap topbar__row">
+    <div class="topbar__links">
+      <a href="tel:{{ settings.get('phone_raw', '+74812383181') }}">{{ settings.get('phone', '+7 (4812) 38-31-81') }}</a>
+      <span>{{ settings.get('address_short', 'Смоленск, ул. Глинки, 3') }}</span>
+    </div>
+    <div class="topbar__links">
+      <a href="{{ url_for('public.appeals') }}">Обращения граждан</a>
+      <a href="{{ url_for('public.documents') }}">Документы</a>
+      <button class="a11y__btn" data-a11y-toggle aria-expanded="false" style="background:transparent;color:#fff;border-color:rgba(255,255,255,.35)">Версия для слабовидящих</button>
+    </div>
+  </div>
+</div>
+
+<div class="a11y" data-a11y>
+  <div class="wrap a11y__row">
+    <div class="a11y__group"><span>Размер шрифта:</span>
+      <button class="a11y__btn" data-a11y-set="size:m">Обычный</button>
+      <button class="a11y__btn" data-a11y-set="size:l">Крупный</button>
+      <button class="a11y__btn" data-a11y-set="size:xl">Очень крупный</button>
+    </div>
+    <div class="a11y__group"><span>Цвета:</span>
+      <button class="a11y__btn" data-a11y-set="theme:bw">Чёрным по белому</button>
+      <button class="a11y__btn" data-a11y-set="theme:wb">Белым по чёрному</button>
+      <button class="a11y__btn" data-a11y-set="theme:bb">Тёмно-синим по голубому</button>
+    </div>
+    <div class="a11y__group"><span>Изображения:</span>
+      <button class="a11y__btn" data-a11y-set="images:on">Показывать</button>
+      <button class="a11y__btn" data-a11y-set="images:off">Скрыть</button>
+    </div>
+    <button class="a11y__btn" data-a11y-reset>Обычная версия</button>
+  </div>
+</div>
+
+<header class="header">
+  <div class="wrap header__row">
+    <a class="logo" href="{{ url_for('public.index') }}">
+      <span class="logo__mark" aria-hidden="true">Ф</span>
+      <span class="logo__text">Смоленская областная филармония</span>
+    </a>
+
+    <nav class="nav" data-nav aria-label="Главное меню">
+      <ul class="nav__list">
+        {% for item in main_menu %}
+          <li class="nav__item">
+            <a class="nav__link" href="{{ item.href }}">{{ item.title }}</a>
+            {% if item.children %}
+              <ul class="nav__sub">
+                {% for child in item.children if child.is_published %}
+                  <li><a href="{{ child.href }}">{{ child.title }}</a></li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    </nav>
+
+    <div class="header__tools">
+      <form action="{{ url_for('public.search') }}" method="get" role="search" style="display:flex;gap:6px">
+        <label class="visually-hidden" for="site-search" style="position:absolute;left:-9999px">Поиск по сайту</label>
+        <input id="site-search" type="text" name="q" placeholder="Поиск" value="{{ request.args.get('q','') }}"
+               style="font:inherit;padding:9px 12px;border:1px solid var(--line);border-radius:4px;width:150px;background:var(--paper);color:var(--ink)">
+      </form>
+      <button class="icon-btn burger" data-burger aria-expanded="false" aria-label="Меню">≡</button>
+    </div>
+  </div>
+</header>
+
+{% block hero %}{% endblock %}
+
+<main>
+  {% block breadcrumbs %}{% endblock %}
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="wrap">
+        {% for category, msg in messages %}
+          <div class="flash {{ 'flash--error' if category == 'error' }}">{{ msg }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer__cols">
+      <div>
+        <h4>{{ settings.get('site_name', 'Смоленская областная филармония') }}</h4>
+        <p style="font-size:.94rem">{{ settings.get('address', '214000, г. Смоленск, ул. Глинки, д. 3') }}</p>
+        <p style="font-size:.94rem">
+          Касса: <a href="tel:{{ settings.get('phone_raw', '+74812383181') }}">{{ settings.get('phone', '+7 (4812) 38-31-81') }}</a><br>
+          <a href="mailto:{{ settings.get('email', 'info@smolensk-filarmonia.ru') }}">{{ settings.get('email', 'info@smolensk-filarmonia.ru') }}</a>
+        </p>
+      </div>
+      <div>
+        <h4>Зрителю</h4>
+        <ul>
+          <li><a href="{{ url_for('public.afisha') }}">Афиша</a></li>
+          <li><a href="{{ url_for('public.collectives') }}">Коллективы</a></li>
+          <li><a href="{{ url_for('public.gallery') }}">Галерея</a></li>
+          <li><a href="{{ url_for('public.news_list') }}">Новости</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Учреждение</h4>
+        <ul>
+          <li><a href="{{ url_for('public.documents') }}">Документы</a></li>
+          <li><a href="{{ url_for('public.page', slug='protivodejstvie-korrupcii') }}">Противодействие коррупции</a></li>
+          <li><a href="{{ url_for('public.appeals') }}">Интернет-приёмная</a></li>
+          <li><a href="{{ url_for('public.page', slug='nezavisimaya-ocenka') }}">Независимая оценка качества</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Обязательные ссылки</h4>
+        <ul>
+          <li><a href="https://www.gosuslugi.ru" rel="noopener" target="_blank">Госуслуги</a></li>
+          <li><a href="https://bus.gov.ru" rel="noopener" target="_blank">bus.gov.ru</a></li>
+          <li><a href="{{ url_for('public.page', slug='politika-konfidencialnosti') }}">Политика конфиденциальности</a></li>
+          <li><a href="{{ url_for('public.page', slug='obrabotka-personalnyh-dannyh') }}">Обработка персональных данных</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer__bottom">
+      <span>© {{ now.year }} {{ settings.get('site_name', 'Смоленская областная филармония') }}</span>
+      <span><a href="{{ url_for('admin.login') }}">Вход для сотрудников</a></span>
+    </div>
+  </div>
+</footer>
+
+<div class="modal" id="photo-viewer">
+  <div class="modal__box modal__box--wide">
+    <button class="modal__close" aria-label="Закрыть">×</button>
+    <img src="" alt="">
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/site.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

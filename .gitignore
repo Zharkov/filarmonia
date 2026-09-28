@@ -1,0 +1,12 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.db
+filarmonia/static/uploads/*
+!filarmonia/static/uploads/.gitkeep
+.env
+server.log
+*.log
+.idea/
+.vscode/

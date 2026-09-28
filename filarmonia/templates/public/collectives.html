@@ -1,0 +1,63 @@
+{% extends "public/base.html" %}
+{% block title %}Коллективы — {{ settings.get('site_name', 'Смоленская областная филармония') }}{% endblock %}
+{% block breadcrumbs %}
+<div class="wrap breadcrumbs"><a href="{{ url_for('public.index') }}">Главная</a> / Коллективы</div>
+{% endblock %}
+
+{% block content %}
+<div class="wrap">
+  <h1>Коллективы</h1>
+  <p class="lead">Оркестры, ансамбли и солисты филармонии. У каждого коллектива — фото и видео, контакты для заявок и подробный рассказ.</p>
+
+  {% for c in items %}
+    <article class="collective">
+      <div class="collective__head">
+        {% if c.logo %}<img class="collective__logo" src="/static/uploads/{{ c.logo }}" alt="">{% endif %}
+        <div>
+          <h2 class="collective__name">{{ c.name }}</h2>
+          {% if c.lead %}<div class="collective__lead">{{ c.lead }}</div>{% endif %}
+        </div>
+      </div>
+
+      {% set items_media = c.media[:5] %}
+      {% if items_media %}
+        <div class="collective__strip">
+          {% for m in items_media %}
+            {% if m.kind == 'photo' %}
+              <a href="{{ m.src }}" data-photo="{{ m.src }}" data-photo-alt="{{ c.name }}">
+                <img src="{{ m.src }}" alt="{{ m.title or c.name }}" loading="lazy">
+              </a>
+            {% else %}
+              <a href="{{ c.url }}#video">
+                {% if m.preview %}<img src="/static/uploads/{{ m.preview }}" alt="{{ m.title or c.name }}" loading="lazy">{% endif %}
+                <span class="collective__play" aria-hidden="true">▶</span>
+              </a>
+            {% endif %}
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {% if c.annotation %}<p style="padding:0 22px">{{ c.annotation }}</p>{% endif %}
+
+      <div class="collective__foot">
+        {% if c.contacts %}
+          <button class="btn btn--ghost btn--sm" data-modal="contacts-{{ c.id }}">Контакты</button>
+        {% endif %}
+        <a class="btn btn--primary btn--sm" href="{{ c.url }}">Подробнее</a>
+      </div>
+    </article>
+
+    {% if c.contacts %}
+      <div class="modal" id="contacts-{{ c.id }}">
+        <div class="modal__box">
+          <button class="modal__close" aria-label="Закрыть">×</button>
+          <h3>{{ c.name }}</h3>
+          <div class="prose">{{ c.contacts | safe }}</div>
+        </div>
+      </div>
+    {% endif %}
+  {% else %}
+    <p class="empty">Коллективы пока не добавлены.</p>
+  {% endfor %}
+</div>
+{% endblock %}

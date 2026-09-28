@@ -1,0 +1,52 @@
+# Тестовое развёртывание сайта на render.com (Blueprint).
+#
+# Это витрина для показа и проверки, а не боевой сервер: по требованиям
+# к сайтам учреждений культуры хостинг и домен должны быть российскими.
+# Боевая установка описана в README.md, порядок действий здесь — в DEPLOY-RENDER.md.
+#
+# База (SQLite) и демо-картинки создаются на этапе сборки, поэтому при каждом
+# деплое или пробуждении уснувшего free-сервиса контент возвращается к демо-состоянию:
+# всё, что внесено через админку, теряется. Как сделать данные постоянными —
+# в конце DEPLOY-RENDER.md.
+
+services:
+  - type: web
+    name: filarmonia
+    runtime: python
+    plan: free
+    region: frankfurt
+    branch: main
+    autoDeploy: true
+    healthCheckPath: /
+
+    # imageio-ffmpeg ставится только ради демо-роликов (видео на главной и в
+    # галереях): на боевом сервере он не нужен, поэтому его нет в requirements.txt.
+    buildCommand: pip install -r requirements.txt imageio-ffmpeg==0.6.0 && python app.py seed
+
+    # $PORT задаёт Render. Таймаут увеличен: через админку загружают файлы до 64 МБ.
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+
+    envVars:
+      # Render сгенерирует случайную строку сам
+      - key: SECRET_KEY
+        generateValue: true
+
+      # Render отдаёт сайт по HTTPS
+      - key: SESSION_COOKIE_SECURE
+        value: "1"
+
+      # за прокси Render: брать протокол и адрес клиента из X-Forwarded-*
+      - key: TRUST_PROXY
+        value: "1"
+
+      # закрыть тестовый адрес от поисковиков, чтобы он не конкурировал
+      # в выдаче с будущим настоящим сайтом
+      - key: SITE_NOINDEX
+        value: "1"
+
+      # пароль администратора Render спросит при создании Blueprint
+      - key: ADMIN_PASSWORD
+        sync: false
+
+      - key: PYTHONUNBUFFERED
+        value: "1"

@@ -1,0 +1,20 @@
+{% extends "admin/base.html" %}
+{% block title %}Обращение{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Обращение от {{ item.created_at | ru_date }}</h1><p class="subtitle">{{ item.name }}</p></div>
+  <a class="btn btn--ghost" href="{{ url_for('admin.appeals') }}">К списку</a>
+</div>
+<section class="panel">
+  <p><strong>Контакты:</strong> {{ item.email or '—' }} · {{ item.phone or '—' }}</p>
+  <p><strong>Тема:</strong> {{ item.subject or '—' }}</p>
+  <p style="white-space:pre-wrap">{{ item.message }}</p>
+  <hr style="border:0;border-top:1px solid var(--a-line);margin:20px 0">
+  <form method="post">
+    <div class="checkline"><input id="pr" type="checkbox" name="is_processed" {{ 'checked' if item.is_processed }}>
+      <label for="pr">Обращение обработано</label></div>
+    <div class="field"><label>Служебная отметка</label><textarea name="note" style="min-height:90px">{{ item.note or '' }}</textarea></div>
+    <button class="btn btn--primary" type="submit">Сохранить</button>
+  </form>
+</section>
+{% endblock %}

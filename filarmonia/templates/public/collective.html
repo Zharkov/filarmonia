@@ -1,0 +1,55 @@
+{% extends "public/base.html" %}
+{% from "public/_macros.html" import event_card %}
+{% block title %}{{ item.name }}{% endblock %}
+{% block breadcrumbs %}
+<div class="wrap breadcrumbs">
+  <a href="{{ url_for('public.index') }}">Главная</a> /
+  <a href="{{ url_for('public.collectives') }}">Коллективы</a> / {{ item.name }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="wrap">
+  <h1>{{ item.name }}</h1>
+  {% if item.lead %}<p class="lead">{{ item.lead }}</p>{% endif %}
+
+  {% set photos, videos = item.photos, item.videos %}
+
+  {% if photos %}
+    <div class="gallery-grid" style="margin-bottom:34px">
+      {% for p in photos %}
+        <a href="{{ p.src }}" data-photo="{{ p.src }}" data-photo-alt="{{ item.name }}">
+          <img src="{{ p.src }}" alt="{{ p.title or item.name }}" loading="lazy">
+        </a>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <div class="prose">{{ item.description | safe }}</div>
+
+  {% if videos %}
+    <h2 id="video">Видео</h2>
+    <div class="video-grid">
+      {% for v in videos %}
+        <div class="video-frame">
+          {% if v.embed %}{{ v.embed | safe }}
+          {% elif v.url %}{{ v.url | video_embed }}
+          {% elif v.file %}<video controls preload="metadata" src="/static/uploads/{{ v.file }}"></video>{% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% if item.contacts %}
+    <h2>Контакты</h2>
+    <div class="prose">{{ item.contacts | safe }}</div>
+  {% endif %}
+
+  {% if events %}
+    <section class="section">
+      <div class="section__head"><h2>Ближайшие выступления</h2></div>
+      <div class="cards">{% for e in events %}{{ event_card(e) }}{% endfor %}</div>
+    </section>
+  {% endif %}
+</div>
+{% endblock %}

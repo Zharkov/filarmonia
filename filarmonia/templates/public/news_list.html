@@ -1,0 +1,26 @@
+{% extends "public/base.html" %}
+{% from "public/_macros.html" import pagination %}
+{% block title %}Новости — {{ settings.get('site_name', 'Смоленская областная филармония') }}{% endblock %}
+{% block breadcrumbs %}
+<div class="wrap breadcrumbs"><a href="{{ url_for('public.index') }}">Главная</a> / Новости</div>
+{% endblock %}
+{% block content %}
+<div class="wrap">
+  <h1>Новости</h1>
+  <div class="newsgrid">
+    {% for item in items.items %}
+      <article class="newscard">
+        <a class="newscard__img" href="{{ item.url }}">
+          {% if item.image %}<img src="/static/uploads/{{ item.image }}" alt="" loading="lazy">{% endif %}
+        </a>
+        <div class="newscard__date">{{ item.published_at | ru_date }}</div>
+        <h3><a href="{{ item.url }}">{{ item.title }}</a></h3>
+        <p>{{ item.lead or item.content | strip_tags(160) }}</p>
+      </article>
+    {% else %}
+      <p class="empty">Новостей пока нет.</p>
+    {% endfor %}
+  </div>
+  {{ pagination(items, 'public.news_list') }}
+</div>
+{% endblock %}

@@ -1,0 +1,56 @@
+{% extends "public/base.html" %}
+{% block title %}{{ item.title }}{% endblock %}
+{% block description %}{{ item.lead or item.content | strip_tags(180) }}{% endblock %}
+{% block breadcrumbs %}
+<div class="wrap breadcrumbs">
+  <a href="{{ url_for('public.index') }}">Главная</a> /
+  <a href="{{ url_for('public.news_list') }}">Новости</a> / {{ item.title | truncate(40) }}
+</div>
+{% endblock %}
+{% block content %}
+<div class="wrap">
+  <article>
+    <div class="newscard__date">{{ item.published_at | ru_date }}</div>
+    <h1>{{ item.title }}</h1>
+    {% if item.image %}<img src="/static/uploads/{{ item.image }}" alt="" style="margin:20px 0;max-height:520px;width:100%;object-fit:cover">{% endif %}
+    {% if item.lead %}<p class="lead">{{ item.lead }}</p>{% endif %}
+    <div class="prose">{{ item.content | safe }}</div>
+
+    {% set photos, videos = item.photos, item.videos %}
+    {% if videos %}
+      <div class="video-grid" style="margin:26px 0">
+        {% for v in videos %}
+          <div class="video-frame">
+            {% if v.embed %}{{ v.embed | safe }}{% elif v.url %}{{ v.url | video_embed }}
+            {% elif v.file %}<video controls src="/static/uploads/{{ v.file }}"></video>{% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% if photos %}
+      <div class="gallery-grid">
+        {% for p in photos %}
+          <a href="{{ p.src }}" data-photo="{{ p.src }}"><img src="{{ p.src }}" alt="" loading="lazy"></a>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </article>
+
+  {% if other %}
+    <section class="section">
+      <div class="section__head"><h2>Другие новости</h2></div>
+      <div class="newsgrid">
+        {% for item in other %}
+          <article class="newscard">
+            <a class="newscard__img" href="{{ item.url }}">
+              {% if item.image %}<img src="/static/uploads/{{ item.image }}" alt="" loading="lazy">{% endif %}
+            </a>
+            <div class="newscard__date">{{ item.published_at | ru_date }}</div>
+            <h3><a href="{{ item.url }}">{{ item.title }}</a></h3>
+          </article>
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
+</div>
+{% endblock %}

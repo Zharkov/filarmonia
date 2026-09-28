@@ -1,0 +1,20 @@
+{% extends "admin/base.html" %}
+{% block title %}Обращения граждан{% endblock %}
+{% block content %}
+<h1>Обращения граждан</h1>
+<p class="subtitle">Поступают из интернет-приёмной. Срок рассмотрения — 30 дней.</p>
+<div class="table-wrap" style="margin-top:20px">
+  <table>
+    <tr><th>Дата</th><th>Заявитель</th><th>Контакты</th><th>Тема</th><th>Статус</th></tr>
+    {% for a in items.items %}
+      <tr>
+        <td>{{ a.created_at | ru_date }}</td>
+        <td><a href="{{ url_for('admin.appeal_view', item_id=a.id) }}">{{ a.name }}</a></td>
+        <td>{{ a.email }}<br>{{ a.phone }}</td>
+        <td>{{ a.subject or '—' }}</td>
+        <td>{% if a.is_processed %}<span class="badge badge--on">обработано</span>{% else %}<span class="badge">новое</span>{% endif %}</td>
+      </tr>
+    {% else %}<tr><td colspan="5">Обращений нет.</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

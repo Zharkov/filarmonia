@@ -1,0 +1,72 @@
+{% extends "public/base.html" %}
+{% from "public/_macros.html" import event_row, daystrip, pagination %}
+{% block title %}Афиша — {{ settings.get('site_name', 'Смоленская областная филармония') }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="wrap breadcrumbs"><a href="{{ url_for('public.index') }}">Главная</a> / Афиша</div>
+{% endblock %}
+
+{% block content %}
+<div class="wrap">
+  <h1>Афиша</h1>
+  {{ daystrip(day_strip, selected_day) }}
+
+  <form class="filters" method="get" action="{{ url_for('public.afisha') }}">
+    <select name="sort" data-autosubmit aria-label="Сортировка">
+      <option value="date" {{ 'selected' if args.get('sort') in (None, '', 'date') }}>Сначала ближайшие</option>
+      <option value="date_desc" {{ 'selected' if args.get('sort') == 'date_desc' }}>Сначала поздние</option>
+      <option value="price" {{ 'selected' if args.get('sort') == 'price' }}>По цене</option>
+      <option value="title" {{ 'selected' if args.get('sort') == 'title' }}>По названию</option>
+    </select>
+
+    <select name="venue" data-autosubmit aria-label="Площадка">
+      <option value="">Все площадки</option>
+      {% for v in venues %}
+        <option value="{{ v.slug }}" {{ 'selected' if args.get('venue') == v.slug }}>{{ v.name }}</option>
+      {% endfor %}
+    </select>
+
+    <select name="category" data-autosubmit aria-label="Категория">
+      <option value="">Все категории</option>
+      {% for c in categories %}
+        <option value="{{ c.slug }}" {{ 'selected' if args.get('category') == c.slug }}>{{ c.name }}</option>
+      {% endfor %}
+    </select>
+
+    <label class="hint">с <input type="date" name="from" value="{{ args.get('from','') }}" data-autosubmit></label>
+    <label class="hint">по <input type="date" name="to" value="{{ args.get('to','') }}" data-autosubmit></label>
+
+    <select name="price" data-autosubmit aria-label="Цена">
+      <option value="">Любая цена</option>
+      <option value="300" {{ 'selected' if args.get('price') == '300' }}>до 300 ₽</option>
+      <option value="600" {{ 'selected' if args.get('price') == '600' }}>до 600 ₽</option>
+      <option value="1000" {{ 'selected' if args.get('price') == '1000' }}>до 1000 ₽</option>
+    </select>
+
+    <input type="text" name="q" placeholder="Название или исполнитель" value="{{ args.get('q','') }}">
+    <button class="btn btn--primary btn--sm" type="submit">Найти</button>
+
+    {% set on_push = args.get('pushkin') == '1' %}
+    {% set on_new = args.get('new') == '1' %}
+    <a class="chip {{ 'chip--on' if on_push }}"
+       href="{{ url_for('public.afisha', **dict(args.to_dict(), pushkin='' if on_push else '1')) }}">Пушкинская карта</a>
+    <a class="chip {{ 'chip--on' if on_new }}"
+       href="{{ url_for('public.afisha', **dict(args.to_dict(), new='' if on_new else '1')) }}">Новинки</a>
+    {% if args %}
+      <a class="chip" href="{{ url_for('public.afisha') }}">Сбросить фильтры</a>
+    {% endif %}
+  </form>
+
+  {% if selected_day %}
+    <p class="hint">Показаны события на {{ selected_day | ru_date }}. <a href="{{ url_for('public.afisha') }}">Показать все</a></p>
+  {% endif %}
+
+  {% if events.items %}
+    {% for ev in events.items %}{{ event_row(ev) }}{% endfor %}
+    {{ pagination(events, 'public.afisha', args.to_dict()) }}
+  {% else %}
+    <p class="empty">На выбранные даты событий нет. Попробуйте изменить фильтры или посмотрите
+      <a href="{{ url_for('public.afisha') }}">всю афишу</a>.</p>
+  {% endif %}
+</div>
+{% endblock %}

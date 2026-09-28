@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Вход — управление сайтом филармонии</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+</head>
+<body>
+<div class="login-wrap">
+  <form class="login-box" method="post">
+    <h1>Вход в управление сайтом</h1>
+    <p class="subtitle" style="margin-bottom:20px">Смоленская областная филармония</p>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, msg in messages %}<div class="flash {{ 'flash--error' if category == 'error' }}">{{ msg }}</div>{% endfor %}
+    {% endwith %}
+    <div class="field"><label for="login">Логин</label><input id="login" type="text" name="login" autofocus required></div>
+    <div class="field"><label for="password">Пароль</label><input id="password" type="password" name="password" required></div>
+    <button class="btn btn--primary" type="submit" style="width:100%;justify-content:center">Войти</button>
+  </form>
+</div>
+</body>
+</html>

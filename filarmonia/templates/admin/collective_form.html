@@ -1,0 +1,42 @@
+{% extends "admin/base.html" %}
+{% from "admin/_media.html" import media_manager %}
+{% block title %}{{ item.name or 'Новый коллектив' }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{{ item.name or 'Новый коллектив' }}</h1></div>
+  <a class="btn btn--ghost" href="{{ url_for('admin.collectives') }}">К списку</a>
+</div>
+
+<form method="post" enctype="multipart/form-data">
+  <section class="panel">
+    <div class="field"><label for="name">Название *</label>
+      <input id="name" type="text" name="name" value="{{ item.name or '' }}" required></div>
+    <div class="grid grid--2">
+      <div class="field"><label for="lead">Художественный руководитель</label>
+        <input id="lead" type="text" name="lead" value="{{ item.lead or '' }}"></div>
+      <div class="field"><label for="sort">Порядок вывода</label>
+        <input id="sort" type="number" name="sort" value="{{ item.sort or 100 }}"></div>
+    </div>
+    <div class="field"><label for="annotation">Короткое описание (в списке коллективов)</label>
+      <textarea id="annotation" name="annotation" style="min-height:70px">{{ item.annotation or '' }}</textarea></div>
+    <div class="field"><label for="description">Подробный рассказ о коллективе</label>
+      <textarea id="description" name="description" class="code">{{ item.description or '' }}</textarea></div>
+    <div class="field"><label for="contacts">Контакты (открываются в баннере по кнопке «Контакты»)</label>
+      <textarea id="contacts" name="contacts" class="code" style="min-height:90px">{{ item.contacts or '' }}</textarea></div>
+    <div class="field"><label for="logo">Логотип или фото</label><input id="logo" type="file" name="logo" accept="image/*">
+      {% if item.logo %}<img src="/static/uploads/{{ item.logo }}" alt="" style="max-width:120px;margin-top:8px">{% endif %}</div>
+    <div class="checkline"><input id="is_published" type="checkbox" name="is_published" {{ 'checked' if item.is_published or not item.id }}>
+      <label for="is_published">Опубликован</label></div>
+    <button class="btn btn--primary" type="submit">Сохранить</button>
+  </section>
+</form>
+
+{% if item.id %}
+  {{ media_manager('collective', item.id, item.media) }}
+  <section class="panel">
+    <form method="post" action="{{ url_for('admin.collective_delete', item_id=item.id) }}"
+          onsubmit="return confirm('Удалить коллектив?')">
+      <button class="btn btn--danger" type="submit">Удалить коллектив</button></form>
+  </section>
+{% endif %}
+{% endblock %}

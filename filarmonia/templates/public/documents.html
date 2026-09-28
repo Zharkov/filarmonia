@@ -1,0 +1,22 @@
+{% extends "public/base.html" %}
+{% block title %}Документы — {{ settings.get('site_name', 'Смоленская областная филармония') }}{% endblock %}
+{% block breadcrumbs %}
+<div class="wrap breadcrumbs"><a href="{{ url_for('public.index') }}">Главная</a> / Документы</div>
+{% endblock %}
+{% block content %}
+<div class="wrap">
+  <h1>Документы</h1>
+  <p class="lead">Учредительные документы, нормативные акты, планы и отчёты учреждения.</p>
+  {% for category, items in grouped.items() %}
+    <h2>{{ category }}</h2>
+    <ul>
+      {% for d in items %}
+        <li><a href="{{ d.href }}">{{ d.title }}</a>
+          <span class="hint">{% if d.year %}{{ d.year }}{% endif %}{% if d.size_kb %} · {{ d.size_kb }} КБ{% endif %}</span></li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="empty">Документы пока не загружены.</p>
+  {% endfor %}
+</div>
+{% endblock %}

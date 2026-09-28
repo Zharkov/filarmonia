@@ -1,0 +1,178 @@
+{% extends "admin/base.html" %}
+{% from "admin/_media.html" import media_manager %}
+{% block title %}{{ ev.title or 'Новое событие' }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>{{ ev.title or 'Новое событие' }}</h1>
+    <p class="subtitle">{% if ev.id %}{{ ev.starts_at | ru_datetime }}{% else %}Заполните карточку и сохраните{% endif %}</p>
+  </div>
+  <div style="display:flex;gap:10px">
+    {% if ev.id %}<a class="btn btn--ghost" href="{{ ev.url }}" target="_blank">Посмотреть на сайте</a>{% endif %}
+    <a class="btn btn--ghost" href="{{ url_for('admin.events') }}">К списку</a>
+  </div>
+</div>
+
+<form method="post" enctype="multipart/form-data">
+  <section class="panel">
+    <div class="field"><label for="title">Название события *</label>
+      <input id="title" type="text" name="title" value="{{ ev.title or '' }}" required></div>
+
+    <div class="grid grid--3">
+      <div class="field"><label for="starts_at">Дата и время *</label>
+        <input id="starts_at" type="datetime-local" name="starts_at"
+               value="{{ ev.starts_at.strftime('%Y-%m-%dT%H:%M') if ev.starts_at }}" required></div>
+      <div class="field"><label for="duration_min">Продолжительность, мин</label>
+        <input id="duration_min" type="number" name="duration_min" value="{{ ev.duration_min or '' }}"></div>
+      <div class="field"><label for="age_limit">Возрастное ограничение</label>
+        <input id="age_limit" type="text" name="age_limit" value="{{ ev.age_limit or '' }}" placeholder="6+"></div>
+    </div>
+
+    <div class="grid grid--4">
+      <div class="field"><label for="venue_id">Площадка</label>
+        <select id="venue_id" name="venue_id">
+          <option value="">—</option>
+          {% for v in venues %}<option value="{{ v.id }}" {{ 'selected' if ev.venue_id == v.id }}>{{ v.name }}</option>{% endfor %}
+        </select></div>
+      <div class="field"><label for="category_id">Жанр / категория</label>
+        <select id="category_id" name="category_id">
+          <option value="">—</option>
+          {% for c in categories %}<option value="{{ c.id }}" {{ 'selected' if ev.category_id == c.id }}>{{ c.name }}</option>{% endfor %}
+        </select></div>
+      <div class="field"><label for="price_min">Цена от, ₽</label>
+        <input id="price_min" type="number" name="price_min" value="{{ ev.price_min or '' }}"></div>
+      <div class="field"><label for="price_max">Цена до, ₽</label>
+        <input id="price_max" type="number" name="price_max" value="{{ ev.price_max or '' }}"></div>
+    </div>
+
+    <div class="grid grid--2">
+      <div class="field"><label for="ticket_url">Ссылка на покупку билета</label>
+        <input id="ticket_url" type="url" name="ticket_url" value="{{ ev.ticket_url or '' }}"
+               placeholder="Ссылка билетной системы"></div>
+      <div class="field"><label for="tickets_left">Наличие билетов</label>
+        <input id="tickets_left" type="text" name="tickets_left" value="{{ ev.tickets_left or '' }}"
+               placeholder="осталось более 100 билетов"></div>
+    </div>
+
+    <div class="grid grid--2">
+      <div class="field"><label for="poster">Афиша (вертикальная, 3:4)</label>
+        <input id="poster" type="file" name="poster" accept="image/*">
+        {% if ev.poster %}<div class="hint">Загружено: {{ ev.poster }}</div>
+          <img src="/static/uploads/{{ ev.poster }}" alt="" style="max-width:150px;margin-top:8px;border-radius:4px">{% endif %}
+      </div>
+      <div class="field"><label for="organizer">Организатор</label>
+        <input id="organizer" type="text" name="organizer" value="{{ ev.organizer or '' }}">
+        <div class="field" style="margin-top:16px"><label for="slug">Адрес страницы</label>
+          <input id="slug" type="text" name="slug" value="{{ ev.slug or '' }}" placeholder="создастся автоматически">
+        </div>
+      </div>
+    </div>
+
+    <div class="field"><label for="annotation">Короткий анонс (для карточек и поиска)</label>
+      <textarea id="annotation" name="annotation" style="min-height:70px">{{ ev.annotation or '' }}</textarea></div>
+
+    <div class="field"><label for="description">Описание программы</label>
+      <textarea id="description" name="description" class="code">{{ ev.description or '' }}</textarea>
+      <div class="hint">Можно использовать HTML: &lt;p&gt;абзац&lt;/p&gt;, &lt;strong&gt;жирный&lt;/strong&gt;, &lt;ul&gt;&lt;li&gt;список&lt;/li&gt;&lt;/ul&gt;</div></div>
+
+    <div class="field"><label for="performers">В концерте принимают участие</label>
+      <textarea id="performers" name="performers" class="code" style="min-height:90px">{{ ev.performers or '' }}</textarea></div>
+
+    <div class="field"><label>Коллективы филармонии в этой программе</label>
+      <select name="collectives" multiple size="5">
+        {% for c in all_collectives %}
+          <option value="{{ c.id }}" {{ 'selected' if c in ev.collectives }}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+      <div class="hint">Удерживайте Ctrl, чтобы выбрать несколько.</div></div>
+  </section>
+
+  <!-- ------------- отключаемые блоки: льготы и Пушкинская карта ------------- -->
+  <section class="panel">
+    <h2 style="margin-top:0">Льготы и Пушкинская карта</h2>
+    <p class="hint" style="margin-bottom:16px">
+      Эти блоки показываются на странице события, только если галочка снята или поставлена
+      здесь — для каждого концерта отдельно.
+    </p>
+
+    <div class="checkline">
+      <input id="show_benefits" type="checkbox" name="show_benefits" {{ 'checked' if ev.show_benefits }}>
+      <label for="show_benefits">Показывать блок «Льготы»</label>
+    </div>
+    <div class="field"><textarea name="benefits_text" class="code" style="min-height:90px">{{ ev.benefits_text or '' }}</textarea>
+      <div class="hint">Например: цена по пенсионному удостоверению, условия для детей до 7 лет, участникам СВО.</div></div>
+
+    <div class="checkline">
+      <input id="show_pushkin" type="checkbox" name="show_pushkin" {{ 'checked' if ev.show_pushkin }}>
+      <label for="show_pushkin">Событие участвует в программе «Пушкинская карта»</label>
+    </div>
+    <div class="field"><textarea name="pushkin_text" class="code" style="min-height:70px">{{ ev.pushkin_text or '' }}</textarea>
+      <div class="hint">Если оставить пустым, подставится общий текст из раздела «Настройки».</div></div>
+  </section>
+
+  <section class="panel">
+    <h2 style="margin-top:0">Публикация</h2>
+    <div class="checkline"><input id="is_published" type="checkbox" name="is_published" {{ 'checked' if ev.is_published or not ev.id }}>
+      <label for="is_published">Опубликовано на сайте</label></div>
+    <div class="checkline"><input id="is_new" type="checkbox" name="is_new" {{ 'checked' if ev.is_new }}>
+      <label for="is_new">Отметка «Новинка» (фильтр в афише)</label></div>
+    <div class="checkline"><input id="is_featured" type="checkbox" name="is_featured" {{ 'checked' if ev.is_featured }}>
+      <label for="is_featured">Показывать в подборке на главной</label></div>
+    <button class="btn btn--primary" type="submit">Сохранить событие</button>
+  </section>
+</form>
+
+{% if ev.id %}
+  <!-- ------------------ всплывающие баннеры на афише ------------------ -->
+  <section id="badges" class="panel">
+    <h2 style="margin-top:0">Всплывающие баннеры на афише</h2>
+    <p class="hint" style="margin-bottom:16px">
+      Баннер лежит поверх афиши события. При наведении (на телефоне — при касании)
+      разворачивается подсказка с пояснением.
+    </p>
+
+    {% if ev.badges %}
+      <div class="table-wrap" style="margin-bottom:18px">
+        <table>
+          <tr><th>Вид</th><th>Надпись и подсказка</th><th>Положение</th><th></th></tr>
+          {% for b in ev.badges %}
+            <tr>
+              <td><span class="preview-pin preview-pin--{{ b.style }}">{{ b.text }}</span></td>
+              <td>{{ b.hint or '—' }}{% if b.url %}<br><span class="hint">ссылка: {{ b.url }}</span>{% endif %}</td>
+              <td>{% for value, label in positions %}{{ label if value == b.position }}{% endfor %}</td>
+              <td><form method="post" action="{{ url_for('admin.badge_delete', badge_id=b.id) }}">
+                <button class="btn btn--danger btn--sm" type="submit">Удалить</button></form></td>
+            </tr>
+          {% endfor %}
+        </table>
+      </div>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('admin.badge_add', event_id=ev.id) }}">
+      <div class="grid grid--4">
+        <div class="field"><label>Надпись *</label><input type="text" name="text" placeholder="Пушкинская карта" required></div>
+        <div class="field"><label>Положение</label>
+          <select name="position">{% for value, label in positions %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Оформление</label>
+          <select name="style">{% for value, label in styles %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Ссылка (необязательно)</label><input type="url" name="url"></div>
+      </div>
+      <div class="field"><label>Подсказка при наведении</label>
+        <input type="text" name="hint" placeholder="Билет можно оплатить Пушкинской картой"></div>
+      <button class="btn btn--primary" type="submit">Добавить баннер</button>
+    </form>
+  </section>
+
+  {{ media_manager('event', ev.id, ev.media) }}
+
+  <section class="panel">
+    <form method="post" action="{{ url_for('admin.event_delete', item_id=ev.id) }}"
+          onsubmit="return confirm('Удалить событие вместе с галереей и баннерами?')">
+      <button class="btn btn--danger" type="submit">Удалить событие</button>
+    </form>
+  </section>
+{% else %}
+  <p class="hint">Галерея и баннеры станут доступны после первого сохранения.</p>
+{% endif %}
+{% endblock %}

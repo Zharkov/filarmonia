@@ -1,0 +1,40 @@
+{% extends "admin/base.html" %}
+{% block title %}Баннеры{% endblock %}
+{% block content %}
+<h1>Баннеры</h1>
+<p class="subtitle">Госуслуги, bus.gov.ru, партнёры и другие ссылки-картинки.</p>
+
+<section class="panel" style="margin-top:20px">
+  <h2 style="margin-top:0">Добавить баннер</h2>
+  <form method="post" enctype="multipart/form-data">
+    <div class="grid grid--4">
+      <div class="field"><label>Название *</label><input type="text" name="title" required></div>
+      <div class="field"><label>Ссылка</label><input type="url" name="url"></div>
+      <div class="field"><label>Место</label>
+        <select name="place">
+          <option value="partners">Лента баннеров на главной</option>
+          <option value="footer">Подвал</option>
+        </select></div>
+      <div class="field"><label>Картинка</label><input type="file" name="image" accept="image/*"></div>
+    </div>
+    <div class="checkline"><input id="bp" type="checkbox" name="is_published" checked><label for="bp">Показывать</label></div>
+    <button class="btn btn--primary" type="submit">Сохранить</button>
+  </form>
+</section>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>Картинка</th><th>Название</th><th>Ссылка</th><th>Место</th><th></th></tr>
+    {% for b in items %}
+      <tr>
+        <td>{% if b.image %}<img src="/static/uploads/{{ b.image }}" alt="" style="max-height:44px">{% endif %}</td>
+        <td>{{ b.title }}</td>
+        <td><a href="{{ b.url }}" target="_blank">{{ b.url | truncate(48) }}</a></td>
+        <td>{{ b.place }}</td>
+        <td><form method="post" action="{{ url_for('admin.banner_delete', item_id=b.id) }}" onsubmit="return confirm('Удалить баннер?')">
+          <button class="btn btn--danger btn--sm" type="submit">Удалить</button></form></td>
+      </tr>
+    {% else %}<tr><td colspan="5">Баннеров нет.</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

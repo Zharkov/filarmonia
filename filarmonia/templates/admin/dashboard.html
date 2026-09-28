@@ -1,0 +1,52 @@
+{% extends "admin/base.html" %}
+{% block title %}Сводка{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Сводка</h1><p class="subtitle">Что происходит на сайте прямо сейчас</p></div>
+  <a class="btn btn--primary" href="{{ url_for('admin.event_form') }}">Добавить событие</a>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="stat__num">{{ counts.upcoming }}</div><div class="stat__label">предстоящих событий</div></div>
+  <div class="stat"><div class="stat__num">{{ counts.news }}</div><div class="stat__label">новостей</div></div>
+  <div class="stat"><div class="stat__num">{{ counts.collectives }}</div><div class="stat__label">коллективов</div></div>
+  <div class="stat"><div class="stat__num">{{ counts.documents }}</div><div class="stat__label">документов</div></div>
+  <div class="stat"><div class="stat__num">{{ counts.events }}</div><div class="stat__label">событий всего</div></div>
+  <div class="stat"><div class="stat__num">{{ counts.appeals_new }}</div><div class="stat__label">новых обращений</div></div>
+</div>
+
+<h2>Ближайшие события</h2>
+<div class="table-wrap">
+  <table>
+    <tr><th>Дата</th><th>Название</th><th>Площадка</th><th>Статус</th><th></th></tr>
+    {% for ev in upcoming %}
+      <tr>
+        <td>{{ ev.starts_at | ru_datetime }}</td>
+        <td><a href="{{ url_for('admin.event_form', event_id=ev.id) }}">{{ ev.title }}</a></td>
+        <td>{{ ev.venue.name if ev.venue else '—' }}</td>
+        <td>{% if ev.is_published %}<span class="badge badge--on">опубликовано</span>{% else %}<span class="badge badge--off">черновик</span>{% endif %}</td>
+        <td><a href="{{ ev.url }}" target="_blank">на сайте</a></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5">Предстоящих событий нет. <a href="{{ url_for('admin.event_form') }}">Добавьте первое</a>.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+<h2>Последние обращения</h2>
+<div class="table-wrap">
+  <table>
+    <tr><th>Дата</th><th>Заявитель</th><th>Тема</th><th>Статус</th></tr>
+    {% for a in appeals %}
+      <tr>
+        <td>{{ a.created_at | ru_date }}</td>
+        <td><a href="{{ url_for('admin.appeal_view', item_id=a.id) }}">{{ a.name }}</a></td>
+        <td>{{ a.subject or '—' }}</td>
+        <td>{% if a.is_processed %}<span class="badge badge--on">обработано</span>{% else %}<span class="badge">новое</span>{% endif %}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="4">Обращений пока нет.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends "admin/base.html" %}
+{% block title %}Сотрудники{% endblock %}
+{% block content %}
+<h1>Сотрудники</h1>
+<p class="subtitle">Доступ к управлению сайтом.</p>
+
+<section class="panel" style="margin-top:20px">
+  <h2 style="margin-top:0">Добавить сотрудника</h2>
+  <form method="post">
+    <div class="grid grid--4">
+      <div class="field"><label>Логин *</label><input type="text" name="login" required></div>
+      <div class="field"><label>Имя</label><input type="text" name="name"></div>
+      <div class="field"><label>Пароль (от 8 символов)</label><input type="password" name="password"></div>
+      <div class="field"><label>Права</label>
+        <select name="role"><option value="editor">Редактор</option><option value="admin">Администратор</option></select></div>
+    </div>
+    <div class="checkline"><input id="ua" type="checkbox" name="is_active" checked><label for="ua">Доступ разрешён</label></div>
+    <button class="btn btn--primary" type="submit">Сохранить</button>
+  </form>
+</section>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>Логин</th><th>Имя</th><th>Права</th><th>Последний вход</th><th></th></tr>
+    {% for u in items %}
+      <tr>
+        <td>{{ u.login }}</td>
+        <td>{{ u.name }}</td>
+        <td>{{ 'Администратор' if u.is_admin else 'Редактор' }}{% if not u.is_active %} <span class="badge badge--off">отключён</span>{% endif %}</td>
+        <td>{{ u.last_login_at | ru_date if u.last_login_at else '—' }}</td>
+        <td><form method="post" action="{{ url_for('admin.user_delete', item_id=u.id) }}" onsubmit="return confirm('Удалить сотрудника?')">
+          <button class="btn btn--danger btn--sm" type="submit">Удалить</button></form></td>
+      </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

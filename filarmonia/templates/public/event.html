@@ -1,0 +1,163 @@
+{% extends "public/base.html" %}
+{% from "public/_macros.html" import event_card %}
+{% block title %}{{ ev.starts_at | ru_date }} — {{ ev.title }}{% endblock %}
+{% block description %}{{ ev.annotation or ev.description | strip_tags(180) }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="wrap breadcrumbs">
+  <a href="{{ url_for('public.index') }}">Главная</a> /
+  <a href="{{ url_for('public.afisha') }}">Афиша</a> / {{ ev.title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="wrap">
+  <h1>{{ ev.title }}</h1>
+
+  <div class="event">
+    <!-- ---------------- афиша с всплывающими баннерами ---------------- -->
+    <div>
+      <div class="event__posterwrap">
+        {% if ev.poster %}
+          <a href="#" data-photo="/static/uploads/{{ ev.poster }}" data-photo-alt="{{ ev.title }}">
+            <img class="event__poster" src="/static/uploads/{{ ev.poster }}" alt="Афиша: {{ ev.title }}">
+          </a>
+        {% endif %}
+
+        {% for b in ev.badges %}
+          {% if b.url %}
+            <a class="pin pin--{{ b.style }} pin--{{ b.position }}" href="{{ b.url }}" rel="noopener">
+              {{ b.text }}
+              {% if b.hint %}<span class="pin__hint">{{ b.hint }}</span>{% endif %}
+            </a>
+          {% else %}
+            <button class="pin pin--{{ b.style }} pin--{{ b.position }}" type="button">
+              {{ b.text }}
+              {% if b.hint %}<span class="pin__hint">{{ b.hint }}</span>{% endif %}
+            </button>
+          {% endif %}
+        {% endfor %}
+      </div>
+      {% if ev.poster %}<p class="event__gallerylink">Нажмите на афишу, чтобы увеличить</p>{% endif %}
+    </div>
+
+    <!-- ---------------- реквизиты и покупка ---------------- -->
+    <div>
+      <div class="event__facts">
+        <div class="fact">
+          <div class="fact__label">Дата и время</div>
+          <div class="fact__value">{{ ev.starts_at | ru_date }}, {{ ev.starts_at | ru_weekday }}, {{ ev.starts_at.strftime('%H:%M') }}</div>
+        </div>
+        {% if ev.venue %}
+        <div class="fact">
+          <div class="fact__label">Площадка</div>
+          <div class="fact__value">{{ ev.venue.name }}{% if ev.venue.address %}<br><span class="hint">{{ ev.venue.address }}</span>{% endif %}</div>
+        </div>
+        {% endif %}
+        {% if ev.category %}
+        <div class="fact">
+          <div class="fact__label">Жанр</div>
+          <div class="fact__value"><a href="{{ url_for('public.afisha', category=ev.category.slug) }}">{{ ev.category.name }}</a></div>
+        </div>
+        {% endif %}
+        {% if ev.duration_min %}
+        <div class="fact">
+          <div class="fact__label">Продолжительность</div>
+          <div class="fact__value">{{ ev.duration_min | ru_duration }}</div>
+        </div>
+        {% endif %}
+        <div class="fact">
+          <div class="fact__label">Возрастное ограничение</div>
+          <div class="fact__value">{{ ev.age_limit or 'не установлено' }}</div>
+        </div>
+        {% if ev.organizer %}
+        <div class="fact">
+          <div class="fact__label">Организатор</div>
+          <div class="fact__value">{{ ev.organizer }}</div>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="event__price">{{ ev.price_label }}</div>
+      <div class="event__buy">
+        {% if ev.ticket_url %}
+          <a class="btn btn--primary" href="{{ ev.ticket_url }}" rel="noopener" target="_blank">Купить билет</a>
+        {% endif %}
+        <a class="btn btn--ghost" href="tel:{{ settings.get('phone_raw', '+74812383181') }}">Заказать по телефону</a>
+      </div>
+      {% if ev.tickets_left %}<p class="event__note">{{ ev.tickets_left }}</p>{% endif %}
+
+      <!-- ---------- блоки, которые редактор включает и выключает ---------- -->
+      {% if ev.show_benefits and ev.benefits_text %}
+        <div class="block">
+          <h4>Льготы</h4>
+          {{ ev.benefits_text | safe }}
+        </div>
+      {% endif %}
+
+      {% if ev.show_pushkin %}
+        <div class="block block--pushkin">
+          <h4>Оплата Пушкинской картой</h4>
+          {{ (ev.pushkin_text or settings.get('pushkin_default', '<p>Билет можно оплатить Пушкинской картой через приложение «Госуслуги Культура» или на сайте билетного оператора.</p>')) | safe }}
+        </div>
+      {% endif %}
+
+      {% if ev.description %}
+        <div class="prose">{{ ev.description | safe }}</div>
+      {% endif %}
+
+      {% if ev.performers %}
+        <h2>В концерте принимают участие</h2>
+        <div class="prose">{{ ev.performers | safe }}</div>
+      {% endif %}
+
+      {% if ev.collectives %}
+        <p>
+          {% for c in ev.collectives %}
+            <a href="{{ c.url }}">{{ c.name }}</a>{{ ", " if not loop.last }}
+          {% endfor %}
+        </p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ---------------- галерея события ---------------- -->
+  {% set photos, videos = ev.photos, ev.videos %}
+  {% if photos or videos %}
+    <section class="section">
+      <h2>Фото и видео</h2>
+      {% if videos %}
+        <div class="video-grid" style="margin-bottom:26px">
+          {% for v in videos %}
+            <figure style="margin:0">
+              <div class="video-frame">
+                {% if v.embed %}{{ v.embed | safe }}
+                {% elif v.url %}{{ v.url | video_embed }}
+                {% elif v.file %}<video controls preload="metadata" src="/static/uploads/{{ v.file }}"
+                                        {% if v.preview %}poster="/static/uploads/{{ v.preview }}"{% endif %}></video>{% endif %}
+              </div>
+              {% if v.title %}<figcaption class="hint" style="margin-top:8px">{{ v.title }}</figcaption>{% endif %}
+            </figure>
+          {% endfor %}
+        </div>
+      {% endif %}
+      {% if photos %}
+        <div class="gallery-grid">
+          {% for p in photos %}
+            <a href="{{ p.src }}" data-photo="{{ p.src }}" data-photo-alt="{{ p.title }}">
+              <img src="{{ p.src }}" alt="{{ p.title or ev.title }}" loading="lazy">
+            </a>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </section>
+  {% endif %}
+
+  {% if similar %}
+    <section class="section">
+      <div class="section__head"><h2>Ближайшие концерты</h2></div>
+      <div class="cards">{% for e in similar %}{{ event_card(e) }}{% endfor %}</div>
+    </section>
+  {% endif %}
+</div>
+{% endblock %}

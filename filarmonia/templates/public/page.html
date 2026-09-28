@@ -1,0 +1,35 @@
+{% extends "public/base.html" %}
+{% block title %}{{ pg.title }}{% endblock %}
+{% block description %}{{ pg.seo_description or pg.content | strip_tags(180) }}{% endblock %}
+{% block breadcrumbs %}
+<div class="wrap breadcrumbs">
+  <a href="{{ url_for('public.index') }}">Главная</a> /
+  {% if pg.parent %}<a href="{{ pg.parent.url }}">{{ pg.parent.title }}</a> / {% endif %}{{ pg.title }}
+</div>
+{% endblock %}
+{% block content %}
+<div class="wrap">
+  <h1>{{ pg.title }}</h1>
+  <div class="prose">{{ pg.content | safe }}</div>
+
+  {% if documents %}
+    <h2>Документы</h2>
+    <ul>
+      {% for d in documents %}
+        <li><a href="{{ d.href }}">{{ d.title }}</a>
+          <span class="hint">{% if d.year %}{{ d.year }}{% endif %}{% if d.size_kb %} · {{ d.size_kb }} КБ{% endif %}</span></li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  {% if pg.children %}
+    <h2>Разделы</h2>
+    <ul>
+      {% for child in pg.children if child.is_published %}
+        <li><a href="{{ child.url }}">{{ child.title }}</a></li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+  <p class="hint">Обновлено: {{ pg.updated_at | ru_date }}</p>
+</div>
+{% endblock %}

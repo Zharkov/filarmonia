@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Управление сайтом{% endblock %} — филармония</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+</head>
+<body>
+<div class="layout">
+  <aside class="side">
+    <div class="side__brand">Управление сайтом<small>Смоленская областная филармония</small></div>
+
+    <div class="side__group">Содержание</div>
+    <a href="{{ url_for('admin.dashboard') }}" class="{{ 'is-active' if request.endpoint == 'admin.dashboard' }}">Сводка</a>
+    <a href="{{ url_for('admin.events') }}" class="{{ 'is-active' if 'event' in request.endpoint }}">Афиша</a>
+    <a href="{{ url_for('admin.news') }}" class="{{ 'is-active' if 'news' in request.endpoint }}">Новости</a>
+    <a href="{{ url_for('admin.collectives') }}" class="{{ 'is-active' if 'collective' in request.endpoint }}">Коллективы</a>
+    <a href="{{ url_for('admin.albums') }}" class="{{ 'is-active' if 'album' in request.endpoint }}">Галерея</a>
+
+    <div class="side__group">Учреждение</div>
+    <a href="{{ url_for('admin.pages') }}" class="{{ 'is-active' if 'page' in request.endpoint }}">Страницы</a>
+    <a href="{{ url_for('admin.documents') }}" class="{{ 'is-active' if 'document' in request.endpoint }}">Документы</a>
+    <a href="{{ url_for('admin.appeals') }}" class="{{ 'is-active' if 'appeal' in request.endpoint }}">Обращения граждан</a>
+
+    <div class="side__group">Оформление</div>
+    <a href="{{ url_for('admin.menu') }}" class="{{ 'is-active' if 'menu' in request.endpoint }}">Меню</a>
+    <a href="{{ url_for('admin.banners') }}" class="{{ 'is-active' if 'banner' in request.endpoint }}">Баннеры</a>
+    <a href="{{ url_for('admin.refs') }}" class="{{ 'is-active' if 'ref' in request.endpoint }}">Площадки и жанры</a>
+    <a href="{{ url_for('admin.settings_page') }}" class="{{ 'is-active' if 'settings' in request.endpoint }}">Настройки</a>
+    {% if current_user and current_user.is_admin %}
+      <a href="{{ url_for('admin.users') }}" class="{{ 'is-active' if 'user' in request.endpoint }}">Сотрудники</a>
+    {% endif %}
+
+    <div class="side__foot">
+      {{ current_user.name or current_user.login }}<br>
+      <a href="{{ url_for('public.index') }}" target="_blank" style="padding:0;color:#fff">Открыть сайт</a> ·
+      <a href="{{ url_for('admin.logout') }}" style="padding:0;color:#fff">Выйти</a>
+    </div>
+  </aside>
+
+  <main class="main">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, msg in messages %}
+        <div class="flash {{ 'flash--error' if category == 'error' }}">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+</body>
+</html>

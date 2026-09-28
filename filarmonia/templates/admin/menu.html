@@ -1,0 +1,45 @@
+{% extends "admin/base.html" %}
+{% block title %}Меню{% endblock %}
+{% block content %}
+<h1>Главное меню</h1>
+<p class="subtitle">Пункт может вести на страницу сайта или на любой адрес.</p>
+
+<div class="table-wrap" style="margin:20px 0">
+  <table>
+    <tr><th>Порядок</th><th>Название</th><th>Ведёт на</th><th>Уровень</th><th>Статус</th><th></th></tr>
+    {% for m in items %}
+      <tr>
+        <td>{{ m.sort }}</td>
+        <td>{{ '— ' if m.parent_id }}{{ m.title }}</td>
+        <td>{{ m.href }}</td>
+        <td>{{ m.parent.title if m.parent else 'верхний' }}</td>
+        <td>{% if m.is_published %}<span class="badge badge--on">видно</span>{% else %}<span class="badge badge--off">скрыто</span>{% endif %}</td>
+        <td><form method="post" action="{{ url_for('admin.menu_delete', item_id=m.id) }}" onsubmit="return confirm('Удалить пункт меню?')">
+          <button class="btn btn--danger btn--sm" type="submit">Удалить</button></form></td>
+      </tr>
+    {% else %}<tr><td colspan="6">Меню пусто.</td></tr>{% endfor %}
+  </table>
+</div>
+
+<section class="panel">
+  <h2 style="margin-top:0">Добавить пункт</h2>
+  <form method="post">
+    <div class="grid grid--3">
+      <div class="field"><label>Название *</label><input type="text" name="title" required></div>
+      <div class="field"><label>Страница сайта</label>
+        <select name="page_id"><option value="">— не выбрана —</option>
+          {% for p in pages %}<option value="{{ p.id }}">{{ p.title }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Или адрес</label><input type="text" name="url" placeholder="/afisha"></div>
+    </div>
+    <div class="grid grid--3">
+      <div class="field"><label>Родительский пункт</label>
+        <select name="parent_id"><option value="">— верхний уровень —</option>
+          {% for m in items if not m.parent_id %}<option value="{{ m.id }}">{{ m.title }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Порядок</label><input type="number" name="sort" value="100"></div>
+      <div class="field"><label>&nbsp;</label>
+        <div class="checkline"><input id="mp" type="checkbox" name="is_published" checked><label for="mp">Показывать</label></div></div>
+    </div>
+    <button class="btn btn--primary" type="submit">Добавить</button>
+  </form>
+</section>
+{% endblock %}

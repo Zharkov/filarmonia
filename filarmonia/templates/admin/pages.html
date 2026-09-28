@@ -1,0 +1,22 @@
+{% extends "admin/base.html" %}
+{% block title %}Страницы{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Страницы</h1><p class="subtitle">Обязательные разделы сайта учреждения культуры</p></div>
+  <a class="btn btn--primary" href="{{ url_for('admin.page_form') }}">Создать страницу</a>
+</div>
+<div class="table-wrap">
+  <table>
+    <tr><th>Порядок</th><th>Заголовок</th><th>Раздел</th><th>Адрес</th><th>Статус</th></tr>
+    {% for p in items %}
+      <tr>
+        <td>{{ p.sort }}</td>
+        <td><a href="{{ url_for('admin.page_form', item_id=p.id) }}">{{ p.title }}</a></td>
+        <td>{{ p.parent.title if p.parent else '—' }}</td>
+        <td><a href="{{ p.url }}" target="_blank">{{ p.url }}</a></td>
+        <td>{% if p.is_published %}<span class="badge badge--on">опубликована</span>{% else %}<span class="badge badge--off">скрыта</span>{% endif %}</td>
+      </tr>
+    {% else %}<tr><td colspan="5">Страниц нет.</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

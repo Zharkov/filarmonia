@@ -1,0 +1,9 @@
+{% extends "public/base.html" %}
+{% block title %}Страница не найдена{% endblock %}
+{% block content %}
+<div class="wrap" style="padding:80px 0">
+  <h1>Такой страницы нет</h1>
+  <p class="lead">Возможно, концерт уже прошёл или адрес изменился.</p>
+  <p><a class="btn btn--primary" href="{{ url_for('public.afisha') }}">Перейти к афише</a></p>
+</div>
+{% endblock %}

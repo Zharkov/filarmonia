@@ -1,0 +1,21 @@
+{% extends "admin/base.html" %}
+{% block title %}Галерея{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Галерея</h1><p class="subtitle">Альбомы фото и видео по годам и событиям</p></div>
+  <a class="btn btn--primary" href="{{ url_for('admin.album_form') }}">Создать альбом</a>
+</div>
+<div class="table-wrap">
+  <table>
+    <tr><th>Год</th><th>Название</th><th>Материалов</th><th>Статус</th></tr>
+    {% for a in items %}
+      <tr>
+        <td>{{ a.year }}</td>
+        <td><a href="{{ url_for('admin.album_form', item_id=a.id) }}">{{ a.title }}</a></td>
+        <td>{{ a.media | length }}</td>
+        <td>{% if a.is_published %}<span class="badge badge--on">опубликован</span>{% else %}<span class="badge badge--off">скрыт</span>{% endif %}</td>
+      </tr>
+    {% else %}<tr><td colspan="4">Альбомов нет.</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

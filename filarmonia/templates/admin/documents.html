@@ -1,0 +1,51 @@
+{% extends "admin/base.html" %}
+{% block title %}Документы{% endblock %}
+{% block content %}
+<h1>Документы</h1>
+<p class="subtitle">Устав, НПА, планы и отчёты. Категория определяет раздел, в котором документ показывается.</p>
+
+<section class="panel" style="margin-top:20px">
+  <h2 style="margin-top:0">Загрузить документ</h2>
+  <form method="post" enctype="multipart/form-data">
+    <div class="grid grid--3">
+      <div class="field"><label>Название *</label><input type="text" name="title" required></div>
+      <div class="field"><label>Категория</label><input type="text" name="category" list="cats" value="Учредительные документы">
+        <datalist id="cats">
+          {% for category in grouped.keys() %}<option value="{{ category }}">{% endfor %}
+          <option value="Учредительные документы"><option value="Приказы"><option value="План финансово-хозяйственной деятельности">
+          <option value="Годовые отчёты о деятельности"><option value="Независимая оценка качества"><option value="Материально-техническая база">
+          <option value="Противодействие коррупции"><option value="Политика конфиденциальности">
+        </datalist></div>
+      <div class="field"><label>Год</label><input type="number" name="year" value="{{ now.year }}"></div>
+    </div>
+    <div class="grid grid--3">
+      <div class="field"><label>Файл (pdf, doc, xls)</label><input type="file" name="file"></div>
+      <div class="field"><label>Или внешняя ссылка</label><input type="url" name="url"></div>
+      <div class="field"><label>Порядок</label><input type="number" name="sort" value="100"></div>
+    </div>
+    <div class="checkline"><input id="dp" type="checkbox" name="is_published" checked><label for="dp">Опубликован</label></div>
+    <button class="btn btn--primary" type="submit">Сохранить документ</button>
+  </form>
+</section>
+
+{% for category, items in grouped.items() %}
+  <h2>{{ category }}</h2>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Название</th><th>Год</th><th>Размер</th><th>Статус</th><th></th></tr>
+      {% for d in items %}
+        <tr>
+          <td><a href="{{ d.href }}" target="_blank">{{ d.title }}</a></td>
+          <td>{{ d.year or '—' }}</td>
+          <td>{{ d.size_kb ~ ' КБ' if d.size_kb else '—' }}</td>
+          <td>{% if d.is_published %}<span class="badge badge--on">опубликован</span>{% else %}<span class="badge badge--off">скрыт</span>{% endif %}</td>
+          <td><form method="post" action="{{ url_for('admin.document_delete', item_id=d.id) }}" onsubmit="return confirm('Удалить документ?')">
+            <button class="btn btn--danger btn--sm" type="submit">Удалить</button></form></td>
+        </tr>
+      {% endfor %}
+    </table>
+  </div>
+{% else %}
+  <p class="hint">Документы ещё не загружены.</p>
+{% endfor %}
+{% endblock %}

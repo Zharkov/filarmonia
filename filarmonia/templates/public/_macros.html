@@ -1,0 +1,77 @@
+{% macro event_card(ev) %}
+<article class="card">
+  <a class="card__poster" href="{{ ev.url }}">
+    {% if ev.poster %}<img src="/static/uploads/{{ ev.poster }}" alt="Афиша: {{ ev.title }}" loading="lazy">{% endif %}
+    <span class="card__date">{{ ev.starts_at | ru_date(false) }}, {{ ev.starts_at.strftime('%H:%M') }}</span>
+    {% if ev.age_limit %}<span class="card__age">{{ ev.age_limit }}</span>{% endif %}
+  </a>
+  <h3 class="card__title"><a href="{{ ev.url }}">{{ ev.title }}</a></h3>
+  <div class="card__meta">{{ ev.venue.name if ev.venue }}</div>
+  <div class="card__foot">
+    <div class="card__price">{{ ev.price_label }}</div>
+    {% if ev.show_pushkin %}<span class="card__pushkin">Пушкинская карта</span>{% endif %}
+  </div>
+</article>
+{% endmacro %}
+
+{% macro event_row(ev) %}
+<article class="eventrow">
+  <a class="eventrow__poster" href="{{ ev.url }}">
+    {% if ev.poster %}<img src="/static/uploads/{{ ev.poster }}" alt="Афиша: {{ ev.title }}" loading="lazy">{% endif %}
+    {% if ev.age_limit %}<span class="card__age">{{ ev.age_limit }}</span>{% endif %}
+  </a>
+  <div>
+    <h3><a href="{{ ev.url }}">{{ ev.title }}</a></h3>
+    <div class="eventrow__meta">{{ ev.venue.name if ev.venue }}</div>
+    <div class="eventrow__when">
+      {{ ev.starts_at | ru_date }} · {{ ev.starts_at | ru_weekday }} · {{ ev.starts_at.strftime('%H:%M') }}
+    </div>
+    <div class="eventrow__meta">
+      {{ ev.category.name if ev.category }}{% if ev.tickets_left %} · {{ ev.tickets_left }}{% endif %}
+    </div>
+    {% if ev.show_pushkin %}<span class="card__pushkin">Пушкинская карта</span>{% endif %}
+  </div>
+  <div class="eventrow__side">
+    <div class="eventrow__price">{{ ev.price_label }}</div>
+    <a class="btn btn--primary" href="{{ ev.url }}">{{ 'Билеты и описание' if ev.ticket_url else 'Подробнее' }}</a>
+  </div>
+</article>
+{% endmacro %}
+
+{% macro daystrip(days, active=None, base='/afisha') %}
+<div class="daystrip">
+  <div class="daystrip__scroll">
+    {% set ns = namespace(month=None) %}
+    {% for d in days %}
+      {% if ns.month != d.date.month %}
+        {% set ns.month = d.date.month %}
+        <div class="daystrip__month">{{ d.date | ru_month }}</div>
+      {% endif %}
+      <a class="daystrip__day {{ 'daystrip__day--weekend' if d.date.weekday() >= 5 }} {{ 'daystrip__day--active' if active and active == d.date }}"
+         href="{{ base }}?day={{ d.date.isoformat() }}">
+        <div class="daystrip__num">{{ '%02d' % d.date.day }}</div>
+        <div class="daystrip__wd">{{ d.date | ru_weekday(true) }}</div>
+        {% if d.has_events %}<div class="daystrip__dot"></div>{% endif %}
+      </a>
+    {% endfor %}
+  </div>
+</div>
+{% endmacro %}
+
+{% macro pagination(pager, endpoint, args={}) %}
+{% if pager.pages > 1 %}
+<nav class="pagination" aria-label="Страницы">
+  {% for p in pager.iter_pages(left_edge=1, left_current=2, right_current=2, right_edge=1) %}
+    {% if p %}
+      {% if p == pager.page %}
+        <span class="is-current">{{ p }}</span>
+      {% else %}
+        <a href="{{ url_for(endpoint, page=p, **args) }}">{{ p }}</a>
+      {% endif %}
+    {% else %}
+      <span>…</span>
+    {% endif %}
+  {% endfor %}
+</nav>
+{% endif %}
+{% endmacro %}

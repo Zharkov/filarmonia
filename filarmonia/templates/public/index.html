@@ -1,0 +1,117 @@
+{% extends "public/base.html" %}
+{% from "public/_macros.html" import event_card, daystrip %}
+
+{% block hero %}
+<section class="hero">
+  <div class="hero__media">
+    {% if settings.get('hero_video') %}
+      <video data-hero-video autoplay muted loop playsinline preload="metadata"
+             {% if settings.get('hero_poster') %}poster="/static/uploads/{{ settings.get('hero_poster') }}"{% endif %}>
+        <source src="/static/uploads/{{ settings.get('hero_video') }}" type="video/mp4">
+      </video>
+    {% elif settings.get('hero_video_url') %}
+      <video data-hero-video autoplay muted loop playsinline preload="metadata"
+             {% if settings.get('hero_poster') %}poster="/static/uploads/{{ settings.get('hero_poster') }}"{% endif %}>
+        <source src="{{ settings.get('hero_video_url') }}" type="video/mp4">
+      </video>
+    {% elif settings.get('hero_poster') %}
+      <img src="/static/uploads/{{ settings.get('hero_poster') }}" alt="">
+    {% endif %}
+  </div>
+
+  <div class="wrap hero__inner">
+    <div class="hero__kicker">{{ settings.get('hero_kicker', 'Сезон 2026 / 2027') }}</div>
+    <h1>{{ settings.get('hero_title', 'Музыка на все времена') }}</h1>
+    <p class="hero__lead">{{ settings.get('hero_lead', 'Симфонические программы, органные вечера, джаз и концерты для детей в зале на улице Глинки.') }}</p>
+    <div class="hero__actions">
+      <a class="btn btn--primary" href="{{ url_for('public.afisha') }}">Смотреть афишу</a>
+      <a class="btn btn--light" href="{{ url_for('public.collectives') }}">Наши коллективы</a>
+      {% if settings.get('hero_video') or settings.get('hero_video_url') %}
+        <button class="btn btn--ghost" data-hero-sound style="color:#fff;border-color:rgba(255,255,255,.5)">Включить звук</button>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="wrap">
+    {{ daystrip(day_strip) }}
+  </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<section class="section">
+  <div class="wrap">
+    <div class="section__head">
+      <h2>Ближайшие концерты</h2>
+      <a class="btn btn--ghost btn--sm" href="{{ url_for('public.afisha') }}">Вся афиша</a>
+    </div>
+    {% if upcoming %}
+      <div class="cards">
+        {% for ev in upcoming[:8] %}{{ event_card(ev) }}{% endfor %}
+      </div>
+    {% else %}
+      <p class="empty">Ближайшие концерты пока не опубликованы. Добавьте события в разделе «Афиша» админки.</p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="section section--tint">
+  <div class="wrap">
+    <div class="section__head">
+      <h2>Что у нас нового</h2>
+      <a class="btn btn--ghost btn--sm" href="{{ url_for('public.news_list') }}">Все новости</a>
+    </div>
+    <div class="newsgrid">
+      {% for item in news[:3] %}
+        <article class="newscard">
+          <a class="newscard__img" href="{{ item.url }}">
+            {% if item.image %}<img src="/static/uploads/{{ item.image }}" alt="" loading="lazy">{% endif %}
+          </a>
+          <div class="newscard__date">{{ item.published_at | ru_date }}</div>
+          <h3><a href="{{ item.url }}">{{ item.title }}</a></h3>
+          <p>{{ item.lead or item.content | strip_tags(160) }}</p>
+        </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{% if collectives %}
+<section class="section">
+  <div class="wrap">
+    <div class="section__head">
+      <h2>Коллективы филармонии</h2>
+      <a class="btn btn--ghost btn--sm" href="{{ url_for('public.collectives') }}">Все коллективы</a>
+    </div>
+    <div class="cards cards--{{ 3 if collectives|length == 3 else 4 }}">
+      {% for c in collectives %}
+        <article class="card">
+          <a class="card__poster" href="{{ c.url }}" style="aspect-ratio:4/3">
+            {% set first = c.photos | first %}
+            {% if first %}<img src="{{ first.src }}" alt="{{ c.name }}" loading="lazy">
+            {% elif c.logo %}<img src="/static/uploads/{{ c.logo }}" alt="{{ c.name }}" loading="lazy">{% endif %}
+          </a>
+          <h3 class="card__title"><a href="{{ c.url }}">{{ c.name }}</a></h3>
+          <div class="card__meta">{{ c.lead }}</div>
+        </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if banners %}
+<section class="section section--tint">
+  <div class="wrap">
+    <div class="partners">
+      {% for b in banners %}
+        <a href="{{ b.url }}" title="{{ b.title }}" rel="noopener" target="_blank">
+          {% if b.image %}<img src="/static/uploads/{{ b.image }}" alt="{{ b.title }}" loading="lazy">
+          {% else %}<span style="font-size:.86rem;text-align:center">{{ b.title }}</span>{% endif %}
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends "public/base.html" %}
+{% block title %}Поиск по сайту{% endblock %}
+{% block content %}
+<div class="wrap">
+  <h1>Поиск</h1>
+  <form method="get" class="filters">
+    <input type="text" name="q" value="{{ query }}" placeholder="Что вы ищете?" style="min-width:320px">
+    <button class="btn btn--primary btn--sm" type="submit">Найти</button>
+  </form>
+
+  {% if query %}
+    {% if events %}
+      <h2>События</h2>
+      <ul>{% for e in events %}<li><a href="{{ e.url }}">{{ e.title }}</a> <span class="hint">{{ e.starts_at | ru_date }}</span></li>{% endfor %}</ul>
+    {% endif %}
+    {% if news %}
+      <h2>Новости</h2>
+      <ul>{% for n in news %}<li><a href="{{ n.url }}">{{ n.title }}</a> <span class="hint">{{ n.published_at | ru_date }}</span></li>{% endfor %}</ul>
+    {% endif %}
+    {% if collectives %}
+      <h2>Коллективы</h2>
+      <ul>{% for c in collectives %}<li><a href="{{ c.url }}">{{ c.name }}</a></li>{% endfor %}</ul>
+    {% endif %}
+    {% if pages %}
+      <h2>Страницы</h2>
+      <ul>{% for p in pages %}<li><a href="{{ p.url }}">{{ p.title }}</a></li>{% endfor %}</ul>
+    {% endif %}
+    {% if not (events or news or pages or collectives) %}
+      <p class="empty">Ничего не нашлось. Попробуйте другой запрос.</p>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

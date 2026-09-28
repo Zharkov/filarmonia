@@ -1,0 +1,31 @@
+{% extends "admin/base.html" %}
+{% block title %}Настройки{% endblock %}
+{% block content %}
+<h1>Настройки сайта</h1>
+<p class="subtitle">Контакты, видео на главной, тексты по умолчанию.</p>
+<form method="post" enctype="multipart/form-data" style="margin-top:20px">
+  {% for group, rows in grouped.items() %}
+    <section class="panel">
+      <h2 style="margin-top:0">{{ group }}</h2>
+      {% for row in rows %}
+        <div class="field">
+          <label for="{{ row.key }}">{{ row.title or row.key }}</label>
+          {% if row.kind == 'textarea' or row.kind == 'html' %}
+            <textarea id="{{ row.key }}" name="{{ row.key }}" class="code">{{ row.value }}</textarea>
+          {% elif row.kind == 'file' %}
+            <input id="{{ row.key }}" type="file" name="f_{{ row.key }}"
+                   accept="{{ 'video/mp4,video/webm' if 'video' in row.key else 'image/*' }}">
+            {% if row.value %}<div class="hint">Загружено: {{ row.value }}</div>{% endif %}
+          {% elif row.kind == 'bool' %}
+            <div class="checkline"><input type="checkbox" id="{{ row.key }}" name="{{ row.key }}" {{ 'checked' if row.value }}>
+              <label for="{{ row.key }}">Включено</label></div>
+          {% else %}
+            <input id="{{ row.key }}" type="text" name="{{ row.key }}" value="{{ row.value }}">
+          {% endif %}
+        </div>
+      {% endfor %}
+    </section>
+  {% endfor %}
+  <button class="btn btn--primary" type="submit">Сохранить настройки</button>
+</form>
+{% endblock %}
