@@ -19,7 +19,23 @@ from filarmonia import create_app
 app = create_app()
 
 
+def tolerant_output() -> None:
+    """Не даёт команде оборваться из-за символа, которого нет в кодировке консоли.
+
+    Русская консоль Windows работает в cp866 или cp1251: длинное тире и кавычки
+    «ёлочки» из сообщений в них кодируются не всегда. Такой символ печатается
+    как «?», а команда доходит до конца.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(errors="replace")
+            except (OSError, ValueError):
+                pass
+
+
 def main(argv=None) -> int:
+    tolerant_output()
     parser = argparse.ArgumentParser(
         prog="app.py",
         description="Сайт Смоленской областной филармонии",

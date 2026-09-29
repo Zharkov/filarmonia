@@ -98,6 +98,7 @@ def run_ffmpeg(cmd):
         print(f"ffmpeg не собрал {cmd[-1]}: {error}. Демо-видео пропущено.")
         return False
 
+
 PALETTES = [
     ((26, 32, 48), (168, 51, 43), (222, 200, 160)),
     ((34, 26, 30), (185, 135, 63), (240, 235, 226)),
@@ -292,5 +293,3 @@ def clip(name="demo-clip.mp4", source="hero-hall.jpg"):
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-an", dst,
     ])
     return name if ok else None
-
-

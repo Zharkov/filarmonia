@@ -1,8 +1,6 @@
-/* ============================================================
-   Смоленская областная филармония — стили публичной части
+/* Смоленская областная филармония — стили публичной части.
    Палитра взята от смоленской крепостной стены (кирпич), зала
-   (глубокий индиго) и бумаги концертной программки.
-   ============================================================ */
+   (глубокий индиго) и бумаги концертной программки. */
 
 :root {
   --paper: #ffffff;
@@ -27,7 +25,7 @@
   --fs-base: 17px;
 }
 
-/* --- режим для слабовидящих (переключается в шапке) --- */
+/* Режим для слабовидящих (переключается в шапке) */
 html[data-size="l"] { --fs-base: 20px; }
 html[data-size="xl"] { --fs-base: 24px; }
 html[data-theme="bw"] {
@@ -76,7 +74,7 @@ p { margin: 0 0 1em; max-width: 72ch; }
 .section__head { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; margin-bottom: 28px; flex-wrap: wrap; }
 .section__head h2 { margin: 0; }
 
-/* -------------------------------------------------- кнопки */
+/* Кнопки */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   padding: 12px 22px; border-radius: var(--radius); border: 1px solid transparent;
@@ -92,7 +90,7 @@ p { margin: 0 0 1em; max-width: 72ch; }
 .btn--sm { padding: 8px 14px; font-size: .92rem; }
 .btn--wide { width: 100%; }
 
-/* -------------------------------------------------- шапка */
+/* Шапка */
 .topbar { background: var(--ink); color: #fff; font-size: .86rem; }
 .topbar a { color: #fff; opacity: .85; }
 .topbar__row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 0; flex-wrap: wrap; }
@@ -128,7 +126,7 @@ p { margin: 0 0 1em; max-width: 72ch; }
 .icon-btn:hover { border-color: var(--ink); }
 .burger { display: none; }
 
-/* -------------------------------------------------- герой с видео */
+/* Герой с видео */
 .hero { position: relative; background: var(--ink); color: #fff; overflow: hidden; }
 .hero__media { position: absolute; inset: 0; }
 .hero__media video, .hero__media img { width: 100%; height: 100%; object-fit: cover; }
@@ -164,7 +162,7 @@ p { margin: 0 0 1em; max-width: 72ch; }
   writing-mode: vertical-rl; transform: rotate(180deg);
 }
 
-/* -------------------------------------------------- карточки событий */
+/* Карточки событий */
 .cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 26px; }
 .cards--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .card { display: flex; flex-direction: column; min-width: 0; }
@@ -184,7 +182,7 @@ p { margin: 0 0 1em; max-width: 72ch; }
 .card__price { font-weight: 600; }
 .card__pushkin { display: inline-block; margin-top: 8px; font-size: .8rem; color: var(--brick); border: 1px solid var(--brick); padding: 2px 8px; border-radius: 20px; }
 
-/* -------------------------------------------------- афиша списком */
+/* Афиша списком */
 .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 24px 0; }
 .filters select, .filters input[type="text"], .filters input[type="date"] {
   font: inherit; padding: 9px 12px; border: 1px solid var(--line); border-radius: var(--radius);
@@ -212,7 +210,7 @@ p { margin: 0 0 1em; max-width: 72ch; }
 .eventrow__side { text-align: right; min-width: 190px; }
 .eventrow__price { font-family: var(--f-display); font-size: 1.5rem; margin-bottom: 10px; }
 
-/* -------------------------------------------------- страница события */
+/* Страница события */
 .event { display: grid; grid-template-columns: 420px 1fr; gap: 54px; align-items: start; }
 .event__posterwrap { position: relative; }
 .event__poster { width: 100%; background: var(--tint-deep); }
@@ -266,7 +264,7 @@ p { margin: 0 0 1em; max-width: 72ch; }
 .prose th, .prose td { border: 1px solid var(--line); padding: 10px 12px; text-align: left; vertical-align: top; }
 .prose th { background: var(--tint); }
 
-/* -------------------------------------------------- галерея */
+/* Галерея */
 .gallery-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
 .gallery-grid a { display: block; aspect-ratio: 4 / 3; overflow: hidden; background: var(--tint-deep); }
 .gallery-grid img { width: 100%; height: 100%; object-fit: cover; }
@@ -274,7 +272,7 @@ p { margin: 0 0 1em; max-width: 72ch; }
 .video-frame { position: relative; aspect-ratio: 16 / 9; background: #000; }
 .video-frame iframe, .video-frame video { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 
-/* -------------------------------------------------- коллективы */
+/* Коллективы */
 .collective {
   border: 1px solid var(--line); background: var(--paper); margin-bottom: 26px;
 }
@@ -288,7 +286,7 @@ p { margin: 0 0 1em; max-width: 72ch; }
 .collective__play { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; background: rgba(0,0,0,.28); }
 .collective__foot { display: flex; justify-content: flex-end; gap: 12px; padding: 16px 22px; border-top: 1px solid var(--line); }
 
-/* -------------------------------------------------- новости */
+/* Новости */
 .newsgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; }
 .newscard { min-width: 0; }
 /* display:block обязателен: у строчной ссылки не работают ни aspect-ratio,
@@ -300,12 +298,12 @@ p { margin: 0 0 1em; max-width: 72ch; }
 .newscard__date { color: var(--muted); font-size: .86rem; }
 .newscard p { color: var(--ink-soft); font-size: .95rem; }
 
-/* -------------------------------------------------- баннеры-партнёры */
+/* Баннеры-партнёры */
 .partners { display: grid; grid-template-columns: repeat(6, 1fr); gap: 18px; align-items: center; }
 .partners a { background: var(--paper); border: 1px solid var(--line); padding: 14px; display: grid; place-items: center; min-height: 92px; }
 .partners img { max-height: 64px; width: auto; object-fit: contain; }
 
-/* -------------------------------------------------- подвал */
+/* Подвал */
 .footer { background: var(--ink); color: rgba(255, 255, 255, .8); padding: 56px 0 30px; margin-top: 70px; }
 .footer a { color: #fff; }
 .footer__cols { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1.2fr; gap: 36px; }
@@ -314,7 +312,7 @@ p { margin: 0 0 1em; max-width: 72ch; }
 .footer li { margin-bottom: 8px; font-size: .94rem; }
 .footer__bottom { border-top: 1px solid rgba(255, 255, 255, .16); margin-top: 38px; padding-top: 20px; font-size: .85rem; display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
 
-/* -------------------------------------------------- вспомогательное */
+/* Вспомогательное */
 .breadcrumbs { font-size: .88rem; color: var(--muted); padding: 18px 0; }
 .breadcrumbs a { color: var(--muted); }
 .pagination { display: flex; gap: 8px; margin-top: 34px; flex-wrap: wrap; }
@@ -355,7 +353,7 @@ p { margin: 0 0 1em; max-width: 72ch; }
   * { animation: none !important; transition: none !important; }
 }
 
-/* -------------------------------------------------- адаптив */
+/* Адаптив */
 @media (max-width: 1080px) {
   .cards { grid-template-columns: repeat(3, 1fr); }
   .partners { grid-template-columns: repeat(4, 1fr); }

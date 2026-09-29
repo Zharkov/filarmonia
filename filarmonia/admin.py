@@ -18,7 +18,7 @@ bp = Blueprint("admin", __name__)
 PER_PAGE = 30
 
 
-# ------------------------------------------------------------------- доступ
+# Доступ
 def login_required(view):
     @wraps(view)
     def wrapper(*args, **kwargs):
@@ -39,7 +39,7 @@ def admin_required(view):
     return wrapper
 
 
-# ---------------------------------------------------------- общие помощники
+# Общие помощники
 def get_or_404(model, item_id):
     """Объект по идентификатору либо 404."""
     item = db.session.get(model, item_id)
@@ -105,7 +105,7 @@ def logout():
     return redirect(url_for("public.index"))
 
 
-# ----------------------------------------------------------------- сводка
+# Сводка
 @bp.route("/")
 @login_required
 def dashboard():
@@ -125,7 +125,7 @@ def dashboard():
     )
 
 
-# ------------------------------------------------------------------ афиша
+# Афиша
 @bp.route("/events")
 @login_required
 def events():
@@ -207,7 +207,7 @@ def _event_refs():
     }
 
 
-# ------------------------------------------- всплывающие баннеры на афише
+# Всплывающие баннеры на афише
 @bp.route("/events/<int:event_id>/badges", methods=["POST"])
 @login_required
 def badge_add(event_id):
@@ -242,7 +242,7 @@ def badge_delete(badge_id):
     return redirect(url_for("admin.event_form", event_id=event_id) + "#badges")
 
 
-# --------------------------------------------------------- медиа (общее)
+# Медиа (общее)
 OWNERS = {
     "event": ("event_id", "admin.event_form", "event_id"),
     "collective": ("collective_id", "admin.collective_form", "item_id"),
@@ -323,7 +323,7 @@ def media_delete(media_id):
     return redirect(url_for("admin.dashboard"))
 
 
-# ------------------------------------------------------------- коллективы
+# Коллективы
 @bp.route("/collectives")
 @login_required
 def collectives():
@@ -358,7 +358,7 @@ def collective_form(item_id=None):
     return render_template("admin/collective_form.html", item=item)
 
 
-# ----------------------------------------------------------------- новости
+# Новости
 @bp.route("/news")
 @login_required
 def news():
@@ -394,7 +394,7 @@ def news_form(item_id=None):
     return render_template("admin/news_form.html", item=item)
 
 
-# ----------------------------------------------------------------- галерея
+# Галерея
 @bp.route("/albums")
 @login_required
 def albums():
@@ -426,7 +426,7 @@ def album_form(item_id=None):
     return render_template("admin/album_form.html", item=item)
 
 
-# ---------------------------------------------------------------- страницы
+# Страницы
 @bp.route("/pages")
 @login_required
 def pages():
@@ -459,7 +459,7 @@ def page_form(item_id=None):
     return render_template("admin/page_form.html", item=item, parents=parents)
 
 
-# -------------------------------------------------------------------- меню
+# Меню
 @bp.route("/menu", methods=["GET", "POST"])
 @login_required
 def menu():
@@ -485,7 +485,7 @@ def menu():
     )
 
 
-# --------------------------------------------------------------- документы
+# Документы
 @bp.route("/documents", methods=["GET", "POST"])
 @login_required
 def documents():
@@ -518,7 +518,7 @@ def documents():
     return render_template("admin/documents.html", grouped=utils.group_by_category(rows))
 
 
-# ----------------------------------------------------------------- баннеры
+# Баннеры
 @bp.route("/banners", methods=["GET", "POST"])
 @login_required
 def banners():
@@ -546,7 +546,7 @@ def banners():
     )
 
 
-# ------------------------------------------------------ площадки и жанры
+# Площадки и жанры
 @bp.route("/refs", methods=["GET", "POST"])
 @login_required
 def refs():
@@ -585,7 +585,7 @@ def ref_delete(kind, item_id):
     return redirect(url_for("admin.refs"))
 
 
-# -------------------------------------------------------------- обращения
+# Обращения
 @bp.route("/appeals")
 @login_required
 def appeals():
@@ -607,7 +607,7 @@ def appeal_view(item_id):
     return render_template("admin/appeal_view.html", item=item)
 
 
-# --------------------------------------------------------------- настройки
+# Настройки
 @bp.route("/settings", methods=["GET", "POST"])
 @login_required
 def settings_page():
@@ -634,7 +634,7 @@ def settings_page():
     return render_template("admin/settings.html", grouped=grouped)
 
 
-# ------------------------------------------------------------ пользователи
+# Пользователи
 @bp.route("/users", methods=["GET", "POST"])
 @admin_required
 def users():
@@ -671,7 +671,7 @@ def user_delete(item_id):
     return redirect(url_for("admin.users"))
 
 
-# ------------------------------------------------------------- удаление
+# Удаление
 # Восемь разделов удаляются одинаково, поэтому маршруты описаны таблицей.
 # Адреса и имена (admin.event_delete и прочие) прежние — шаблоны не меняются.
 DELETE_ROUTES = [

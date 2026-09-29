@@ -285,7 +285,7 @@ def run(app, reset=False):
                 db.session.add(Setting(key=key, value=value, title=title, group=group, kind=kind))
         db.session.commit()
 
-        # ---------------------------------------------------------- страницы
+        # Страницы
         by_title = {}
         for title, parent, template, sort, content in PAGES:
             pg = Page.query.filter_by(title=title).first()
@@ -299,7 +299,7 @@ def run(app, reset=False):
                 by_title[title].parent_id = by_title[parent].id
         db.session.commit()
 
-        # -------------------------------------------------------------- меню
+        # Меню
         if MenuItem.query.count() == 0:
             for title, url, page_title, sort, children in MENU:
                 parent = MenuItem(
@@ -315,7 +315,7 @@ def run(app, reset=False):
                     ))
             db.session.commit()
 
-        # ------------------------------------------------ площадки и жанры
+        # Площадки и жанры
         if Venue.query.count() == 0:
             for name, address in VENUES:
                 db.session.add(Venue(name=name, slug=slugify(name), address=address))
@@ -324,13 +324,13 @@ def run(app, reset=False):
                 db.session.add(Category(name=name, slug=slugify(name), sort=(i + 1) * 10))
         db.session.commit()
 
-        # -------------------------------------------------------- настройки
+        # Настройки
         demo.photo("hero-hall.jpg", "Концертный зал филармонии", 3, (1920, 1080))
         Setting.set("hero_video", demo.hero_video("hero-hall.jpg", "hero.mp4") or "")
         Setting.set("hero_poster", "hero-hall.jpg")
         db.session.commit()
 
-        # ------------------------------------------------------- коллективы
+        # Коллективы
         if Collective.query.count() == 0:
             for i, (name, lead, ann, desc, contacts) in enumerate(COLLECTIVES):
                 c = Collective(
@@ -351,7 +351,7 @@ def run(app, reset=False):
                     ))
             db.session.commit()
 
-        # ------------------------------------------------------------ афиша
+        # Афиша
         collectives = Collective.query.all()
         venues = Venue.query.all()
         if Event.query.count() == 0:
@@ -417,7 +417,7 @@ def run(app, reset=False):
                         ))
                 db.session.commit()
 
-        # ---------------------------------------------------------- новости
+        # Новости
         if News.query.count() == 0:
             for i, (title, lead, content) in enumerate(NEWS):
                 db.session.add(News(
@@ -427,7 +427,7 @@ def run(app, reset=False):
                 ))
             db.session.commit()
 
-        # ---------------------------------------------------------- галерея
+        # Галерея
         if Album.query.count() == 0:
             for i, title in enumerate(["Концерты сезона 2026", "Фестиваль имени М. И. Глинки",
                                        "Гастроли по области"]):
@@ -442,20 +442,20 @@ def run(app, reset=False):
                     ))
             db.session.commit()
 
-        # -------------------------------------------------------- документы
+        # Документы
         if Document.query.count() == 0:
             for i, (title, category, year) in enumerate(DOCUMENTS):
                 db.session.add(Document(title=title, category=category, year=year,
                                         url="#", sort=(i + 1) * 10))
             db.session.commit()
 
-        # ---------------------------------------------------------- баннеры
+        # Баннеры
         if Banner.query.count() == 0:
             for i, (title, url) in enumerate(BANNERS):
                 db.session.add(Banner(title=title, url=url, place="partners", sort=(i + 1) * 10))
             db.session.commit()
 
-        # ------------------------------------------- обращения граждан (демо)
+        # Обращения граждан (демо)
         if Appeal.query.count() == 0:
             for name, email, phone, subject, message, days, processed, note in APPEALS:
                 db.session.add(Appeal(

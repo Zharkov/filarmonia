@@ -10,7 +10,6 @@ from config import build_config
 from .models import db, Setting, MenuItem, User
 from . import utils
 
-# Фильтры шаблонов: имя в Jinja -> функция из utils
 JINJA_FILTERS = {
     "ru_date": utils.ru_date,
     "ru_datetime": utils.ru_datetime,

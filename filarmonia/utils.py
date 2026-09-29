@@ -41,7 +41,7 @@ def slugify(text: str, existing_check=None) -> str:
     return candidate
 
 
-# --------------------------------------------------------------------- даты
+# Даты
 def ru_date(value, with_year: bool = True) -> str:
     """«28 августа 2026»."""
     if not value:
@@ -81,7 +81,7 @@ def ru_duration(minutes) -> str:
     return " ".join(parts)
 
 
-# ------------------------------------------------------------------- файлы
+# Файлы
 def _ext(filename: str) -> str:
     return filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
 
@@ -121,7 +121,7 @@ def file_size_kb(filename: str) -> int:
         return 0
 
 
-# -------------------------------------------------------------------- видео
+# Видео
 def video_embed(url: str) -> str:
     """Превращает ссылку на видео в код проигрывателя.
 

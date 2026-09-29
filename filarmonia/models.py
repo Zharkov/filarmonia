@@ -24,7 +24,7 @@ class HasMedia:
         return [m for m in self.media if m.kind == "video"]
 
 
-# ---------------------------------------------------------------- пользователи
+# Пользователи
 class User(db.Model):
     """Сотрудник, работающий с админкой."""
 
@@ -50,7 +50,7 @@ class User(db.Model):
         return self.role == "admin"
 
 
-# ------------------------------------------------------------------ настройки
+# Настройки
 class Setting(db.Model):
     """Пары ключ-значение: телефоны, адрес, видео на главной, тексты по умолчанию."""
 
@@ -76,7 +76,7 @@ class Setting(db.Model):
         row.value = value
 
 
-# --------------------------------------------------------------- меню/страницы
+# Меню/страницы
 class Page(db.Model):
     """Статическая страница (Об учреждении, Услуги, Отчёты, НПА и т.д.)."""
 
@@ -134,7 +134,7 @@ class MenuItem(db.Model):
         return self.url or "#"
 
 
-# ------------------------------------------------------------------- афиша
+# Афиша
 event_collectives = db.Table(
     "event_collectives",
     db.Column("event_id", db.Integer, db.ForeignKey("events.id"), primary_key=True),
@@ -191,7 +191,7 @@ class Event(db.Model, HasMedia):
     ticket_url = db.Column(db.String(500), default="")  # ссылка билетной системы
     tickets_left = db.Column(db.String(80), default="")  # «осталось более 100 билетов»
 
-    # --- блоки, которые редактор включает и выключает на своё усмотрение
+    # Блоки, которые редактор включает и выключает на своё усмотрение
     show_pushkin = db.Column(db.Boolean, default=False, nullable=False)
     pushkin_text = db.Column(db.Text, default="")
     show_benefits = db.Column(db.Boolean, default=False, nullable=False)
@@ -257,7 +257,7 @@ class EventBadge(db.Model):
     sort = db.Column(db.Integer, default=100)
 
 
-# --------------------------------------------------------------- медиагалерея
+# Медиагалерея
 class MediaItem(db.Model):
     """Фото или видео. Прикрепляется к событию, коллективу или новости.
 
@@ -307,7 +307,7 @@ class Album(db.Model, HasMedia):
     )
 
 
-# --------------------------------------------------------------- коллективы
+# Коллективы
 class Collective(db.Model, HasMedia):
     """Творческий коллектив филармонии."""
 
@@ -334,7 +334,7 @@ class Collective(db.Model, HasMedia):
         return f"/kollektivy/{self.slug}"
 
 
-# ------------------------------------------------------------------- новости
+# Новости
 class News(db.Model, HasMedia):
     __tablename__ = "news"
 
@@ -357,7 +357,7 @@ class News(db.Model, HasMedia):
         return f"/novosti/{self.slug}"
 
 
-# ----------------------------------------------------------------- документы
+# Документы
 class Document(db.Model):
     """Документ для скачивания: устав, НПА, отчёт, план ФХД."""
 

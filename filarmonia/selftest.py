@@ -7,6 +7,7 @@
 import io
 import os
 import shutil
+import sys
 import tempfile
 
 from . import create_app
@@ -14,6 +15,23 @@ from .models import db, User, Event, MediaItem, Setting
 
 PASSWORD = "secret123"
 RUTUBE_URL = "https://rutube.ru/video/" + "a1b2c3d4" * 4 + "/"
+
+
+def marks() -> tuple:
+    """Значки «прошло» и «не прошло», которые умеет показать эта консоль.
+
+    Русская консоль Windows работает в cp866 или cp1251, галочек в них нет,
+    поэтому там переходим на латиницу — ширина та же, столбец не разъезжается.
+    """
+    encoding = getattr(sys.stdout, "encoding", None) or "ascii"
+    try:
+        "✓✗".encode(encoding)
+    except (UnicodeEncodeError, LookupError):
+        return "+", "X"
+    return "✓", "✗"
+
+
+PASS_MARK, FAIL_MARK = marks()
 
 
 def png() -> io.BytesIO:
@@ -35,7 +53,7 @@ class Checks:
     def __call__(self, name: str, passed: bool) -> None:
         if not passed:
             self.failed += 1
-        print(("  ✓ " if passed else "  ✗ ") + name)
+        print(f"  {PASS_MARK if passed else FAIL_MARK} {name}")
 
 
 def run() -> int:

@@ -20,7 +20,7 @@ PER_PAGE_NEWS = 12
 SEARCH_LIMIT = 20
 
 
-# --------------------------------------------------------------------- главная
+# Главная
 @bp.route("/")
 def index():
     now = datetime.now()
@@ -82,7 +82,7 @@ def _day_end(day: date) -> datetime:
     return datetime.combine(day, datetime.max.time())
 
 
-# ----------------------------------------------------------------------- афиша
+# Афиша
 @bp.route("/afisha")
 def afisha():
     q = Event.query.filter(Event.is_published.is_(True))
@@ -165,7 +165,7 @@ def event(slug):
     return render_template("public/event.html", ev=ev, similar=similar)
 
 
-# ------------------------------------------------------------------ коллективы
+# Коллективы
 @bp.route("/kollektivy")
 def collectives():
     items = Collective.query.filter_by(is_published=True).order_by(Collective.sort).all()
@@ -188,7 +188,7 @@ def collective(slug):
     return render_template("public/collective.html", item=item, events=events)
 
 
-# --------------------------------------------------------------------- новости
+# Новости
 @bp.route("/novosti")
 def news_list():
     page = utils.parse_int(request.args.get("page"), 1)
@@ -212,7 +212,7 @@ def news_item(slug):
     return render_template("public/news_item.html", item=item, other=other)
 
 
-# -------------------------------------------------------------------- галерея
+# Галерея
 @bp.route("/galereya")
 def gallery():
     year = utils.parse_int(request.args.get("year"))
@@ -236,7 +236,7 @@ def album(slug):
     return render_template("public/album.html", item=item)
 
 
-# ------------------------------------------------------- страницы и документы
+# Страницы и документы
 @bp.route("/info/<slug>")
 def page(slug):
     pg = Page.query.filter_by(slug=slug, is_published=True).first_or_404()
@@ -260,7 +260,7 @@ def documents():
     return render_template("public/documents.html", grouped=utils.group_by_category(rows))
 
 
-# ---------------------------------------------------------- интернет-приёмная
+# Интернет-приёмная
 @bp.route("/obrashcheniya", methods=["GET", "POST"])
 def appeals():
     if request.method == "POST":
@@ -286,7 +286,7 @@ def appeals():
     return render_template("public/appeals.html", pg=pg)
 
 
-# ----------------------------------------------------------------------- поиск
+# Поиск
 @bp.route("/poisk")
 def search():
     query = (request.args.get("q") or "").strip()
@@ -331,7 +331,7 @@ def search():
     return render_template("public/search.html", query=query, **found)
 
 
-# ------------------------------------------------------------------ служебное
+# Служебное
 @bp.route("/sitemap.xml")
 def sitemap():
     urls = ["/", "/afisha", "/kollektivy", "/novosti", "/galereya", "/dokumenty", "/obrashcheniya"]

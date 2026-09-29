@@ -2,7 +2,7 @@
 (function () {
   "use strict";
 
-  /* ---------- мобильное меню ---------- */
+  /* Мобильное меню */
   var burger = document.querySelector("[data-burger]");
   var nav = document.querySelector("[data-nav]");
   if (burger && nav) {
@@ -12,7 +12,7 @@
     });
   }
 
-  /* ---------- настройки для слабовидящих ---------- */
+  /* Настройки для слабовидящих */
   var root = document.documentElement;
   var panel = document.querySelector("[data-a11y]");
   var toggle = document.querySelector("[data-a11y-toggle]");
@@ -63,7 +63,7 @@
   }
   applyStored();
 
-  /* ---------- всплывающие баннеры на афише (тач-устройства) ---------- */
+  /* Всплывающие баннеры на афише (тач-устройства) */
   document.querySelectorAll(".pin").forEach(function (pin) {
     pin.addEventListener("click", function (e) {
       if (pin.tagName === "A") return;          // ссылка работает как ссылка
@@ -77,7 +77,7 @@
     document.querySelectorAll(".pin.is-open").forEach(function (p) { p.classList.remove("is-open"); });
   });
 
-  /* ---------- модальные окна ---------- */
+  /* Модальные окна */
   function openModal(id) {
     var m = document.getElementById(id);
     if (m) { m.classList.add("is-open"); document.body.style.overflow = "hidden"; }
@@ -99,7 +99,7 @@
   });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeModals(); });
 
-  /* ---------- просмотр фотографий ---------- */
+  /* Просмотр фотографий */
   var viewer = document.getElementById("photo-viewer");
   if (viewer) {
     var img = viewer.querySelector("img");
@@ -113,7 +113,7 @@
     });
   }
 
-  /* ---------- видео в шапке: звук и пауза ---------- */
+  /* Видео в шапке: звук и пауза */
   var heroVideo = document.querySelector("[data-hero-video]");
   var soundBtn = document.querySelector("[data-hero-sound]");
   if (heroVideo && soundBtn) {
@@ -126,7 +126,7 @@
     heroVideo.pause();
   }
 
-  /* ---------- автоотправка фильтров афиши ---------- */
+  /* Автоотправка фильтров афиши */
   document.querySelectorAll("[data-autosubmit]").forEach(function (el) {
     el.addEventListener("change", function () { el.form.submit(); });
   });
