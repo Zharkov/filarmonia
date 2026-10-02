@@ -1,0 +1,19 @@
+{#- Результат «Музыкального маршрута». Выводится на главной и отдаётся
+    кусочком по адресу /marshrut, когда форму отправляет скрипт. -#}
+{% from "public/_macros.html" import event_card %}
+<div class="route__done">
+  <h3 class="route__title">Ваш маршрут готов</h3>
+  <p class="route__chosen">Вы выбрали: {{ route.labels | join(' · ') | lower }}</p>
+  {% if route.events %}
+    {% if not route.exact %}
+      <p class="route__note">Точного совпадения не нашлось — вот что идёт в эти дни.</p>
+    {% endif %}
+    <div class="cards">
+      {% for ev in route.events %}{{ event_card(ev) }}{% endfor %}
+    </div>
+  {% else %}
+    <p class="route__note">На выбранные даты концертов нет. Попробуйте другой срок или
+      <a href="{{ url_for('public.afisha') }}">посмотрите всю афишу</a>.</p>
+  {% endif %}
+  <a class="btn btn--ghost btn--onDark" href="{{ url_for('public.index') }}#marshrut" data-route-reset>Пройти заново</a>
+</div>

@@ -12,6 +12,10 @@ import os
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
+# Значение-заглушка. Приложение отказывается работать с ним на боевом сервере,
+# см. filarmonia.check_secret_key.
+INSECURE_SECRET_KEY = "change-me-in-production"
+
 # Расширения, разрешённые к загрузке через админку
 ALLOWED_IMAGE_EXT = {"jpg", "jpeg", "png", "webp", "gif"}
 ALLOWED_VIDEO_EXT = {"mp4", "webm"}
@@ -21,7 +25,7 @@ ALLOWED_DOC_EXT = {"pdf", "doc", "docx", "xls", "xlsx", "odt", "rtf", "zip"}
 def build_config(**overrides) -> dict:
     """Настройки приложения. Именованные аргументы перекрывают окружение."""
     config = {
-        "SECRET_KEY": os.environ.get("SECRET_KEY", "change-me-in-production"),
+        "SECRET_KEY": os.environ.get("SECRET_KEY", INSECURE_SECRET_KEY),
 
         # SQLite по умолчанию; для боевого сервера задать DATABASE_URL вида
         # postgresql+psycopg://user:pass@localhost/filarmonia
@@ -38,6 +42,19 @@ def build_config(**overrides) -> dict:
         "ALLOWED_IMAGE_EXT": ALLOWED_IMAGE_EXT,
         "ALLOWED_VIDEO_EXT": ALLOWED_VIDEO_EXT,
         "ALLOWED_DOC_EXT": ALLOWED_DOC_EXT,
+
+        # Загруженные фотографии ужимаются до этой стороны и пересохраняются:
+        # снимок с телефона весит 8-12 МБ, а в вёрстке нигде не крупнее 2000 px.
+        "IMAGE_MAX_SIDE": int(os.environ.get("IMAGE_MAX_SIDE", "2000")),
+        "IMAGE_QUALITY": int(os.environ.get("IMAGE_QUALITY", "85")),
+
+        # Защита входа в админку от подбора пароля: сколько неудач подряд
+        # с одной пары «логин + адрес» и на сколько секунд после этого запирать.
+        "LOGIN_MAX_ATTEMPTS": int(os.environ.get("LOGIN_MAX_ATTEMPTS", "5")),
+        "LOGIN_LOCKOUT_SECONDS": int(os.environ.get("LOGIN_LOCKOUT_SECONDS", "900")),
+
+        # Пауза между обращениями граждан с одного адреса — от спама.
+        "APPEAL_INTERVAL_SECONDS": int(os.environ.get("APPEAL_INTERVAL_SECONDS", "60")),
 
         "SESSION_COOKIE_HTTPONLY": True,
         "SESSION_COOKIE_SAMESITE": "Lax",

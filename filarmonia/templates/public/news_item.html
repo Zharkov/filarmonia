@@ -1,6 +1,11 @@
 {% extends "public/base.html" %}
+{% from "public/_macros.html" import news_card, img_src %}
 {% block title %}{{ item.title }}{% endblock %}
 {% block description %}{{ item.lead or item.content | strip_tags(180) }}{% endblock %}
+{% block og_type %}article{% endblock %}
+{% block og_image %}
+  {%- if item.image and item.show_media %}<meta property="og:image" content="{{ request.host_url }}static/uploads/{{ item.image }}">{% endif %}
+{% endblock %}
 {% block breadcrumbs %}
 <div class="wrap breadcrumbs">
   <a href="{{ url_for('public.index') }}">Главная</a> /
@@ -12,13 +17,13 @@
   <article>
     <div class="newscard__date">{{ item.published_at | ru_date }}</div>
     <h1>{{ item.title }}</h1>
-    {% if item.image %}<img src="/static/uploads/{{ item.image }}" alt="" style="margin:20px 0;max-height:520px;width:100%;object-fit:cover">{% endif %}
+    {% if item.image and item.show_media %}<img class="article__hero" {{ img_src('/static/uploads/' ~ item.image) }} alt="{{ item.title }}">{% endif %}
     {% if item.lead %}<p class="lead">{{ item.lead }}</p>{% endif %}
     <div class="prose">{{ item.content | safe }}</div>
 
-    {% set photos, videos = item.photos, item.videos %}
+    {% set photos, videos = (item.photos, item.videos) if item.show_media else ([], []) %}
     {% if videos %}
-      <div class="video-grid" style="margin:26px 0">
+      <div class="video-grid video-grid--spaced">
         {% for v in videos %}
           <div class="video-frame">
             {% if v.embed %}{{ v.embed | safe }}{% elif v.url %}{{ v.url | video_embed }}
@@ -30,7 +35,9 @@
     {% if photos %}
       <div class="gallery-grid">
         {% for p in photos %}
-          <a href="{{ p.src }}" data-photo="{{ p.src }}"><img src="{{ p.src }}" alt="" loading="lazy"></a>
+          <a href="{{ p.src }}" data-photo="{{ p.src }}" data-photo-alt="{{ p.title or item.title }}">
+            <img {{ img_src(p.src, '(max-width: 620px) 50vw, 25vw') }} alt="{{ p.title or item.title }}" loading="lazy">
+          </a>
         {% endfor %}
       </div>
     {% endif %}
@@ -40,15 +47,7 @@
     <section class="section">
       <div class="section__head"><h2>Другие новости</h2></div>
       <div class="newsgrid">
-        {% for item in other %}
-          <article class="newscard">
-            <a class="newscard__img" href="{{ item.url }}">
-              {% if item.image %}<img src="/static/uploads/{{ item.image }}" alt="" loading="lazy">{% endif %}
-            </a>
-            <div class="newscard__date">{{ item.published_at | ru_date }}</div>
-            <h3><a href="{{ item.url }}">{{ item.title }}</a></h3>
-          </article>
-        {% endfor %}
+        {% for item in other %}{{ news_card(item, lead=false) }}{% endfor %}
       </div>
     </section>
   {% endif %}

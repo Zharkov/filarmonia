@@ -5,21 +5,38 @@
 <p class="subtitle">Используются в фильтрах афиши и на странице события.</p>
 
 <div class="grid grid--2" style="margin-top:20px">
-  <section class="panel">
+  {% set e = edit %}
+  <section class="panel {{ 'panel--editing' if e }}" id="form">
     <h2 style="margin-top:0">Площадки</h2>
+    <h3>{{ 'Изменить «' ~ e.name ~ '»' if e else 'Добавить площадку' }}</h3>
     <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="kind" value="venue">
-      <div class="field"><label>Название *</label><input type="text" name="name" required></div>
-      <div class="field"><label>Адрес</label><input type="text" name="address"></div>
-      <div class="field"><label>Код интерактивной карты</label><textarea name="map_embed" class="code" style="min-height:70px"></textarea></div>
-      <button class="btn btn--primary" type="submit">Добавить площадку</button>
+      {% if e %}<input type="hidden" name="id" value="{{ e.id }}">{% endif %}
+      <div class="field"><label for="v-name">Название *</label>
+        <input id="v-name" type="text" name="name" value="{{ e.name if e }}" required></div>
+      <div class="field"><label for="v-address">Адрес</label>
+        <input id="v-address" type="text" name="address" value="{{ e.address if e }}"></div>
+      <div class="field"><label for="v-desc">Описание (выводится на странице «Контакты»)</label>
+        <textarea id="v-desc" name="description" data-rich="small">{{ e.description if e }}</textarea></div>
+      <div class="field"><label for="v-map">Код интерактивной карты</label>
+        <textarea id="v-map" name="map_embed" class="code" style="min-height:70px"
+                  {{ 'readonly' if not current_user.is_admin }}>{{ e.map_embed if e }}</textarea>
+        {% if not current_user.is_admin %}<div class="hint">Код вставляется на страницу как есть, поэтому менять его может только администратор.</div>{% endif %}</div>
+      <button class="btn btn--primary" type="submit">{{ 'Сохранить изменения' if e else 'Добавить площадку' }}</button>
+      {% if e %}<a class="btn btn--ghost" href="{{ url_for('admin.refs') }}">Отмена</a>{% endif %}
     </form>
     <div class="table-wrap" style="margin-top:18px">
       <table>
         {% for v in venues %}
-          <tr><td>{{ v.name }}<div class="hint">{{ v.address }}</div></td>
-            <td style="width:1%"><form method="post" action="{{ url_for('admin.ref_delete', kind='venue', item_id=v.id) }}">
-              <button class="btn btn--danger btn--sm" type="submit">Удалить</button></form></td></tr>
+          <tr class="{{ 'is-editing' if e and e.id == v.id }}"><td>{{ v.name }}<div class="hint">{{ v.address }}</div></td>
+            <td style="width:1%"><div class="row-actions">
+              <a class="btn btn--ghost btn--sm" href="{{ url_for('admin.refs', edit=v.id) }}#form">Изменить</a>
+              <form method="post" action="{{ url_for('admin.ref_delete', kind='venue', item_id=v.id) }}"
+                    onsubmit="return confirm('Удалить площадку?')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn--danger btn--sm" type="submit">Удалить</button></form>
+            </div></td></tr>
         {% else %}<tr><td>Площадок нет.</td></tr>{% endfor %}
       </table>
     </div>
@@ -28,17 +45,44 @@
   <section class="panel">
     <h2 style="margin-top:0">Жанры и категории</h2>
     <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="kind" value="category">
       <div class="field"><label>Название *</label><input type="text" name="name" required></div>
       <div class="field"><label>Порядок</label><input type="number" name="sort" value="100"></div>
+      <div class="field"><label>Подходит для «Музыкального маршрута»</label>
+        {% for value, label in route_tags %}
+          <div class="checkline"><input id="new-tag-{{ value }}" type="checkbox" name="route_tags" value="{{ value }}">
+            <label for="new-tag-{{ value }}">{{ label }}</label></div>
+        {% endfor %}</div>
       <button class="btn btn--primary" type="submit">Добавить категорию</button>
     </form>
-    <div class="table-wrap" style="margin-top:18px">
+    <p class="hint" style="margin-top:18px">
+      Метки решают, какие концерты «Музыкальный маршрут» на главной предложит посетителю
+      по его ответам. Концерты с отметкой «Новинка» сами считаются «новыми открытиями».
+    </p>
+    <div class="table-wrap">
       <table>
         {% for c in categories %}
-          <tr><td>{{ c.name }}</td>
-            <td style="width:1%"><form method="post" action="{{ url_for('admin.ref_delete', kind='category', item_id=c.id) }}">
-              <button class="btn btn--danger btn--sm" type="submit">Удалить</button></form></td></tr>
+          <tr><td>
+              <form method="post" id="cat-{{ c.id }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="kind" value="category">
+                <input type="hidden" name="id" value="{{ c.id }}">
+                <input type="hidden" name="sort" value="{{ c.sort }}">
+                <input type="text" name="name" value="{{ c.name }}" aria-label="Название" required>
+                <div style="display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px">
+                  {% for value, label in route_tags %}
+                    <div class="checkline" style="margin:0"><input id="tag-{{ c.id }}-{{ value }}" type="checkbox" name="route_tags"
+                      value="{{ value }}" {{ 'checked' if value in c.tags }}>
+                      <label for="tag-{{ c.id }}-{{ value }}">{{ label }}</label></div>
+                  {% endfor %}
+                </div>
+              </form></td>
+            <td style="width:1%;white-space:nowrap">
+              <button class="btn btn--ghost btn--sm" type="submit" form="cat-{{ c.id }}">Сохранить</button>
+              <form method="post" action="{{ url_for('admin.ref_delete', kind='category', item_id=c.id) }}" style="margin-top:6px">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn--danger btn--sm" type="submit">Удалить</button></form></td></tr>
         {% else %}<tr><td>Категорий нет.</td></tr>{% endfor %}
       </table>
     </div>

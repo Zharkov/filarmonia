@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-{%- for u in urls %}
-  <url><loc>{{ host }}{{ u }}</loc></url>
+{%- for path, changed in urls %}
+  <url><loc>{{ host }}{{ path }}</loc>{% if changed %}<lastmod>{{ changed.strftime('%Y-%m-%d') }}</lastmod>{% endif %}</url>
 {%- endfor %}
 </urlset>

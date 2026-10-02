@@ -1,4 +1,5 @@
 {% extends "admin/base.html" %}
+{% from "admin/_table.html" import publish_toggle %}
 {% block title %}Сводка{% endblock %}
 {% block content %}
 <div class="page-head">
@@ -6,13 +7,21 @@
   <a class="btn btn--primary" href="{{ url_for('admin.event_form') }}">Добавить событие</a>
 </div>
 
+{#- Каждый счётчик — ссылка в свой раздел, сразу с нужным фильтром -#}
 <div class="stats">
-  <div class="stat"><div class="stat__num">{{ counts.upcoming }}</div><div class="stat__label">предстоящих событий</div></div>
-  <div class="stat"><div class="stat__num">{{ counts.news }}</div><div class="stat__label">новостей</div></div>
-  <div class="stat"><div class="stat__num">{{ counts.collectives }}</div><div class="stat__label">коллективов</div></div>
-  <div class="stat"><div class="stat__num">{{ counts.documents }}</div><div class="stat__label">документов</div></div>
-  <div class="stat"><div class="stat__num">{{ counts.events }}</div><div class="stat__label">событий всего</div></div>
-  <div class="stat"><div class="stat__num">{{ counts.appeals_new }}</div><div class="stat__label">новых обращений</div></div>
+  {% for num, label, href in [
+       (counts.upcoming, 'предстоящих событий', url_for('admin.events', scope='upcoming')),
+       (counts.news, 'новостей', url_for('admin.news')),
+       (counts.collectives, 'коллективов', url_for('admin.collectives')),
+       (counts.documents, 'документов', url_for('admin.documents')),
+       (counts.events, 'событий всего', url_for('admin.events', scope='all')),
+       (counts.appeals_new, 'новых обращений', url_for('admin.appeals', status='new')),
+     ] %}
+    <a class="stat {{ 'stat--alert' if label == 'новых обращений' and num }}" href="{{ href }}">
+      <div class="stat__num">{{ num }}</div>
+      <div class="stat__label">{{ label }} <span class="stat__go" aria-hidden="true">→</span></div>
+    </a>
+  {% endfor %}
 </div>
 
 <h2>Ближайшие события</h2>
@@ -20,11 +29,11 @@
   <table>
     <tr><th>Дата</th><th>Название</th><th>Площадка</th><th>Статус</th><th></th></tr>
     {% for ev in upcoming %}
-      <tr>
+      <tr id="row-{{ ev.id }}">
         <td>{{ ev.starts_at | ru_datetime }}</td>
         <td><a href="{{ url_for('admin.event_form', event_id=ev.id) }}">{{ ev.title }}</a></td>
         <td>{{ ev.venue.name if ev.venue else '—' }}</td>
-        <td>{% if ev.is_published %}<span class="badge badge--on">опубликовано</span>{% else %}<span class="badge badge--off">черновик</span>{% endif %}</td>
+        <td>{{ publish_toggle('event', ev) }}</td>
         <td><a href="{{ ev.url }}" target="_blank">на сайте</a></td>
       </tr>
     {% else %}

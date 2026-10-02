@@ -1,22 +1,51 @@
 {% extends "admin/base.html" %}
+{% from "admin/_table.html" import sort_th, keep_sort, reset_link, publish_toggle %}
 {% block title %}Страницы{% endblock %}
 {% block content %}
 <div class="page-head">
   <div><h1>Страницы</h1><p class="subtitle">Обязательные разделы сайта учреждения культуры</p></div>
   <a class="btn btn--primary" href="{{ url_for('admin.page_form') }}">Создать страницу</a>
 </div>
+
+<form class="filters" method="get">
+  {{ keep_sort() }}
+  <input type="text" name="q" value="{{ search }}" placeholder="Поиск по заголовку" aria-label="Поиск по заголовку">
+  <select name="parent" onchange="this.form.submit()" aria-label="Раздел">
+    <option value="">Все разделы</option>
+    <option value="top" {{ 'selected' if request.args.get('parent') == 'top' }}>Только верхний уровень</option>
+    {% for s in sections %}<option value="{{ s.id }}" {{ 'selected' if request.args.get('parent') == s.id | string }}>{{ s.title }}</option>{% endfor %}
+  </select>
+  <select name="template" onchange="this.form.submit()" aria-label="Тип страницы">
+    <option value="">Любой тип</option>
+    {% for value, label in templates %}<option value="{{ value }}" {{ 'selected' if request.args.get('template') == value }}>{{ label }}</option>{% endfor %}
+  </select>
+  <select name="status" onchange="this.form.submit()" aria-label="Статус">
+    <option value="">Любой статус</option>
+    <option value="on" {{ 'selected' if request.args.get('status') == 'on' }}>Опубликованные</option>
+    <option value="off" {{ 'selected' if request.args.get('status') == 'off' }}>Скрытые</option>
+  </select>
+  <button class="btn btn--ghost btn--sm" type="submit">Найти</button>
+  {{ reset_link(['q', 'parent', 'template', 'status']) }}
+</form>
+
 <div class="table-wrap">
   <table>
-    <tr><th>Порядок</th><th>Заголовок</th><th>Раздел</th><th>Адрес</th><th>Статус</th></tr>
+    <tr>
+      {{ sort_th('Порядок', 'sort', sorting) }}
+      {{ sort_th('Заголовок', 'title', sorting) }}
+      {{ sort_th('Раздел', 'parent', sorting) }}
+      {{ sort_th('Адрес', 'slug', sorting) }}
+      {{ sort_th('Статус', 'status', sorting) }}
+    </tr>
     {% for p in items %}
-      <tr>
+      <tr id="row-{{ p.id }}">
         <td>{{ p.sort }}</td>
         <td><a href="{{ url_for('admin.page_form', item_id=p.id) }}">{{ p.title }}</a></td>
         <td>{{ p.parent.title if p.parent else '—' }}</td>
         <td><a href="{{ p.url }}" target="_blank">{{ p.url }}</a></td>
-        <td>{% if p.is_published %}<span class="badge badge--on">опубликована</span>{% else %}<span class="badge badge--off">скрыта</span>{% endif %}</td>
+        <td>{{ publish_toggle('page', p, 'опубликована', 'скрыта') }}</td>
       </tr>
-    {% else %}<tr><td colspan="5">Страниц нет.</td></tr>{% endfor %}
+    {% else %}<tr><td colspan="5">Страниц не найдено.</td></tr>{% endfor %}
   </table>
 </div>
 {% endblock %}

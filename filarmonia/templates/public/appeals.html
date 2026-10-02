@@ -13,6 +13,13 @@
   {% endif %}
 
   <form method="post" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {#- Поле-приманка: человек его не видит и не заполняет, робот заполняет
+        всё подряд. Заполненное поле — верный признак рассылки. -#}
+    <div class="visually-hidden" aria-hidden="true">
+      <label for="a-website">Не заполняйте это поле</label>
+      <input id="a-website" type="text" name="website" tabindex="-1" autocomplete="off">
+    </div>
     <div class="form-row"><label for="a-name">Фамилия, имя, отчество *</label>
       <input id="a-name" type="text" name="name" required></div>
     <div class="form-row"><label for="a-email">Электронная почта</label>

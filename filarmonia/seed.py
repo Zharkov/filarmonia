@@ -9,12 +9,14 @@
 import os
 from datetime import datetime, timedelta
 
+from sqlalchemy import text
+
 from .models import (
     db, User, Setting, Page, MenuItem, Venue, Category, Event, EventBadge,
-    Collective, News, Album, Document, Banner, MediaItem, Appeal,
+    Collective, News, Document, Banner, MediaItem, Appeal,
 )
 from .utils import slugify
-from . import demo
+from . import demo, maintenance, migrate
 
 # Учётная запись администратора. На сервере, доступном из интернета, пароль
 # задаётся переменной окружения ADMIN_PASSWORD, чтобы он не лежал в репозитории.
@@ -43,6 +45,26 @@ SETTINGS = [
                   "в зале на улице Глинки.", "Подзаголовок", "Главная страница", "textarea"),
     ("hero_video", "", "Видео на главной (файл .mp4)", "Главная страница", "file"),
     ("hero_poster", "", "Кадр-заставка для видео", "Главная страница", "file"),
+    ("history_kicker", "Филармония — историческое место", "Блок о здании: надстрочная строка",
+     "Главная страница", "text"),
+    ("history_title", "Музыка в центре города", "Блок о здании: заголовок", "Главная страница", "text"),
+    ("history_text", "<p>Здание филармонии на улице Глинки — одно из старейших концертных мест "
+                     "Смоленска. Здесь выступали выдающиеся музыканты страны, а зал помнит "
+                     "премьеры, фестивали имени М. И. Глинки и первые концерты многих "
+                     "смоленских исполнителей.</p>",
+     "Блок о здании: краткая история", "Главная страница", "html"),
+    ("history_page", "istoriya", "Блок о здании: адрес страницы, чьи фото идут в карусель",
+     "Главная страница", "text"),
+    ("history_map", "", "Блок о здании: код интерактивной карты (если пусто — карта по адресу)",
+     "Главная страница", "html"),
+    ("pos_widget", "", "Код виджета «Госуслуги. Решаем вместе» (если пусто — баннер из раздела "
+                       "«Баннеры», место «Главная, крупно»)", "Главная страница", "html"),
+    ("appeals_retention_years", "5", "Срок хранения обработанных обращений, лет (0 — хранить бессрочно)",
+     "Обращения граждан", "text"),
+    ("social_vk","https://vk.com/", "ВКонтакте — адрес страницы филармонии", "Соцсети", "text"),
+    ("social_tg", "https://t.me/", "Telegram — адрес канала", "Соцсети", "text"),
+    ("social_ok", "https://ok.ru/", "Одноклассники — адрес группы", "Соцсети", "text"),
+    ("social_max", "", "MAX — адрес канала", "Соцсети", "text"),
     ("pushkin_default", "<p>Билет можно оплатить Пушкинской картой через приложение "
                         "«Госуслуги Культура» или на сайте билетного оператора.</p>",
      "Текст о Пушкинской карте по умолчанию", "Тексты по умолчанию", "html"),
@@ -85,7 +107,7 @@ PAGES = [
      "<p>Планы ФХД учреждения по годам.</p>"),
     ("Нормативные правовые акты", None, "documents", 50,
      "<p>Нормативные правовые акты и приказы учреждения.</p>"),
-    ("Противодействие коррупции", None, "page", 60,
+    ("Противодействие коррупции", "Об учреждении", "page", 60,
      "<p>Информация о мерах по противодействию коррупции.</p>"
      "<p>Телефон для анонимных обращений по вопросам коррупции: +7 (4812) 38-31-81.</p>"),
     ("Интернет-приёмная", None, "page", 70,
@@ -101,19 +123,40 @@ PAGES = [
      "от 27 июля 2006 г. № 152-ФЗ.</p>"),
     ("Правила посещения", None, "page", 25,
      "<p>Правила продажи и возврата билетов, правила посещения концертов, этикет зрителя.</p>"),
+    ("Посетителям", None, "page", 26,
+     "<p>Всё, что пригодится перед концертом: как оплатить билет Пушкинской картой "
+     "и кому положено льготное посещение.</p>"),
+    ("Пушкинская карта", "Посетителям", "pushkin", 27,
+     "<p>Пушкинская карта — программа для молодёжи от 14 до 22 лет: билеты на концерты "
+     "оплачиваются за счёт государства, до 10 000 ₽ в год.</p>"
+     "<h2>Как оформить</h2><p>Карту выпускают в приложении «Госуслуги Культура» или "
+     "в отделении банка-партнёра программы.</p>"
+     "<h2>Как купить билет</h2><p>Выберите концерт с отметкой «Пушкинская карта» и оплатите "
+     "билет картой на сайте билетного оператора или в кассе филармонии.</p>"),
+    ("Льготное посещение", "Посетителям", "benefits", 28,
+     "<p>Льготные билеты продаются в кассе филармонии при предъявлении подтверждающего документа.</p>"
+     "<h2>Кому положены льготы</h2><ul><li>пенсионерам — по пенсионному удостоверению;</li>"
+     "<li>детям до 7 лет — вход бесплатный в сопровождении взрослых;</li>"
+     "<li>участникам СВО и членам их семей;</li><li>многодетным семьям.</li></ul>"
+     "<p>Точные условия указаны на странице каждого концерта.</p>"),
+    ("Учредительные документы", None, "documents", 29,
+     "<p>Устав, свидетельство о регистрации и другие учредительные документы.</p>"),
 ]
 
+# Главное меню: (название, адрес, страница, порядок, подпункты).
+# Подпункт — заголовок страницы либо пара (своё название, заголовок страницы).
 MENU = [
     ("Афиша", "/afisha", None, 10, []),
-    ("Коллективы", "/kollektivy", None, 20, []),
+    ("Коллективы и артисты", "/kollektivy", None, 20, []),
     ("Новости", "/novosti", None, 30, []),
-    ("Галерея", "/galereya", None, 40, []),
-    ("Об учреждении", None, "Об учреждении", 50,
-     ["Общие сведения", "Об учредителе", "Структура и органы управления", "История",
-      "Материально-техническая база", "Контакты и схема проезда"]),
-    ("Сведения об услугах", None, "Услуги", 60, ["Правила посещения"]),
-    ("Отчёты", None, "Годовые отчёты о деятельности", 70,
-     ["Независимая оценка качества", "План финансово-хозяйственной деятельности",
+    ("Об учреждении", None, "Об учреждении", 40,
+     ["Общие сведения", "История", "Структура и органы управления",
+      ("О противодействии коррупции", "Противодействие коррупции"),
+      "Материально-техническая база"]),
+    ("Посетителям", None, "Посетителям", 50, ["Пушкинская карта", "Льготное посещение"]),
+    ("Документы", "/dokumenty", None, 60,
+     ["Учредительные документы", "Годовые отчёты о деятельности",
+      "Независимая оценка качества", "План финансово-хозяйственной деятельности",
       "Нормативные правовые акты"]),
 ]
 
@@ -123,7 +166,15 @@ VENUES = [
     ("Выездная площадка", "Смоленская область"),
 ]
 
-CATEGORIES = ["Симфоническая музыка", "Народная музыка", "Детям", "Джаз", "Органная музыка", "Эстрада"]
+# Жанр и его метки для «Музыкального маршрута» (см. models.ROUTE_TAGS)
+CATEGORIES = [
+    ("Симфоническая музыка", "calm,romance"),
+    ("Народная музыка", "energy,family"),
+    ("Детям", "family,discover"),
+    ("Джаз", "energy,romance"),
+    ("Органная музыка", "calm,discover"),
+    ("Эстрада", "energy,romance"),
+]
 
 COLLECTIVES = [
     ("Смоленский русский народный оркестр имени В. П. Дубровского",
@@ -217,6 +268,8 @@ NEWS = [
      "Касса работает ежедневно с 11:00 до 19:00.",
      "<p>В дни концертов касса работает до начала мероприятия.</p>"),
 ]
+# Новости, которые публикуются только текстом, без фото и видео
+TEXT_ONLY_NEWS = {"Обновлён распорядок работы кассы"}
 
 DOCUMENTS = [
     ("Устав учреждения", "Учредительные документы", 2023),
@@ -232,12 +285,22 @@ DOCUMENTS = [
 ]
 
 BANNERS = [
-    ("Госуслуги", "https://www.gosuslugi.ru"),
-    ("bus.gov.ru — оценка качества услуг", "https://bus.gov.ru"),
-    ("Культура.РФ", "https://www.culture.ru"),
-    ("Пушкинская карта", "https://www.culture.ru/pushkinskaya-karta"),
-    ("Нацпроект «Семья»", "https://culture.gov.ru"),
-    ("Смоленская область", "https://smolensk.ru"),
+    # (название, адрес, место)
+    ("Госуслуги. Решаем вместе", "https://pos.gosuslugi.ru/landing/", "main"),
+    ("Госуслуги", "https://www.gosuslugi.ru", "partners"),
+    ("bus.gov.ru — оценка качества услуг", "https://bus.gov.ru", "partners"),
+    ("Культура.РФ", "https://www.culture.ru", "partners"),
+    ("Пушкинская карта", "https://www.culture.ru/pushkinskaya-karta", "partners"),
+    ("Нацпроект «Семья»", "https://culture.gov.ru", "partners"),
+    ("Смоленская область", "https://smolensk.ru", "partners"),
+]
+
+# Фото здания для карусели на главной — прикрепляются к странице «История»
+BUILDING_PHOTOS = [
+    "Здание филармонии на улице Глинки",
+    "Большой концертный зал",
+    "Фойе и парадная лестница",
+    "Филармония вечером",
 ]
 
 # Демонстрационные обращения: чтобы раздел «Обращения граждан» в админке
@@ -268,12 +331,21 @@ APPEALS = [
 ]
 
 
-def run(app, reset=False):
-    """Наполняет базу. При reset=True прежние данные удаляются."""
+def run(app, reset=False, rebuild_menu=False):
+    """Наполняет базу. При reset=True прежние данные удаляются.
+
+    rebuild_menu=True пересобирает главное меню по списку MENU, не трогая
+    остальное содержимое: так на рабочую базу переносится новая структура меню.
+    """
     with app.app_context():
         if reset:
             db.drop_all()
-        db.create_all()
+            db.session.execute(text("DROP TABLE IF EXISTS alembic_version"))
+            db.session.commit()
+    # Схему создают и обновляют миграции, а не create_all: так рабочая база
+    # и база разработчика всегда одной версии
+    migrate.upgrade(app)
+    with app.app_context():
 
         if User.query.count() == 0:
             admin = User(login=ADMIN_LOGIN, name="Администратор сайта", role="admin")
@@ -300,6 +372,11 @@ def run(app, reset=False):
         db.session.commit()
 
         # Меню
+        if rebuild_menu:
+            # Сначала подпункты: у них ссылка на родителя
+            MenuItem.query.filter(MenuItem.parent_id.isnot(None)).delete()
+            MenuItem.query.delete()
+            db.session.commit()
         if MenuItem.query.count() == 0:
             for title, url, page_title, sort, children in MENU:
                 parent = MenuItem(
@@ -308,9 +385,10 @@ def run(app, reset=False):
                 )
                 db.session.add(parent)
                 db.session.commit()
-                for i, child_title in enumerate(children):
+                for i, child in enumerate(children):
+                    label, page_title = child if isinstance(child, tuple) else (child, child)
                     db.session.add(MenuItem(
-                        title=child_title, page_id=by_title[child_title].id,
+                        title=label, page_id=by_title[page_title].id,
                         parent_id=parent.id, sort=(i + 1) * 10,
                     ))
             db.session.commit()
@@ -319,9 +397,14 @@ def run(app, reset=False):
         if Venue.query.count() == 0:
             for name, address in VENUES:
                 db.session.add(Venue(name=name, slug=slugify(name), address=address))
-        if Category.query.count() == 0:
-            for i, name in enumerate(CATEGORIES):
-                db.session.add(Category(name=name, slug=slugify(name), sort=(i + 1) * 10))
+        for i, (name, tags) in enumerate(CATEGORIES):
+            category = Category.query.filter_by(name=name).first()
+            if category is None:
+                db.session.add(Category(name=name, slug=slugify(name), sort=(i + 1) * 10,
+                                        route_tags=tags))
+            elif not category.route_tags:
+                # Жанр заведён до появления «Музыкального маршрута» — даём метки
+                category.route_tags = tags
         db.session.commit()
 
         # Настройки
@@ -329,6 +412,16 @@ def run(app, reset=False):
         Setting.set("hero_video", demo.hero_video("hero-hall.jpg", "hero.mp4") or "")
         Setting.set("hero_poster", "hero-hall.jpg")
         db.session.commit()
+
+        # Фото здания для карусели на главной
+        history = by_title["История"]
+        if not history.media:
+            for i, caption in enumerate(BUILDING_PHOTOS):
+                db.session.add(MediaItem(
+                    kind="photo", title=caption, page_id=history.id, sort=(i + 1) * 10,
+                    file=demo.photo(f"building-{i}.jpg", caption, i + 81, (1600, 1000)),
+                ))
+            db.session.commit()
 
         # Коллективы
         if Collective.query.count() == 0:
@@ -364,8 +457,10 @@ def run(app, reset=False):
                     f"poster-{i}.jpg", spec["title"], spec["ann"],
                     f"{starts.day:02d}.{starts.month:02d}.{starts.year} · {spec['hour']}:{spec['minute']:02d}", i,
                 )
+                cover_file = demo.photo(f"cover-{i}.jpg", spec["title"], i + 91, (1600, 900))
                 ev = Event(
                     title=spec["title"], slug=slugify(spec["title"]), poster=poster_file,
+                    cover=cover_file,
                     starts_at=starts, duration_min=spec["dur"], age_limit=spec["age"],
                     price_min=spec["price"][0], price_max=spec["price"][1],
                     venue_id=venues[i % 2].id, category_id=category.id if category else None,
@@ -420,26 +515,13 @@ def run(app, reset=False):
         # Новости
         if News.query.count() == 0:
             for i, (title, lead, content) in enumerate(NEWS):
+                with_media = title not in TEXT_ONLY_NEWS
                 db.session.add(News(
                     title=title, slug=slugify(title), lead=lead, content=content,
-                    image=demo.photo(f"news-{i}.jpg", title, i + 51, (1400, 900)),
+                    image=demo.photo(f"news-{i}.jpg", title, i + 51, (1400, 900)) if with_media else "",
+                    show_media=with_media,
                     published_at=datetime.now() - timedelta(days=i * 3 + 1),
                 ))
-            db.session.commit()
-
-        # Галерея
-        if Album.query.count() == 0:
-            for i, title in enumerate(["Концерты сезона 2026", "Фестиваль имени М. И. Глинки",
-                                       "Гастроли по области"]):
-                album = Album(title=title, slug=slugify(title), year=2026 - i,
-                              cover=demo.photo(f"alb-{i}.jpg", title, i + 61, (1400, 900)))
-                db.session.add(album)
-                db.session.commit()
-                for j in range(6):
-                    db.session.add(MediaItem(
-                        kind="photo", file=demo.photo(f"alb-{i}-{j}.jpg", title, i * 6 + j + 71, (1400, 900)),
-                        album_id=album.id, sort=j * 10,
-                    ))
             db.session.commit()
 
         # Документы
@@ -451,8 +533,8 @@ def run(app, reset=False):
 
         # Баннеры
         if Banner.query.count() == 0:
-            for i, (title, url) in enumerate(BANNERS):
-                db.session.add(Banner(title=title, url=url, place="partners", sort=(i + 1) * 10))
+            for i, (title, url, place) in enumerate(BANNERS):
+                db.session.add(Banner(title=title, url=url, place=place, sort=(i + 1) * 10))
             db.session.commit()
 
         # Обращения граждан (демо)
@@ -465,6 +547,10 @@ def run(app, reset=False):
                 ))
             db.session.commit()
 
+    # Демо-картинки рисуются напрямую, мимо загрузки через админку, —
+    # уменьшенные копии для них делаем отдельно
+    maintenance.make_all_variants(app)
+    with app.app_context():
         print("База наполнена.")
         if os.environ.get("ADMIN_PASSWORD"):
             # Пароль в логи сборки не пишем

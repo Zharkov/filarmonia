@@ -1,23 +1,80 @@
+{#- Атрибуты картинки: src и, если у фото есть уменьшенные копии, srcset.
+    sizes подсказывает браузеру ширину картинки на экране — по ней он выберет
+    копию 400, 800 px или оригинал и не будет качать лишнее. -#}
+{% macro img_src(url, sizes='100vw') -%}
+src="{{ url }}"{% set variants = url | srcset %}{% if variants %} srcset="{{ variants }}" sizes="{{ sizes }}"{% endif %}
+{%- endmacro %}
+
+{#- Карточка концерта: горизонтальное фото, плавно уходящее в тёмный фон.
+    Поверх фото — дата, отметки «Пушкинская карта» и «Есть льготы», время и возраст.
+    Жанр на карточке не выводится. Кнопка «Купить билет» ведёт по ссылке
+    билетной системы, а пока её нет — на страницу события. -#}
 {% macro event_card(ev) %}
-<article class="card">
-  <a class="card__poster" href="{{ ev.url }}">
-    {% if ev.poster %}<img src="/static/uploads/{{ ev.poster }}" alt="Афиша: {{ ev.title }}" loading="lazy">{% endif %}
-    <span class="card__date">{{ ev.starts_at | ru_date(false) }}, {{ ev.starts_at.strftime('%H:%M') }}</span>
-    {% if ev.age_limit %}<span class="card__age">{{ ev.age_limit }}</span>{% endif %}
-  </a>
-  <h3 class="card__title"><a href="{{ ev.url }}">{{ ev.title }}</a></h3>
-  <div class="card__meta">{{ ev.venue.name if ev.venue }}</div>
-  <div class="card__foot">
-    <div class="card__price">{{ ev.price_label }}</div>
-    {% if ev.show_pushkin %}<span class="card__pushkin">Пушкинская карта</span>{% endif %}
+<article class="ecard">
+  <div class="ecard__top">
+    <a class="ecard__media" href="{{ ev.url }}" tabindex="-1" aria-hidden="true">
+      {% if ev.card_image %}<img {{ img_src(ev.card_image, '(max-width: 620px) 100vw, (max-width: 1080px) 50vw, 400px') }} alt="" loading="lazy">{% endif %}
+    </a>
+    <div class="ecard__date" aria-hidden="true">
+      <span class="ecard__day">{{ ev.starts_at.day }}</span>
+      <span class="ecard__mon">{{ ev.starts_at | ru_month_short }}</span>
+    </div>
+    {% if ev.show_pushkin or ev.show_benefits %}
+      <div class="ecard__flags">
+        {% if ev.show_pushkin %}<span class="ecard__flag">Пушкинская карта</span>{% endif %}
+        {% if ev.show_benefits %}<span class="ecard__flag ecard__flag--alt">Есть льготы</span>{% endif %}
+      </div>
+    {% endif %}
+    <div class="ecard__when">
+      <span>
+        {{ icon('clock') }}
+        <span class="visually-hidden">{{ ev.starts_at | ru_date }},</span>
+        {{ ev.starts_at.strftime('%H:%M') }}{% if ev.duration_min %} · {{ ev.duration_min | ru_duration }}{% endif %}
+      </span>
+      {% if ev.age_limit %}<span class="ecard__age">{{ ev.age_limit }}</span>{% endif %}
+    </div>
   </div>
+
+  <div class="ecard__body">
+    <h3 class="ecard__title"><a href="{{ ev.url }}">{{ ev.title }}</a></h3>
+    {% if ev.annotation %}<p class="ecard__text">{{ ev.annotation }}</p>{% endif %}
+    {% if ev.venue %}<div class="ecard__venue">{{ icon('pin') }} {{ ev.venue.name }}</div>{% endif %}
+
+    <div class="ecard__foot">
+      <div>
+        <div class="ecard__pricelabel">Стоимость билета</div>
+        <div class="ecard__price">{{ ev.price_label }}</div>
+      </div>
+      {% if ev.ticket_url %}
+        <a class="ecard__buy" href="{{ ev.ticket_url }}" rel="noopener" target="_blank"
+           data-ticket-event="{{ ev.id }}">{{ icon('ticket') }} Купить билет</a>
+      {% else %}
+        <a class="ecard__buy" href="{{ ev.url }}" data-ticket-event="{{ ev.id }}">{{ icon('ticket') }} Купить билет</a>
+      {% endif %}
+    </div>
+  </div>
+</article>
+{% endmacro %}
+
+{#- Карточка новости. У новости «только текст» картинки нет совсем. -#}
+{% macro news_card(item, lead=true) %}
+{% set picture = item.image if item.show_media else '' %}
+<article class="newscard {{ 'newscard--text' if not picture }}">
+  {% if picture %}
+    <a class="newscard__img" href="{{ item.url }}" tabindex="-1" aria-hidden="true">
+      <img {{ img_src('/static/uploads/' ~ picture, '(max-width: 860px) 100vw, 400px') }} alt="" loading="lazy">
+    </a>
+  {% endif %}
+  <div class="newscard__date">{{ item.published_at | ru_date }}</div>
+  <h3><a href="{{ item.url }}">{{ item.title }}</a></h3>
+  {% if lead %}<p>{{ item.lead or item.content | strip_tags(160) }}</p>{% endif %}
 </article>
 {% endmacro %}
 
 {% macro event_row(ev) %}
 <article class="eventrow">
   <a class="eventrow__poster" href="{{ ev.url }}">
-    {% if ev.poster %}<img src="/static/uploads/{{ ev.poster }}" alt="Афиша: {{ ev.title }}" loading="lazy">{% endif %}
+    {% if ev.poster %}<img {{ img_src('/static/uploads/' ~ ev.poster, '170px') }} alt="Афиша: {{ ev.title }}" loading="lazy">{% endif %}
     {% if ev.age_limit %}<span class="card__age">{{ ev.age_limit }}</span>{% endif %}
   </a>
   <div>
@@ -30,6 +87,7 @@
       {{ ev.category.name if ev.category }}{% if ev.tickets_left %} · {{ ev.tickets_left }}{% endif %}
     </div>
     {% if ev.show_pushkin %}<span class="card__pushkin">Пушкинская карта</span>{% endif %}
+    {% if ev.show_benefits %}<span class="card__pushkin">Есть льготы</span>{% endif %}
   </div>
   <div class="eventrow__side">
     <div class="eventrow__price">{{ ev.price_label }}</div>
@@ -38,21 +96,40 @@
 </article>
 {% endmacro %}
 
+{#- Календарь: лента дней со стрелками, как на билетных сайтах.
+    Выходные красным, дни без концертов приглушены и не нажимаются,
+    название месяца в шапке меняется при прокрутке. -#}
 {% macro daystrip(days, active=None, base='/afisha') %}
-<div class="daystrip">
-  <div class="daystrip__scroll">
-    {% set ns = namespace(month=None) %}
+<div class="cal" data-cal>
+  <div class="cal__head">
+    <h2 class="cal__title">Календарь событий</h2>
+    <span class="cal__month" data-cal-month aria-live="polite">{{ days[0].date | ru_month }} {{ days[0].date.year }}</span>
+    <div class="cal__nav">
+      <button class="cal__arrow" type="button" data-cal-prev aria-label="Предыдущие дни">‹</button>
+      <button class="cal__arrow" type="button" data-cal-next aria-label="Следующие дни">›</button>
+    </div>
+  </div>
+  <div class="cal__scroll" data-cal-scroll>
     {% for d in days %}
-      {% if ns.month != d.date.month %}
-        {% set ns.month = d.date.month %}
-        <div class="daystrip__month">{{ d.date | ru_month }}</div>
+      {% set classes = [
+           'cal__day',
+           'cal__day--weekend' if d.date.weekday() >= 5,
+           'cal__day--off' if not d.has_events,
+           'cal__day--active' if active and active == d.date,
+           'cal__day--first' if d.date.day == 1 and not loop.first,
+         ] | select | join(' ') %}
+      {% set month = (d.date | ru_month) ~ ' ' ~ d.date.year %}
+      {% if d.has_events %}
+        <a class="{{ classes }}" href="{{ base }}?day={{ d.date.isoformat() }}" data-month="{{ month }}"
+           aria-label="{{ d.date | ru_date }}, {{ d.date | ru_weekday }} — есть концерты"
+           {% if active and active == d.date %}aria-current="date"{% endif %}>
+      {% else %}
+        <span class="{{ classes }}" data-month="{{ month }}">
       {% endif %}
-      <a class="daystrip__day {{ 'daystrip__day--weekend' if d.date.weekday() >= 5 }} {{ 'daystrip__day--active' if active and active == d.date }}"
-         href="{{ base }}?day={{ d.date.isoformat() }}">
-        <div class="daystrip__num">{{ '%02d' % d.date.day }}</div>
-        <div class="daystrip__wd">{{ d.date | ru_weekday(true) }}</div>
-        {% if d.has_events %}<div class="daystrip__dot"></div>{% endif %}
-      </a>
+        {% if d.date.day == 1 or loop.first %}<span class="cal__mtag">{{ d.date | ru_month_short }}</span>{% endif %}
+        <span class="cal__wd">{{ 'сегодня' if loop.first and not active else d.date | ru_weekday(true) }}</span>
+        <span class="cal__num">{{ d.date.day }}</span>
+      {% if d.has_events %}</a>{% else %}</span>{% endif %}
     {% endfor %}
   </div>
 </div>
@@ -75,3 +152,52 @@
 </nav>
 {% endif %}
 {% endmacro %}
+
+{#- Ссылки на соцсети из «Настроек». Пустой адрес — значок не выводится. -#}
+{% macro social_links(settings, modifier='') %}
+{% set networks = [
+     ('social_vk', 'ВКонтакте', 'vk'), ('social_tg', 'Telegram', 'tg'),
+     ('social_ok', 'Одноклассники', 'ok'), ('social_max', 'MAX', 'max'),
+   ] %}
+{% set ns = namespace(any=false) %}
+{% for key, _, _ in networks if settings.get(key) %}{% set ns.any = true %}{% endfor %}
+{% if ns.any %}
+<ul class="social {{ modifier }}">
+  {% for key, name, glyph in networks if settings.get(key) %}
+    <li><a href="{{ settings.get(key) }}" rel="noopener" target="_blank" aria-label="{{ name }}" title="{{ name }}">{{ icon(glyph) }}</a></li>
+  {% endfor %}
+</ul>
+{% endif %}
+{% endmacro %}
+
+{#- Значки рисуются цветом текста (currentColor) и подстраиваются под тему. -#}
+{% macro icon(name) -%}
+<svg class="icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+{%- if name == 'clock' -%}
+  <circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+  <path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+{%- elif name == 'pin' -%}
+  <path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z" fill="none" stroke="currentColor" stroke-width="1.8"/>
+  <circle cx="12" cy="10" r="2.3" fill="none" stroke="currentColor" stroke-width="1.8"/>
+{%- elif name == 'ticket' -%}
+  <path d="M3.5 8.5V6.8c0-.7.6-1.3 1.3-1.3h14.4c.7 0 1.3.6 1.3 1.3v1.7a2.5 2.5 0 0 0 0 5v1.7c0 .7-.6 1.3-1.3 1.3H4.8c-.7 0-1.3-.6-1.3-1.3v-1.7a2.5 2.5 0 0 0 0-5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+  <path d="M9.5 9.5h5M9.5 12.5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+{%- elif name == 'sound-off' -%}
+  <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/>
+  <path d="M15.5 9.5l5 5M20.5 9.5l-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+{%- elif name == 'sound-on' -%}
+  <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/>
+  <path d="M15.5 9a4.5 4.5 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+{%- elif name == 'vk' -%}
+  <path d="M3 7h3.2c.2 4.2 2 6 3.4 6.4V7h3v3.6c1.4-.2 2.8-1.8 3.3-3.6h3c-.5 2.4-2.2 4.2-3.5 4.9 1.3.6 3.3 2.2 4.1 5.1h-3.3c-.7-2-2.3-3.5-3.6-3.7V17h-.4C6.8 17 3.3 13.4 3 7z" fill="currentColor"/>
+{%- elif name == 'tg' -%}
+  <path d="M20.7 4.4 3.4 11.1c-1 .4-1 1.5 0 1.8l4.3 1.4 1.7 5.2c.2.7 1 .9 1.5.4l2.4-2.3 4.6 3.4c.6.4 1.4.1 1.5-.6l2.9-14.2c.2-1-.7-1.7-1.6-1.3zM9.6 14l8-7.1-6.3 8.3-.3 2.9-1.4-4.1z" fill="currentColor"/>
+{%- elif name == 'ok' -%}
+  <circle cx="12" cy="7.5" r="3.3" fill="none" stroke="currentColor" stroke-width="2.2"/>
+  <path d="M7.5 13c2.8 1.8 6.2 1.8 9 0M12 15.2 8.2 19.5M12 15.2l3.8 4.3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+{%- elif name == 'max' -%}
+  <rect x="3.5" y="3.5" width="17" height="17" rx="5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+  <path d="M8 16V8.5l4 4.5 4-4.5V16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+{%- endif -%}
+</svg>
+{%- endmacro %}

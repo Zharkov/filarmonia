@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Обращение № {{ item.id }} от {{ item.created_at | ru_date }}</title>
+<style>
+  body { font: 14px/1.55 "Times New Roman", Georgia, serif; color: #000; margin: 0; padding: 32px; max-width: 760px; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .org { font-size: 13px; margin-bottom: 26px; }
+  table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+  th, td { text-align: left; vertical-align: top; padding: 6px 10px; border: 1px solid #999; }
+  th { width: 34%; font-weight: normal; background: #f2f2f2; }
+  .message { white-space: pre-wrap; border: 1px solid #999; padding: 12px; }
+  .tools { margin-bottom: 20px; font-family: Arial, sans-serif; }
+  .tools button { font: inherit; padding: 8px 16px; cursor: pointer; }
+  @media print { .tools { display: none; } body { padding: 0; } }
+</style>
+</head>
+<body>
+<div class="tools">
+  <button type="button" onclick="window.print()">Печать / сохранить в PDF</button>
+  <a href="{{ url_for('admin.appeal_view', item_id=item.id) }}">← к обращению</a>
+</div>
+
+<div class="org">{{ settings.get('site_name', 'Смоленская областная филармония') }}<br>
+  {{ settings.get('address', '') }}</div>
+
+<h1>Обращение гражданина № {{ item.id }}</h1>
+<p>Поступило через интернет-приёмную {{ item.created_at | msk | ru_datetime }} (мск).</p>
+
+<table>
+  <tr><th>Заявитель</th><td>{{ item.name }}</td></tr>
+  <tr><th>Электронная почта</th><td>{{ item.email or '—' }}</td></tr>
+  <tr><th>Телефон</th><td>{{ item.phone or '—' }}</td></tr>
+  <tr><th>Тема</th><td>{{ item.subject or '—' }}</td></tr>
+  <tr><th>Согласие на обработку персональных данных</th><td>{{ 'дано' if item.consent else 'нет' }}</td></tr>
+  <tr><th>Статус</th><td>{{ 'обработано' if item.is_processed else 'не обработано' }}</td></tr>
+  {% if item.note %}<tr><th>Служебная отметка</th><td style="white-space:pre-wrap">{{ item.note }}</td></tr>{% endif %}
+</table>
+
+<p><strong>Текст обращения:</strong></p>
+<div class="message">{{ item.message }}</div>
+
+<p style="margin-top:28px;font-size:12px">Распечатано {{ now | ru_datetime }}.</p>
+</body>
+</html>

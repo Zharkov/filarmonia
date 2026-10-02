@@ -8,6 +8,7 @@
 </div>
 
 <form method="post" enctype="multipart/form-data">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <section class="panel">
     <div class="field"><label for="name">Название *</label>
       <input id="name" type="text" name="name" value="{{ item.name or '' }}" required></div>
@@ -20,9 +21,9 @@
     <div class="field"><label for="annotation">Короткое описание (в списке коллективов)</label>
       <textarea id="annotation" name="annotation" style="min-height:70px">{{ item.annotation or '' }}</textarea></div>
     <div class="field"><label for="description">Подробный рассказ о коллективе</label>
-      <textarea id="description" name="description" class="code">{{ item.description or '' }}</textarea></div>
+      <textarea id="description" name="description" data-rich>{{ item.description or '' }}</textarea></div>
     <div class="field"><label for="contacts">Контакты (открываются в баннере по кнопке «Контакты»)</label>
-      <textarea id="contacts" name="contacts" class="code" style="min-height:90px">{{ item.contacts or '' }}</textarea></div>
+      <textarea id="contacts" name="contacts" data-rich="small">{{ item.contacts or '' }}</textarea></div>
     <div class="field"><label for="logo">Логотип или фото</label><input id="logo" type="file" name="logo" accept="image/*">
       {% if item.logo %}<img src="/static/uploads/{{ item.logo }}" alt="" style="max-width:120px;margin-top:8px">{% endif %}</div>
     <div class="checkline"><input id="is_published" type="checkbox" name="is_published" {{ 'checked' if item.is_published or not item.id }}>
@@ -36,6 +37,7 @@
   <section class="panel">
     <form method="post" action="{{ url_for('admin.collective_delete', item_id=item.id) }}"
           onsubmit="return confirm('Удалить коллектив?')">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button class="btn btn--danger" type="submit">Удалить коллектив</button></form>
   </section>
 {% endif %}

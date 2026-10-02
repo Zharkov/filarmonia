@@ -4,11 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Вход — управление сайтом филармонии</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+<link rel="stylesheet" href="{{ asset_url('css/admin.css') }}">
 </head>
 <body>
 <div class="login-wrap">
   <form class="login-box" method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <h1>Вход в управление сайтом</h1>
     <p class="subtitle" style="margin-bottom:20px">Смоленская областная филармония</p>
     {% with messages = get_flashed_messages(with_categories=true) %}

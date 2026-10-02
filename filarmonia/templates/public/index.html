@@ -1,7 +1,8 @@
 {% extends "public/base.html" %}
-{% from "public/_macros.html" import event_card, daystrip %}
+{% from "public/_macros.html" import event_card, daystrip, news_card, icon, img_src %}
 
 {% block hero %}
+{% set has_video = settings.get('hero_video') or settings.get('hero_video_url') %}
 <section class="hero">
   <div class="hero__media">
     {% if settings.get('hero_video') %}
@@ -23,18 +24,18 @@
     <div class="hero__kicker">{{ settings.get('hero_kicker', 'Сезон 2026 / 2027') }}</div>
     <h1>{{ settings.get('hero_title', 'Музыка на все времена') }}</h1>
     <p class="hero__lead">{{ settings.get('hero_lead', 'Симфонические программы, органные вечера, джаз и концерты для детей в зале на улице Глинки.') }}</p>
-    <div class="hero__actions">
-      <a class="btn btn--primary" href="{{ url_for('public.afisha') }}">Смотреть афишу</a>
-      <a class="btn btn--light" href="{{ url_for('public.collectives') }}">Наши коллективы</a>
-      {% if settings.get('hero_video') or settings.get('hero_video_url') %}
-        <button class="btn btn--ghost" data-hero-sound style="color:#fff;border-color:rgba(255,255,255,.5)">Включить звук</button>
-      {% endif %}
-    </div>
   </div>
 
-  <div class="wrap">
-    {{ daystrip(day_strip) }}
-  </div>
+  {% if has_video %}
+    <button class="hero__sound" type="button" data-hero-sound aria-pressed="false" aria-label="Включить звук">
+      <span data-sound-off>{{ icon('sound-off') }}</span>
+      <span data-sound-on hidden>{{ icon('sound-on') }}</span>
+    </button>
+  {% endif %}
+</section>
+
+<section class="calendar">
+  <div class="wrap">{{ daystrip(day_strip) }}</div>
 </section>
 {% endblock %}
 
@@ -47,7 +48,7 @@
     </div>
     {% if upcoming %}
       <div class="cards">
-        {% for ev in upcoming[:8] %}{{ event_card(ev) }}{% endfor %}
+        {% for ev in upcoming %}{{ event_card(ev) }}{% endfor %}
       </div>
     {% else %}
       <p class="empty">Ближайшие концерты пока не опубликованы. Добавьте события в разделе «Афиша» админки.</p>
@@ -55,47 +56,120 @@
   </div>
 </section>
 
-<section class="section section--tint">
+<section class="section route" id="marshrut">
   <div class="wrap">
-    <div class="section__head">
-      <h2>Что у нас нового</h2>
-      <a class="btn btn--ghost btn--sm" href="{{ url_for('public.news_list') }}">Все новости</a>
+    <div class="route__intro">
+      <div class="kicker">Подбор концерта</div>
+      <h2>Музыкальный маршрут</h2>
+      <p>Ответьте на три вопроса — и мы соберём персональную подборку концертов.</p>
     </div>
-    <div class="newsgrid">
-      {% for item in news[:3] %}
-        <article class="newscard">
-          <a class="newscard__img" href="{{ item.url }}">
-            {% if item.image %}<img src="/static/uploads/{{ item.image }}" alt="" loading="lazy">{% endif %}
-          </a>
-          <div class="newscard__date">{{ item.published_at | ru_date }}</div>
-          <h3><a href="{{ item.url }}">{{ item.title }}</a></h3>
-          <p>{{ item.lead or item.content | strip_tags(160) }}</p>
-        </article>
+
+    <form class="route__form" method="get" action="{{ url_for('public.index') }}#marshrut"
+          data-route data-route-url="{{ url_for('public.route') }}">
+      {% for key, question, options in route_questions %}
+        <fieldset class="route__step" data-route-step>
+          <legend><span class="route__num">{{ loop.index }} / {{ loop.length }}</span> {{ question }}</legend>
+          <div class="route__options">
+            {% for value, label in options %}
+              <label class="route__option">
+                <input type="radio" name="{{ key }}" value="{{ value }}" required
+                       {{ 'checked' if answers[key] == value }}>
+                <span>{{ label }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        </fieldset>
       {% endfor %}
+      <div class="route__actions">
+        <button class="btn btn--gold" type="submit" data-route-submit>Составить маршрут</button>
+      </div>
+    </form>
+
+    <div class="route__result" data-route-result aria-live="polite">
+      {% if route %}{% include "public/_route_result.html" %}{% endif %}
     </div>
   </div>
 </section>
 
-{% if collectives %}
-<section class="section">
+{% set photos = history.photos if history else [] %}
+<section class="section place" id="zdanie">
+  <div class="wrap place__grid {{ 'place__grid--solo' if not photos }}">
+    {% if photos %}
+      <div class="carousel" data-carousel>
+        <div class="carousel__track" data-carousel-track tabindex="0" aria-label="Фотографии здания">
+          {% for p in photos %}
+            <figure class="carousel__slide">
+              <img {{ img_src(p.src, '(max-width: 1080px) 100vw, 700px') }} alt="{{ p.title or 'Здание филармонии' }}" loading="lazy">
+              {% if p.title %}<figcaption>{{ p.title }}</figcaption>{% endif %}
+            </figure>
+          {% endfor %}
+        </div>
+        {% if photos | length > 1 %}
+          <button class="carousel__arrow carousel__arrow--prev" type="button" data-carousel-prev aria-label="Предыдущее фото">‹</button>
+          <button class="carousel__arrow carousel__arrow--next" type="button" data-carousel-next aria-label="Следующее фото">›</button>
+          <div class="carousel__dots">
+            {% for p in photos %}
+              <button type="button" data-carousel-dot="{{ loop.index0 }}" aria-label="Фото {{ loop.index }}"></button>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    <div class="place__text">
+      <div class="kicker">{{ settings.get('history_kicker', 'Филармония — историческое место') }}</div>
+      <h2>{{ settings.get('history_title', 'Музыка в центре города') }}</h2>
+      <div class="prose">{{ settings.get('history_text', '') | safe }}</div>
+      {% if history %}<a class="btn btn--ghost" href="{{ history.url }}">Подробнее об истории</a>{% endif %}
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="map map--wide">
+      {% if settings.get('history_map') %}
+        {{ settings.get('history_map') | safe }}
+      {% else %}
+        <iframe src="https://yandex.ru/map-widget/v1/?text={{ settings.get('address', 'Смоленск, ул. Глинки, 3') | urlencode }}&amp;z=16"
+                title="Карта: {{ settings.get('address', 'Смоленск, ул. Глинки, 3') }}" loading="lazy" allowfullscreen></iframe>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="section section--tint">
   <div class="wrap">
     <div class="section__head">
-      <h2>Коллективы филармонии</h2>
-      <a class="btn btn--ghost btn--sm" href="{{ url_for('public.collectives') }}">Все коллективы</a>
+      <h2>Новости</h2>
+      <a class="btn btn--ghost btn--sm" href="{{ url_for('public.news_list') }}">Все новости</a>
     </div>
-    <div class="cards cards--{{ 3 if collectives|length == 3 else 4 }}">
-      {% for c in collectives %}
-        <article class="card">
-          <a class="card__poster" href="{{ c.url }}" style="aspect-ratio:4/3">
-            {% set first = c.photos | first %}
-            {% if first %}<img src="{{ first.src }}" alt="{{ c.name }}" loading="lazy">
-            {% elif c.logo %}<img src="/static/uploads/{{ c.logo }}" alt="{{ c.name }}" loading="lazy">{% endif %}
+    <div class="newsgrid">
+      {% for item in news %}{{ news_card(item) }}{% endfor %}
+    </div>
+  </div>
+</section>
+
+{% if settings.get('pos_widget') or main_banners %}
+<section class="section section--flush">
+  <div class="wrap">
+    {% if settings.get('pos_widget') %}
+      <div class="pos-widget">{{ settings.get('pos_widget') | safe }}</div>
+    {% else %}
+      {% for b in main_banners %}
+        {% if b.image %}
+          <a class="bigbanner bigbanner--image" href="{{ b.url }}" rel="noopener" target="_blank">
+            <img src="/static/uploads/{{ b.image }}" alt="{{ b.title }}" loading="lazy">
           </a>
-          <h3 class="card__title"><a href="{{ c.url }}">{{ c.name }}</a></h3>
-          <div class="card__meta">{{ c.lead }}</div>
-        </article>
+        {% else %}
+          <a class="bigbanner" href="{{ b.url }}" rel="noopener" target="_blank">
+            <span class="bigbanner__text">
+              <strong>{{ b.title }}</strong>
+              <span>Есть вопрос или предложение по работе филармонии? Напишите через Госуслуги — обращение обязательно рассмотрят.</span>
+            </span>
+            <span class="bigbanner__btn">Сообщить</span>
+          </a>
+        {% endif %}
       {% endfor %}
-    </div>
+    {% endif %}
   </div>
 </section>
 {% endif %}
@@ -107,7 +181,7 @@
       {% for b in banners %}
         <a href="{{ b.url }}" title="{{ b.title }}" rel="noopener" target="_blank">
           {% if b.image %}<img src="/static/uploads/{{ b.image }}" alt="{{ b.title }}" loading="lazy">
-          {% else %}<span style="font-size:.86rem;text-align:center">{{ b.title }}</span>{% endif %}
+          {% else %}<span class="partners__text">{{ b.title }}</span>{% endif %}
         </a>
       {% endfor %}
     </div>

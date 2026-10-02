@@ -1,11 +1,33 @@
 {% extends "admin/base.html" %}
+{% from "admin/_table.html" import sort_th, pager, keep_sort, reset_link %}
 {% block title %}Обращения граждан{% endblock %}
 {% block content %}
 <h1>Обращения граждан</h1>
-<p class="subtitle">Поступают из интернет-приёмной. Срок рассмотрения — 30 дней.</p>
-<div class="table-wrap" style="margin-top:20px">
+<p class="subtitle">Поступают из интернет-приёмной. Срок рассмотрения — 30 дней.
+  {% if retention %}Обработанные обращения хранятся {{ retention | plural('год', 'года', 'лет') }}, затем удаляются автоматически
+  (срок меняется в «Настройках»).{% else %}Обращения хранятся бессрочно.{% endif %}</p>
+
+<form class="filters" method="get" style="margin-top:20px">
+  {{ keep_sort() }}
+  <input type="text" name="q" value="{{ search }}" placeholder="Имя, тема, почта или телефон" aria-label="Поиск">
+  <select name="status" onchange="this.form.submit()" aria-label="Статус">
+    <option value="">Любой статус</option>
+    <option value="new" {{ 'selected' if request.args.get('status') == 'new' }}>Новые</option>
+    <option value="done" {{ 'selected' if request.args.get('status') == 'done' }}>Обработанные</option>
+  </select>
+  <button class="btn btn--ghost btn--sm" type="submit">Найти</button>
+  {{ reset_link(['q', 'status']) }}
+</form>
+
+<div class="table-wrap">
   <table>
-    <tr><th>Дата</th><th>Заявитель</th><th>Контакты</th><th>Тема</th><th>Статус</th></tr>
+    <tr>
+      {{ sort_th('Дата', 'date', sorting) }}
+      {{ sort_th('Заявитель', 'name', sorting) }}
+      <th>Контакты</th>
+      {{ sort_th('Тема', 'subject', sorting) }}
+      {{ sort_th('Статус', 'status', sorting) }}
+    </tr>
     {% for a in items.items %}
       <tr>
         <td>{{ a.created_at | ru_date }}</td>
@@ -14,7 +36,9 @@
         <td>{{ a.subject or '—' }}</td>
         <td>{% if a.is_processed %}<span class="badge badge--on">обработано</span>{% else %}<span class="badge">новое</span>{% endif %}</td>
       </tr>
-    {% else %}<tr><td colspan="5">Обращений нет.</td></tr>{% endfor %}
+    {% else %}<tr><td colspan="5">Обращений не найдено.</td></tr>{% endfor %}
   </table>
 </div>
+<p class="hint">Найдено: {{ items.total }}.</p>
+{{ pager(items) }}
 {% endblock %}

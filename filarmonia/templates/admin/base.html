@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}Управление сайтом{% endblock %} — филармония</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+<link rel="stylesheet" href="{{ asset_url('css/admin.css') }}">
 </head>
 <body>
 <div class="layout">
@@ -13,23 +13,27 @@
 
     <div class="side__group">Содержание</div>
     <a href="{{ url_for('admin.dashboard') }}" class="{{ 'is-active' if request.endpoint == 'admin.dashboard' }}">Сводка</a>
-    <a href="{{ url_for('admin.events') }}" class="{{ 'is-active' if 'event' in request.endpoint }}">Афиша</a>
-    <a href="{{ url_for('admin.news') }}" class="{{ 'is-active' if 'news' in request.endpoint }}">Новости</a>
-    <a href="{{ url_for('admin.collectives') }}" class="{{ 'is-active' if 'collective' in request.endpoint }}">Коллективы</a>
-    <a href="{{ url_for('admin.albums') }}" class="{{ 'is-active' if 'album' in request.endpoint }}">Галерея</a>
+    <a href="{{ url_for('admin.events') }}" class="{{ 'is-active' if (request.endpoint or '').startswith('admin.event') }}">Афиша</a>
+    <a href="{{ url_for('admin.news') }}" class="{{ 'is-active' if (request.endpoint or '').startswith('admin.news') }}">Новости</a>
+    <a href="{{ url_for('admin.collectives') }}" class="{{ 'is-active' if (request.endpoint or '').startswith('admin.collective') }}">Коллективы и артисты</a>
 
     <div class="side__group">Учреждение</div>
-    <a href="{{ url_for('admin.pages') }}" class="{{ 'is-active' if 'page' in request.endpoint }}">Страницы</a>
-    <a href="{{ url_for('admin.documents') }}" class="{{ 'is-active' if 'document' in request.endpoint }}">Документы</a>
-    <a href="{{ url_for('admin.appeals') }}" class="{{ 'is-active' if 'appeal' in request.endpoint }}">Обращения граждан</a>
+    <a href="{{ url_for('admin.pages') }}" class="{{ 'is-active' if (request.endpoint or '').startswith('admin.page') }}">Страницы</a>
+    <a href="{{ url_for('admin.documents') }}" class="{{ 'is-active' if (request.endpoint or '').startswith('admin.document') }}">Документы</a>
+    <a href="{{ url_for('admin.appeals') }}" class="side__link {{ 'is-active' if (request.endpoint or '').startswith('admin.appeal') }}">
+      Обращения граждан
+      {% if new_appeals %}<span class="counter" title="Новых обращений: {{ new_appeals }}">{{ new_appeals if new_appeals < 100 else '99+' }}<span class="visually-hidden"> новых</span></span>{% endif %}
+    </a>
 
     <div class="side__group">Оформление</div>
-    <a href="{{ url_for('admin.menu') }}" class="{{ 'is-active' if 'menu' in request.endpoint }}">Меню</a>
-    <a href="{{ url_for('admin.banners') }}" class="{{ 'is-active' if 'banner' in request.endpoint }}">Баннеры</a>
-    <a href="{{ url_for('admin.refs') }}" class="{{ 'is-active' if 'ref' in request.endpoint }}">Площадки и жанры</a>
-    <a href="{{ url_for('admin.settings_page') }}" class="{{ 'is-active' if 'settings' in request.endpoint }}">Настройки</a>
+    <a href="{{ url_for('admin.menu') }}" class="{{ 'is-active' if (request.endpoint or '').startswith('admin.menu') }}">Меню</a>
+    <a href="{{ url_for('admin.banners') }}" class="{{ 'is-active' if (request.endpoint or '').startswith('admin.banner') }}">Баннеры</a>
+    <a href="{{ url_for('admin.refs') }}" class="{{ 'is-active' if (request.endpoint or '').startswith('admin.ref') }}">Площадки и жанры</a>
+    {# Эти разделы открыты только администратору — редактору их не показываем #}
     {% if current_user and current_user.is_admin %}
-      <a href="{{ url_for('admin.users') }}" class="{{ 'is-active' if 'user' in request.endpoint }}">Сотрудники</a>
+      <a href="{{ url_for('admin.settings_page') }}" class="{{ 'is-active' if (request.endpoint or '').startswith('admin.settings') }}">Настройки</a>
+      <a href="{{ url_for('admin.users') }}" class="{{ 'is-active' if (request.endpoint or '').startswith('admin.user') }}">Сотрудники</a>
+      <a href="{{ url_for('admin.action_log') }}" class="{{ 'is-active' if request.endpoint == 'admin.action_log' }}">Журнал действий</a>
     {% endif %}
 
     <div class="side__foot">
@@ -48,5 +52,44 @@
     {% block content %}{% endblock %}
   </main>
 </div>
+<script src="{{ asset_url('js/admin.js') }}"></script>
+<script>
+/* Визуальный редактор текста (Jodit). Весит под мегабайт, поэтому грузится
+   только на страницах, где есть поле с разметкой: textarea[data-rich].
+   Без скрипта поле остаётся обычным, и HTML вводится вручную. */
+(function () {
+  var fields = document.querySelectorAll("textarea[data-rich]");
+  if (!fields.length) return;
+  var css = document.createElement("link");
+  css.rel = "stylesheet";
+  css.href = "{{ asset_url('vendor/jodit/jodit.min.css') }}";
+  document.head.appendChild(css);
+  var script = document.createElement("script");
+  script.src = "{{ asset_url('vendor/jodit/jodit.min.js') }}";
+  script.onload = function () {
+    fields.forEach(function (field) {
+      Jodit.make(field, {
+        language: "ru",
+        height: field.getAttribute("data-rich") === "small" ? 220 : 420,
+        toolbarAdaptive: false,
+        buttons: "paragraph,bold,italic,underline,strikethrough,|,ul,ol,|,link,image,table,|," +
+                 "hr,eraser,|,undo,redo,|,source,fullsize",
+        controls: {
+          paragraph: { list: { p: "Обычный текст", h2: "Заголовок", h3: "Подзаголовок",
+                               h4: "Малый заголовок", blockquote: "Цитата" } }
+        },
+        // Текст из Word вставляется без его шрифтов, цветов и пустых стилей
+        askBeforePasteHTML: false,
+        askBeforePasteFromWord: false,
+        defaultActionOnPaste: "insert_clear_html",
+        // Картинки — только ссылкой: вставка файлом раздула бы базу
+        uploader: { insertImageAsBase64URI: false },
+        showCharsCounter: false, showWordsCounter: false, showXPathInStatusbar: false
+      });
+    });
+  };
+  document.body.appendChild(script);
+})();
+</script>
 </body>
 </html>

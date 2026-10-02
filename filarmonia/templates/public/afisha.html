@@ -1,6 +1,6 @@
 {% extends "public/base.html" %}
 {% from "public/_macros.html" import event_row, daystrip, pagination %}
-{% block title %}Афиша — {{ settings.get('site_name', 'Смоленская областная филармония') }}{% endblock %}
+{% block title %}Афиша{% endblock %}
 
 {% block breadcrumbs %}
 <div class="wrap breadcrumbs"><a href="{{ url_for('public.index') }}">Главная</a> / Афиша</div>
@@ -48,8 +48,11 @@
 
     {% set on_push = args.get('pushkin') == '1' %}
     {% set on_new = args.get('new') == '1' %}
+    {% set on_ben = args.get('benefits') == '1' %}
     <a class="chip {{ 'chip--on' if on_push }}"
        href="{{ url_for('public.afisha', **dict(args.to_dict(), pushkin='' if on_push else '1')) }}">Пушкинская карта</a>
+    <a class="chip {{ 'chip--on' if on_ben }}"
+       href="{{ url_for('public.afisha', **dict(args.to_dict(), benefits='' if on_ben else '1')) }}">Есть льготы</a>
     <a class="chip {{ 'chip--on' if on_new }}"
        href="{{ url_for('public.afisha', **dict(args.to_dict(), new='' if on_new else '1')) }}">Новинки</a>
     {% if args %}

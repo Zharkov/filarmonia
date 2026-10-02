@@ -1,0 +1,10 @@
+{% extends "public/base.html" %}
+{% block title %}Форма устарела{% endblock %}
+{% block content %}
+<div class="wrap section--roomy">
+  <h1>Форма устарела</h1>
+  <p class="lead">Страница пролежала открытой слишком долго, и защита от подделки запросов
+    не пропустила отправку. Откройте форму заново и заполните её ещё раз.</p>
+  <p><a class="btn btn--primary" href="{{ url_for('public.index') }}">На главную</a></p>
+</div>
+{% endblock %}

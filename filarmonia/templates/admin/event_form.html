@@ -8,13 +8,21 @@
     <h1>{{ ev.title or 'Новое событие' }}</h1>
     <p class="subtitle">{% if ev.id %}{{ ev.starts_at | ru_datetime }}{% else %}Заполните карточку и сохраните{% endif %}</p>
   </div>
-  <div style="display:flex;gap:10px">
-    {% if ev.id %}<a class="btn btn--ghost" href="{{ ev.url }}" target="_blank">Посмотреть на сайте</a>{% endif %}
+  <div style="display:flex;gap:10px;flex-wrap:wrap">
+    {% if ev.id %}
+      <a class="btn btn--ghost" href="{{ ev.url }}" target="_blank">{{ 'Посмотреть на сайте' if ev.is_published else 'Предпросмотр (скрыто с сайта)' }}</a>
+      <form method="post" action="{{ url_for('admin.event_copy', event_id=ev.id) }}"
+            onsubmit="return confirm('Создать копию события? Она будет скрыта с сайта, пока вы не поменяете дату и не опубликуете её.')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn--ghost" type="submit" title="Для повторной программы: всё, кроме даты, переносится">Создать копию</button>
+      </form>
+    {% endif %}
     <a class="btn btn--ghost" href="{{ url_for('admin.events') }}">К списку</a>
   </div>
 </div>
 
 <form method="post" enctype="multipart/form-data">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <section class="panel">
     <div class="field"><label for="title">Название события *</label>
       <input id="title" type="text" name="title" value="{{ ev.title or '' }}" required></div>
@@ -49,17 +57,23 @@
     <div class="grid grid--2">
       <div class="field"><label for="ticket_url">Ссылка на покупку билета</label>
         <input id="ticket_url" type="url" name="ticket_url" value="{{ ev.ticket_url or '' }}"
-               placeholder="Ссылка билетной системы"></div>
+               placeholder="Ссылка билетной системы">
+        <div class="hint">Ведёт кнопка «Купить билет» на карточке концерта. Пусто — кнопка ведёт на страницу события.</div></div>
       <div class="field"><label for="tickets_left">Наличие билетов</label>
         <input id="tickets_left" type="text" name="tickets_left" value="{{ ev.tickets_left or '' }}"
                placeholder="осталось более 100 билетов"></div>
     </div>
 
-    <div class="grid grid--2">
+    <div class="grid grid--3">
+      <div class="field"><label for="cover">Фото для карточки (горизонтальное, 16:9)</label>
+        <input id="cover" type="file" name="cover" accept="image/*">
+        <div class="hint">Идёт в карточки на главной и в подборках. Без него берётся первое фото галереи или афиша.</div>
+        {% if ev.cover %}<img src="/static/uploads/{{ ev.cover }}" alt="" style="max-width:220px;margin-top:8px;border-radius:4px">{% endif %}
+      </div>
       <div class="field"><label for="poster">Афиша (вертикальная, 3:4)</label>
         <input id="poster" type="file" name="poster" accept="image/*">
-        {% if ev.poster %}<div class="hint">Загружено: {{ ev.poster }}</div>
-          <img src="/static/uploads/{{ ev.poster }}" alt="" style="max-width:150px;margin-top:8px;border-radius:4px">{% endif %}
+        <div class="hint">Показывается на странице события.</div>
+        {% if ev.poster %}<img src="/static/uploads/{{ ev.poster }}" alt="" style="max-width:120px;margin-top:8px;border-radius:4px">{% endif %}
       </div>
       <div class="field"><label for="organizer">Организатор</label>
         <input id="organizer" type="text" name="organizer" value="{{ ev.organizer or '' }}">
@@ -73,11 +87,11 @@
       <textarea id="annotation" name="annotation" style="min-height:70px">{{ ev.annotation or '' }}</textarea></div>
 
     <div class="field"><label for="description">Описание программы</label>
-      <textarea id="description" name="description" class="code">{{ ev.description or '' }}</textarea>
-      <div class="hint">Можно использовать HTML: &lt;p&gt;абзац&lt;/p&gt;, &lt;strong&gt;жирный&lt;/strong&gt;, &lt;ul&gt;&lt;li&gt;список&lt;/li&gt;&lt;/ul&gt;</div></div>
+      <textarea id="description" name="description" data-rich>{{ ev.description or '' }}</textarea>
+      </div>
 
     <div class="field"><label for="performers">В концерте принимают участие</label>
-      <textarea id="performers" name="performers" class="code" style="min-height:90px">{{ ev.performers or '' }}</textarea></div>
+      <textarea id="performers" name="performers" data-rich="small">{{ ev.performers or '' }}</textarea></div>
 
     <div class="field"><label>Коллективы филармонии в этой программе</label>
       <select name="collectives" multiple size="5">
@@ -86,6 +100,17 @@
         {% endfor %}
       </select>
       <div class="hint">Удерживайте Ctrl, чтобы выбрать несколько.</div></div>
+
+    <div class="field"><label for="hall_widget">Схема зала</label>
+      <textarea id="hall_widget" name="hall_widget" class="code" style="min-height:70px"
+                {{ 'readonly' if not current_user.is_admin }}>{{ ev.hall_widget or '' }}</textarea>
+      <div class="hint">Код виджета продажи билетов со схемой зала (Яндекс Афиша). Выводится под описанием концерта. Пусто — блока нет.
+        {% if not current_user.is_admin %}Код вставляется на страницу как есть, поэтому менять его может только администратор.{% endif %}</div></div>
+
+    <div class="checkline">
+      <input id="show_media" type="checkbox" name="show_media" {{ 'checked' if ev.show_media or not ev.id }}>
+      <label for="show_media">Показывать блок «Фото и видео» на странице события</label>
+    </div>
   </section>
 
   <!-- ------------- отключаемые блоки: льготы и Пушкинская карта ------------- -->
@@ -100,14 +125,14 @@
       <input id="show_benefits" type="checkbox" name="show_benefits" {{ 'checked' if ev.show_benefits }}>
       <label for="show_benefits">Показывать блок «Льготы»</label>
     </div>
-    <div class="field"><textarea name="benefits_text" class="code" style="min-height:90px">{{ ev.benefits_text or '' }}</textarea>
+    <div class="field"><textarea name="benefits_text" data-rich="small" aria-label="Текст о льготах">{{ ev.benefits_text or '' }}</textarea>
       <div class="hint">Например: цена по пенсионному удостоверению, условия для детей до 7 лет, участникам СВО.</div></div>
 
     <div class="checkline">
       <input id="show_pushkin" type="checkbox" name="show_pushkin" {{ 'checked' if ev.show_pushkin }}>
       <label for="show_pushkin">Событие участвует в программе «Пушкинская карта»</label>
     </div>
-    <div class="field"><textarea name="pushkin_text" class="code" style="min-height:70px">{{ ev.pushkin_text or '' }}</textarea>
+    <div class="field"><textarea name="pushkin_text" data-rich="small" aria-label="Текст о Пушкинской карте">{{ ev.pushkin_text or '' }}</textarea>
       <div class="hint">Если оставить пустым, подставится общий текст из раздела «Настройки».</div></div>
   </section>
 
@@ -132,35 +157,53 @@
       разворачивается подсказка с пояснением.
     </p>
 
+    {#- Баннер, открытый на правку: ?edit_badge=<id> -#}
+    {% set edit_id = request.args.get('edit_badge', 0) | int %}
+    {% set eb = ev.badges | selectattr('id', 'equalto', edit_id) | first %}
+
     {% if ev.badges %}
       <div class="table-wrap" style="margin-bottom:18px">
         <table>
           <tr><th>Вид</th><th>Надпись и подсказка</th><th>Положение</th><th></th></tr>
           {% for b in ev.badges %}
-            <tr>
+            <tr class="{{ 'is-editing' if eb and eb.id == b.id }}">
               <td><span class="preview-pin preview-pin--{{ b.style }}">{{ b.text }}</span></td>
               <td>{{ b.hint or '—' }}{% if b.url %}<br><span class="hint">ссылка: {{ b.url }}</span>{% endif %}</td>
               <td>{% for value, label in positions %}{{ label if value == b.position }}{% endfor %}</td>
-              <td><form method="post" action="{{ url_for('admin.badge_delete', badge_id=b.id) }}">
-                <button class="btn btn--danger btn--sm" type="submit">Удалить</button></form></td>
+              <td><div class="row-actions">
+                <a class="btn btn--ghost btn--sm" href="{{ url_for('admin.event_form', event_id=ev.id, edit_badge=b.id) }}#badge-form">Изменить</a>
+                <form method="post" action="{{ url_for('admin.badge_delete', badge_id=b.id) }}"
+                      onsubmit="return confirm('Удалить баннер?')">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn--danger btn--sm" type="submit">Удалить</button></form>
+              </div></td>
             </tr>
           {% endfor %}
         </table>
       </div>
     {% endif %}
 
-    <form method="post" action="{{ url_for('admin.badge_add', event_id=ev.id) }}">
+    <form method="post" action="{{ url_for('admin.badge_add', event_id=ev.id) }}" id="badge-form"
+          class="{{ 'edit-box' if eb }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% if eb %}
+        <h3>Изменить баннер «{{ eb.text }}»</h3>
+        <input type="hidden" name="id" value="{{ eb.id }}">
+      {% endif %}
       <div class="grid grid--4">
-        <div class="field"><label>Надпись *</label><input type="text" name="text" placeholder="Пушкинская карта" required></div>
-        <div class="field"><label>Положение</label>
-          <select name="position">{% for value, label in positions %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></div>
-        <div class="field"><label>Оформление</label>
-          <select name="style">{% for value, label in styles %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></div>
-        <div class="field"><label>Ссылка (необязательно)</label><input type="url" name="url"></div>
+        <div class="field"><label for="b-text">Надпись *</label>
+          <input id="b-text" type="text" name="text" placeholder="Пушкинская карта" value="{{ eb.text if eb }}" required></div>
+        <div class="field"><label for="b-pos">Положение</label>
+          <select id="b-pos" name="position">{% for value, label in positions %}<option value="{{ value }}" {{ 'selected' if eb and eb.position == value }}>{{ label }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="b-style">Оформление</label>
+          <select id="b-style" name="style">{% for value, label in styles %}<option value="{{ value }}" {{ 'selected' if eb and eb.style == value }}>{{ label }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="b-url">Ссылка (необязательно)</label>
+          <input id="b-url" type="url" name="url" value="{{ eb.url if eb }}"></div>
       </div>
-      <div class="field"><label>Подсказка при наведении</label>
-        <input type="text" name="hint" placeholder="Билет можно оплатить Пушкинской картой"></div>
-      <button class="btn btn--primary" type="submit">Добавить баннер</button>
+      <div class="field"><label for="b-hint">Подсказка при наведении</label>
+        <input id="b-hint" type="text" name="hint" placeholder="Билет можно оплатить Пушкинской картой" value="{{ eb.hint if eb }}"></div>
+      <button class="btn btn--primary" type="submit">{{ 'Сохранить изменения' if eb else 'Добавить баннер' }}</button>
+      {% if eb %}<a class="btn btn--ghost" href="{{ url_for('admin.event_form', event_id=ev.id) }}#badges">Отмена</a>{% endif %}
     </form>
   </section>
 
@@ -169,6 +212,7 @@
   <section class="panel">
     <form method="post" action="{{ url_for('admin.event_delete', item_id=ev.id) }}"
           onsubmit="return confirm('Удалить событие вместе с галереей и баннерами?')">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button class="btn btn--danger" type="submit">Удалить событие</button>
     </form>
   </section>

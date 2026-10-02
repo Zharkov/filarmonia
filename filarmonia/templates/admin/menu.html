@@ -1,45 +1,81 @@
 {% extends "admin/base.html" %}
+{% from "admin/_table.html" import sort_th, keep_sort, reset_link, publish_toggle %}
 {% block title %}Меню{% endblock %}
 {% block content %}
 <h1>Главное меню</h1>
 <p class="subtitle">Пункт может вести на страницу сайта или на любой адрес.</p>
 
-<div class="table-wrap" style="margin:20px 0">
+<form class="filters" method="get" style="margin-top:20px">
+  {{ keep_sort() }}
+  <input type="text" name="q" value="{{ search }}" placeholder="Поиск по названию" aria-label="Поиск по названию">
+  <select name="level" onchange="this.form.submit()" aria-label="Уровень">
+    <option value="">Все уровни</option>
+    <option value="top" {{ 'selected' if request.args.get('level') == 'top' }}>Только верхний уровень</option>
+    {% for m in top_items %}<option value="{{ m.id }}" {{ 'selected' if request.args.get('level') == m.id | string }}>Подпункты «{{ m.title }}»</option>{% endfor %}
+  </select>
+  <select name="status" onchange="this.form.submit()" aria-label="Статус">
+    <option value="">Любой статус</option>
+    <option value="on" {{ 'selected' if request.args.get('status') == 'on' }}>Видимые</option>
+    <option value="off" {{ 'selected' if request.args.get('status') == 'off' }}>Скрытые</option>
+  </select>
+  <button class="btn btn--ghost btn--sm" type="submit">Найти</button>
+  {{ reset_link(['q', 'level', 'status']) }}
+</form>
+
+<div class="table-wrap" style="margin-bottom:20px">
   <table>
-    <tr><th>Порядок</th><th>Название</th><th>Ведёт на</th><th>Уровень</th><th>Статус</th><th></th></tr>
+    <tr>
+      {{ sort_th('Порядок', 'sort', sorting) }}
+      {{ sort_th('Название', 'title', sorting) }}
+      <th>Ведёт на</th>
+      {{ sort_th('Уровень', 'parent', sorting) }}
+      {{ sort_th('Статус', 'status', sorting) }}
+      <th></th>
+    </tr>
     {% for m in items %}
-      <tr>
+      <tr id="row-{{ m.id }}" class="{{ 'is-editing' if edit and edit.id == m.id }}">
         <td>{{ m.sort }}</td>
         <td>{{ '— ' if m.parent_id }}{{ m.title }}</td>
         <td>{{ m.href }}</td>
         <td>{{ m.parent.title if m.parent else 'верхний' }}</td>
-        <td>{% if m.is_published %}<span class="badge badge--on">видно</span>{% else %}<span class="badge badge--off">скрыто</span>{% endif %}</td>
-        <td><form method="post" action="{{ url_for('admin.menu_delete', item_id=m.id) }}" onsubmit="return confirm('Удалить пункт меню?')">
-          <button class="btn btn--danger btn--sm" type="submit">Удалить</button></form></td>
+        <td>{{ publish_toggle('menu', m, 'видно', 'скрыто') }}</td>
+        <td><div class="row-actions">
+          <a class="btn btn--ghost btn--sm" href="{{ url_for('admin.menu', edit=m.id) }}#form">Изменить</a>
+          <form method="post" action="{{ url_for('admin.menu_delete', item_id=m.id) }}" onsubmit="return confirm('Удалить пункт меню?')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn--danger btn--sm" type="submit">Удалить</button></form>
+        </div></td>
       </tr>
-    {% else %}<tr><td colspan="6">Меню пусто.</td></tr>{% endfor %}
+    {% else %}<tr><td colspan="6">Пунктов не найдено.</td></tr>{% endfor %}
   </table>
 </div>
 
-<section class="panel">
-  <h2 style="margin-top:0">Добавить пункт</h2>
+{% set e = edit %}
+<section class="panel {{ 'panel--editing' if e }}" id="form">
+  <h2 style="margin-top:0">{{ 'Изменить пункт «' ~ e.title ~ '»' if e else 'Добавить пункт' }}</h2>
   <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% if e %}<input type="hidden" name="id" value="{{ e.id }}">{% endif %}
     <div class="grid grid--3">
-      <div class="field"><label>Название *</label><input type="text" name="title" required></div>
-      <div class="field"><label>Страница сайта</label>
-        <select name="page_id"><option value="">— не выбрана —</option>
-          {% for p in pages %}<option value="{{ p.id }}">{{ p.title }}</option>{% endfor %}</select></div>
-      <div class="field"><label>Или адрес</label><input type="text" name="url" placeholder="/afisha"></div>
+      <div class="field"><label for="m-title">Название *</label>
+        <input id="m-title" type="text" name="title" value="{{ e.title if e }}" required></div>
+      <div class="field"><label for="m-page">Страница сайта</label>
+        <select id="m-page" name="page_id"><option value="">— не выбрана —</option>
+          {% for p in pages %}<option value="{{ p.id }}" {{ 'selected' if e and e.page_id == p.id }}>{{ p.title }}</option>{% endfor %}</select></div>
+      <div class="field"><label for="m-url">Или адрес</label>
+        <input id="m-url" type="text" name="url" placeholder="/afisha" value="{{ e.url if e }}"></div>
     </div>
     <div class="grid grid--3">
-      <div class="field"><label>Родительский пункт</label>
-        <select name="parent_id"><option value="">— верхний уровень —</option>
-          {% for m in items if not m.parent_id %}<option value="{{ m.id }}">{{ m.title }}</option>{% endfor %}</select></div>
-      <div class="field"><label>Порядок</label><input type="number" name="sort" value="100"></div>
+      <div class="field"><label for="m-parent">Родительский пункт</label>
+        <select id="m-parent" name="parent_id"><option value="">— верхний уровень —</option>
+          {% for m in top_items if not e or m.id != e.id %}<option value="{{ m.id }}" {{ 'selected' if e and e.parent_id == m.id }}>{{ m.title }}</option>{% endfor %}</select></div>
+      <div class="field"><label for="m-sort">Порядок</label>
+        <input id="m-sort" type="number" name="sort" value="{{ e.sort if e else 100 }}"></div>
       <div class="field"><label>&nbsp;</label>
-        <div class="checkline"><input id="mp" type="checkbox" name="is_published" checked><label for="mp">Показывать</label></div></div>
+        <div class="checkline"><input id="mp" type="checkbox" name="is_published" {{ 'checked' if not e or e.is_published }}><label for="mp">Показывать</label></div></div>
     </div>
-    <button class="btn btn--primary" type="submit">Добавить</button>
+    <button class="btn btn--primary" type="submit">{{ 'Сохранить изменения' if e else 'Добавить' }}</button>
+    {% if e %}<a class="btn btn--ghost" href="{{ url_for('admin.menu') }}">Отмена</a>{% endif %}
   </form>
 </section>
 {% endblock %}

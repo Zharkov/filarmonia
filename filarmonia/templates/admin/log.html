@@ -1,0 +1,51 @@
+{% extends "admin/base.html" %}
+{% from "admin/_table.html" import sort_th, pager, keep_sort, reset_link %}
+{% block title %}Журнал действий{% endblock %}
+{% block content %}
+<h1>Журнал действий</h1>
+<p class="subtitle">Кто, когда и что создал, изменил или удалил в админке.</p>
+
+<form class="filters" method="get" style="margin-top:20px">
+  {{ keep_sort() }}
+  <input type="text" name="q" value="{{ search }}" placeholder="Название объекта" aria-label="Поиск по названию">
+  <select name="user" onchange="this.form.submit()" aria-label="Сотрудник">
+    <option value="">Все сотрудники</option>
+    {% for u in users %}<option value="{{ u.id }}" {{ 'selected' if request.args.get('user') == u.id | string }}>{{ u.name or u.login }}</option>{% endfor %}
+  </select>
+  <select name="type" onchange="this.form.submit()" aria-label="Раздел">
+    <option value="">Все разделы</option>
+    {% for key, label in object_labels | dictsort(by='value') %}<option value="{{ key }}" {{ 'selected' if request.args.get('type') == key }}>{{ label }}</option>{% endfor %}
+  </select>
+  <select name="action" onchange="this.form.submit()" aria-label="Действие">
+    <option value="">Любое действие</option>
+    {% for key, label in action_labels.items() %}<option value="{{ key }}" {{ 'selected' if request.args.get('action') == key }}>{{ label }}</option>{% endfor %}
+  </select>
+  <label class="hint" style="margin:0">с <input type="date" name="from" value="{{ request.args.get('from', '') }}" style="width:auto"></label>
+  <label class="hint" style="margin:0">по <input type="date" name="to" value="{{ request.args.get('to', '') }}" style="width:auto"></label>
+  <button class="btn btn--ghost btn--sm" type="submit">Найти</button>
+  {{ reset_link(['q', 'user', 'type', 'action', 'from', 'to']) }}
+</form>
+
+<div class="table-wrap">
+  <table>
+    <tr>
+      {{ sort_th('Когда', 'date', sorting) }}
+      {{ sort_th('Сотрудник', 'user', sorting) }}
+      {{ sort_th('Действие', 'action', sorting) }}
+      {{ sort_th('Раздел', 'type', sorting) }}
+      {{ sort_th('Объект', 'title', sorting) }}
+    </tr>
+    {% for r in items.items %}
+      <tr>
+        <td style="white-space:nowrap">{{ r.created_at | msk | ru_datetime }}</td>
+        <td>{{ r.user_name or '—' }}</td>
+        <td><span class="badge {{ 'badge--off' if r.action in ('delete', 'purge') }}">{{ action_labels.get(r.action, r.action) }}</span></td>
+        <td>{{ object_labels.get(r.object_type, r.object_type or '—') }}</td>
+        <td>{{ r.title or '—' }}{% if r.details %}<div class="hint">{{ r.details }}</div>{% endif %}</td>
+      </tr>
+    {% else %}<tr><td colspan="5">Записей не найдено.</td></tr>{% endfor %}
+  </table>
+</div>
+<p class="hint">Найдено: {{ items.total }}.</p>
+{{ pager(items) }}
+{% endblock %}

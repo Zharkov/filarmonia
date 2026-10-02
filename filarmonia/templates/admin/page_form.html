@@ -1,4 +1,5 @@
 {% extends "admin/base.html" %}
+{% from "admin/_media.html" import media_manager %}
 {% block title %}{{ item.title or 'Новая страница' }}{% endblock %}
 {% block content %}
 <div class="page-head">
@@ -9,6 +10,7 @@
   </div>
 </div>
 <form method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <section class="panel">
     <div class="field"><label for="title">Заголовок *</label>
       <input id="title" type="text" name="title" value="{{ item.title or '' }}" required></div>
@@ -19,17 +21,19 @@
         </select></div>
       <div class="field"><label for="template">Тип страницы</label>
         <select id="template" name="template">
-          <option value="page" {{ 'selected' if item.template == 'page' }}>Обычная</option>
-          <option value="documents" {{ 'selected' if item.template == 'documents' }}>Со списком документов</option>
+          {% for value, label in templates %}
+            <option value="{{ value }}" {{ 'selected' if item.template == value }}>{{ label }}</option>
+          {% endfor %}
         </select>
-        <div class="hint">«Со списком документов» подтягивает документы категории, совпадающей с заголовком.</div></div>
+        <div class="hint">«Со списком документов» подтягивает документы категории, совпадающей с заголовком.
+          «Пушкинская карта» и «Льготное посещение» выводят под текстом ближайшие концерты с этой отметкой.</div></div>
       <div class="field"><label for="sort">Порядок</label><input id="sort" type="number" name="sort" value="{{ item.sort or 100 }}"></div>
     </div>
     <div class="field"><label for="slug">Адрес страницы</label>
       <input id="slug" type="text" name="slug" value="{{ item.slug or '' }}" placeholder="создастся автоматически"></div>
     <div class="field"><label for="content">Содержание</label>
-      <textarea id="content" name="content" class="code" style="min-height:320px">{{ item.content or '' }}</textarea>
-      <div class="hint">HTML: заголовки &lt;h2&gt;, абзацы &lt;p&gt;, списки &lt;ul&gt;&lt;li&gt;, таблицы &lt;table&gt;, ссылки &lt;a href=""&gt;</div></div>
+      <textarea id="content" name="content" data-rich>{{ item.content or '' }}</textarea>
+      <div class="hint">Кнопка «&lt;/&gt;» на панели редактора переключает в режим HTML-кода.</div></div>
     <div class="field"><label for="seo_description">Описание для поисковых систем</label>
       <input id="seo_description" type="text" name="seo_description" value="{{ item.seo_description or '' }}"></div>
     <div class="checkline"><input id="is_published" type="checkbox" name="is_published" {{ 'checked' if item.is_published or not item.id }}>
@@ -40,8 +44,10 @@
   </section>
 </form>
 {% if item.id %}
+{{ media_manager('page', item.id, item.media) }}
 <section class="panel">
   <form method="post" action="{{ url_for('admin.page_delete', item_id=item.id) }}" onsubmit="return confirm('Удалить страницу?')">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <button class="btn btn--danger" type="submit">Удалить страницу</button></form>
 </section>
 {% endif %}

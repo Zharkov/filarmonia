@@ -4,14 +4,18 @@
 <h1>Настройки сайта</h1>
 <p class="subtitle">Контакты, видео на главной, тексты по умолчанию.</p>
 <form method="post" enctype="multipart/form-data" style="margin-top:20px">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   {% for group, rows in grouped.items() %}
     <section class="panel">
       <h2 style="margin-top:0">{{ group }}</h2>
       {% for row in rows %}
         <div class="field">
           <label for="{{ row.key }}">{{ row.title or row.key }}</label>
-          {% if row.kind == 'textarea' or row.kind == 'html' %}
+          {% if row.kind == 'html' and row.key not in widget_keys %}
+            <textarea id="{{ row.key }}" name="{{ row.key }}" data-rich="small">{{ row.value }}</textarea>
+          {% elif row.kind == 'textarea' or row.kind == 'html' %}
             <textarea id="{{ row.key }}" name="{{ row.key }}" class="code">{{ row.value }}</textarea>
+            {% if row.key in widget_keys %}<div class="hint">Код вставляется на страницу без изменений — копируйте его целиком с сайта сервиса.</div>{% endif %}
           {% elif row.kind == 'file' %}
             <input id="{{ row.key }}" type="file" name="f_{{ row.key }}"
                    accept="{{ 'video/mp4,video/webm' if 'video' in row.key else 'image/*' }}">

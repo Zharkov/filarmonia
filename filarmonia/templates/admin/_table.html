@@ -1,0 +1,59 @@
+{#- Заголовок столбца, по которому сортируют. Первый щелчок — по возрастанию,
+    повторный — в обратную сторону. Фильтры из адреса сохраняются, страница
+    сбрасывается на первую: на десятой странице новой сортировки делать нечего. -#}
+{% macro sort_th(label, key, sorting) %}
+{% set active = sorting.key == key %}
+{% set next_dir = 'desc' if active and sorting.dir == 'asc' else 'asc' %}
+{% set args = request.args.to_dict() %}
+{% set _ = args.update({'sort': key, 'dir': next_dir}) %}
+{% set _ = args.pop('page', None) %}
+<th class="sortable {{ 'is-sorted' if active }}"
+    aria-sort="{{ ('ascending' if sorting.dir == 'asc' else 'descending') if active else 'none' }}">
+  <a href="{{ url_for(request.endpoint, **args) }}">{{ label }}<span class="sortable__arrow" aria-hidden="true">{{ ('▲' if sorting.dir == 'asc' else '▼') if active else '↕' }}</span></a>
+</th>
+{% endmacro %}
+
+{#- Номера страниц с сохранением фильтров и сортировки -#}
+{% macro pager(items) %}
+{% if items.pages > 1 %}
+  <nav class="pager" aria-label="Страницы">
+    {% for p in items.iter_pages() %}
+      {% if p %}
+        {% set args = request.args.to_dict() %}
+        {% set _ = args.update({'page': p}) %}
+        {% if p == items.page %}<span class="is-current">{{ p }}</span>
+        {% else %}<a href="{{ url_for(request.endpoint, **args) }}">{{ p }}</a>{% endif %}
+      {% else %}<span>…</span>{% endif %}
+    {% endfor %}
+  </nav>
+{% endif %}
+{% endmacro %}
+
+{#- Метка статуса, которая сама и переключатель: щелчок публикует запись
+    или скрывает её с сайта, не заходя в карточку. kind — раздел из
+    admin.PUBLISH_TOGGLES, on/off — подписи под род слова раздела. -#}
+{% macro publish_toggle(kind, item, on='опубликовано', off='скрыто') %}
+<form class="inline-form" method="post" action="{{ url_for('admin.toggle_publish', kind=kind, item_id=item.id) }}"
+      data-publish-toggle>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ request.full_path }}">
+  <button type="submit" class="badge badge--toggle {{ 'badge--on' if item.is_published else 'badge--off' }}"
+          data-on="{{ on }}" data-off="{{ off }}"
+          aria-pressed="{{ 'true' if item.is_published else 'false' }}"
+          title="{{ 'Скрыть с сайта' if item.is_published else 'Показать на сайте' }}">{{ on if item.is_published else off }}</button>
+</form>
+{% endmacro %}
+
+{#- Скрытые поля сортировки: форма фильтров не должна её сбрасывать -#}
+{% macro keep_sort(extra=()) %}
+{% for name in ('sort', 'dir') + extra %}
+  {% if request.args.get(name) %}<input type="hidden" name="{{ name }}" value="{{ request.args.get(name) }}">{% endif %}
+{% endfor %}
+{% endmacro %}
+
+{#- Ссылка «Сбросить», если хоть один фильтр выбран -#}
+{% macro reset_link(names, keep={}) %}
+{% set ns = namespace(any=false) %}
+{% for name in names if request.args.get(name) %}{% set ns.any = true %}{% endfor %}
+{% if ns.any %}<a class="btn btn--ghost btn--sm" href="{{ url_for(request.endpoint, **keep) }}">Сбросить</a>{% endif %}
+{% endmacro %}

@@ -8,6 +8,7 @@
 
   <div class="grid grid--2">
     <form method="post" action="{{ url_for('admin.media_add') }}" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="owner" value="{{ owner }}">
       <input type="hidden" name="owner_id" value="{{ owner_id }}">
       <input type="hidden" name="kind" value="photo">
@@ -19,6 +20,7 @@
     </form>
 
     <form method="post" action="{{ url_for('admin.media_add') }}" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="owner" value="{{ owner }}">
       <input type="hidden" name="owner_id" value="{{ owner_id }}">
       <input type="hidden" name="kind" value="video">
@@ -35,6 +37,7 @@
 
   {% if media %}
     <h3 style="margin-top:26px">Загружено ({{ media | length }})</h3>
+    <p class="hint" style="margin-bottom:12px">Порядок здесь — порядок на сайте. Стрелки ← → переставляют материал на одно место.</p>
     <div class="thumbs">
       {% for m in media %}
         <div class="thumb">
@@ -48,12 +51,23 @@
             <div style="aspect-ratio:4/3;display:grid;place-items:center;background:#1e2430;color:#fff;font-size:.8rem">видео по ссылке</div>
           {% endif %}
           <div class="thumb__body">
+            <span class="thumb__num">{{ loop.index }}.</span>
             {{ m.title or ('Фото' if m.kind == 'photo' else 'Видео') }}
             {% if m.url %}<br><a href="{{ m.url }}" target="_blank">источник</a>{% endif %}
-            <form method="post" action="{{ url_for('admin.media_delete', media_id=m.id) }}"
-                  onsubmit="return confirm('Удалить этот материал?')">
-              <button class="btn btn--danger btn--sm" type="submit">Удалить</button>
-            </form>
+            <div class="thumb__actions">
+              <form method="post" action="{{ url_for('admin.media_move', media_id=m.id) }}" data-media-move>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn--ghost btn--sm" type="submit" name="dir" value="up" data-dir="up"
+                        title="Поставить раньше" aria-label="Поставить раньше" {{ 'disabled' if loop.first }}>←</button>
+                <button class="btn btn--ghost btn--sm" type="submit" name="dir" value="down" data-dir="down"
+                        title="Поставить позже" aria-label="Поставить позже" {{ 'disabled' if loop.last }}>→</button>
+              </form>
+              <form method="post" action="{{ url_for('admin.media_delete', media_id=m.id) }}"
+                    onsubmit="return confirm('Удалить этот материал?')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn--danger btn--sm" type="submit">Удалить</button>
+              </form>
+            </div>
           </div>
         </div>
       {% endfor %}

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Филармония">
+  <rect width="64" height="64" fill="#1e2430"/>
+  <rect x="9" y="9" width="46" height="46" fill="none" stroke="#a8332b" stroke-width="4"/>
+  <text x="32" y="45" text-anchor="middle" fill="#ffffff"
+        font-family="Georgia, 'Times New Roman', serif" font-size="34">Ф</text>
+</svg>

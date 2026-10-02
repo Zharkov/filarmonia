@@ -1,18 +1,19 @@
 {% extends "public/base.html" %}
-{% block title %}Коллективы — {{ settings.get('site_name', 'Смоленская областная филармония') }}{% endblock %}
+{% from "public/_macros.html" import img_src %}
+{% block title %}Коллективы и артисты{% endblock %}
 {% block breadcrumbs %}
-<div class="wrap breadcrumbs"><a href="{{ url_for('public.index') }}">Главная</a> / Коллективы</div>
+<div class="wrap breadcrumbs"><a href="{{ url_for('public.index') }}">Главная</a> / Коллективы и артисты</div>
 {% endblock %}
 
 {% block content %}
 <div class="wrap">
-  <h1>Коллективы</h1>
+  <h1>Коллективы и артисты</h1>
   <p class="lead">Оркестры, ансамбли и солисты филармонии. У каждого коллектива — фото и видео, контакты для заявок и подробный рассказ.</p>
 
   {% for c in items %}
     <article class="collective">
       <div class="collective__head">
-        {% if c.logo %}<img class="collective__logo" src="/static/uploads/{{ c.logo }}" alt="">{% endif %}
+        {% if c.logo %}<img class="collective__logo" src="/static/uploads/{{ c.logo }}" alt="Эмблема: {{ c.name }}">{% endif %}
         <div>
           <h2 class="collective__name">{{ c.name }}</h2>
           {% if c.lead %}<div class="collective__lead">{{ c.lead }}</div>{% endif %}
@@ -25,11 +26,11 @@
           {% for m in items_media %}
             {% if m.kind == 'photo' %}
               <a href="{{ m.src }}" data-photo="{{ m.src }}" data-photo-alt="{{ c.name }}">
-                <img src="{{ m.src }}" alt="{{ m.title or c.name }}" loading="lazy">
+                <img {{ img_src(m.src, '260px') }} alt="{{ m.title or c.name }}" loading="lazy">
               </a>
             {% else %}
               <a href="{{ c.url }}#video">
-                {% if m.preview %}<img src="/static/uploads/{{ m.preview }}" alt="{{ m.title or c.name }}" loading="lazy">{% endif %}
+                {% if m.preview %}<img {{ img_src('/static/uploads/' ~ m.preview, '260px') }} alt="{{ m.title or c.name }}" loading="lazy">{% endif %}
                 <span class="collective__play" aria-hidden="true">▶</span>
               </a>
             {% endif %}
@@ -37,7 +38,7 @@
         </div>
       {% endif %}
 
-      {% if c.annotation %}<p style="padding:0 22px">{{ c.annotation }}</p>{% endif %}
+      {% if c.annotation %}<p class="collective__text">{{ c.annotation }}</p>{% endif %}
 
       <div class="collective__foot">
         {% if c.contacts %}

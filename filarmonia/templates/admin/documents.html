@@ -1,51 +1,94 @@
 {% extends "admin/base.html" %}
+{% from "admin/_table.html" import sort_th, keep_sort, reset_link, publish_toggle %}
 {% block title %}Документы{% endblock %}
 {% block content %}
 <h1>Документы</h1>
 <p class="subtitle">Устав, НПА, планы и отчёты. Категория определяет раздел, в котором документ показывается.</p>
 
-<section class="panel" style="margin-top:20px">
-  <h2 style="margin-top:0">Загрузить документ</h2>
+{% set d = edit %}
+<section class="panel {{ 'panel--editing' if d }}" style="margin-top:20px" id="form">
+  <h2 style="margin-top:0">{{ 'Изменить документ' if d else 'Загрузить документ' }}</h2>
   <form method="post" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% if d %}<input type="hidden" name="id" value="{{ d.id }}">{% endif %}
     <div class="grid grid--3">
-      <div class="field"><label>Название *</label><input type="text" name="title" required></div>
-      <div class="field"><label>Категория</label><input type="text" name="category" list="cats" value="Учредительные документы">
+      <div class="field"><label for="doc-title">Название *</label>
+        <input id="doc-title" type="text" name="title" value="{{ d.title if d }}" required></div>
+      <div class="field"><label for="doc-cat">Категория</label>
+        <input id="doc-cat" type="text" name="category" list="cats" value="{{ d.category if d else 'Учредительные документы' }}">
         <datalist id="cats">
-          {% for category in grouped.keys() %}<option value="{{ category }}">{% endfor %}
+          {% for category in categories %}<option value="{{ category }}">{% endfor %}
           <option value="Учредительные документы"><option value="Приказы"><option value="План финансово-хозяйственной деятельности">
           <option value="Годовые отчёты о деятельности"><option value="Независимая оценка качества"><option value="Материально-техническая база">
           <option value="Противодействие коррупции"><option value="Политика конфиденциальности">
         </datalist></div>
-      <div class="field"><label>Год</label><input type="number" name="year" value="{{ now.year }}"></div>
+      <div class="field"><label for="doc-year">Год</label>
+        <input id="doc-year" type="number" name="year" value="{{ (d.year or '') if d else now.year }}"></div>
     </div>
     <div class="grid grid--3">
-      <div class="field"><label>Файл (pdf, doc, xls)</label><input type="file" name="file"></div>
-      <div class="field"><label>Или внешняя ссылка</label><input type="url" name="url"></div>
-      <div class="field"><label>Порядок</label><input type="number" name="sort" value="100"></div>
+      <div class="field"><label for="doc-file">Файл (pdf, doc, xls)</label><input id="doc-file" type="file" name="file">
+        {% if d and d.file %}<div class="hint">Сейчас: <a href="{{ d.href }}" target="_blank">{{ d.file }}</a>. Новый файл заменит его.</div>{% endif %}</div>
+      <div class="field"><label for="doc-url">Или внешняя ссылка</label>
+        <input id="doc-url" type="url" name="url" value="{{ d.url if d and d.url != '#' }}"></div>
+      <div class="field"><label for="doc-sort">Порядок</label>
+        <input id="doc-sort" type="number" name="sort" value="{{ d.sort if d else 100 }}"></div>
     </div>
-    <div class="checkline"><input id="dp" type="checkbox" name="is_published" checked><label for="dp">Опубликован</label></div>
-    <button class="btn btn--primary" type="submit">Сохранить документ</button>
+    <div class="checkline"><input id="dp" type="checkbox" name="is_published" {{ 'checked' if not d or d.is_published }}><label for="dp">Опубликован</label></div>
+    <button class="btn btn--primary" type="submit">{{ 'Сохранить изменения' if d else 'Сохранить документ' }}</button>
+    {% if d %}<a class="btn btn--ghost" href="{{ url_for('admin.documents') }}">Отмена</a>{% endif %}
   </form>
 </section>
 
-{% for category, items in grouped.items() %}
-  <h2>{{ category }}</h2>
-  <div class="table-wrap">
-    <table>
-      <tr><th>Название</th><th>Год</th><th>Размер</th><th>Статус</th><th></th></tr>
-      {% for d in items %}
-        <tr>
-          <td><a href="{{ d.href }}" target="_blank">{{ d.title }}</a></td>
-          <td>{{ d.year or '—' }}</td>
-          <td>{{ d.size_kb ~ ' КБ' if d.size_kb else '—' }}</td>
-          <td>{% if d.is_published %}<span class="badge badge--on">опубликован</span>{% else %}<span class="badge badge--off">скрыт</span>{% endif %}</td>
-          <td><form method="post" action="{{ url_for('admin.document_delete', item_id=d.id) }}" onsubmit="return confirm('Удалить документ?')">
-            <button class="btn btn--danger btn--sm" type="submit">Удалить</button></form></td>
-        </tr>
-      {% endfor %}
-    </table>
-  </div>
-{% else %}
-  <p class="hint">Документы ещё не загружены.</p>
-{% endfor %}
+<form class="filters" method="get">
+  {{ keep_sort() }}
+  <input type="text" name="q" value="{{ search }}" placeholder="Поиск по названию" aria-label="Поиск по названию">
+  <select name="category" onchange="this.form.submit()" aria-label="Категория">
+    <option value="">Все категории</option>
+    {% for c in categories %}<option value="{{ c }}" {{ 'selected' if request.args.get('category') == c }}>{{ c }}</option>{% endfor %}
+  </select>
+  <select name="year" onchange="this.form.submit()" aria-label="Год">
+    <option value="">Любой год</option>
+    {% for y in years %}<option value="{{ y }}" {{ 'selected' if request.args.get('year') == y | string }}>{{ y }}</option>{% endfor %}
+  </select>
+  <select name="status" onchange="this.form.submit()" aria-label="Статус">
+    <option value="">Любой статус</option>
+    <option value="on" {{ 'selected' if request.args.get('status') == 'on' }}>Опубликованные</option>
+    <option value="off" {{ 'selected' if request.args.get('status') == 'off' }}>Скрытые</option>
+  </select>
+  <button class="btn btn--ghost btn--sm" type="submit">Найти</button>
+  {{ reset_link(['q', 'category', 'year', 'status']) }}
+</form>
+
+<div class="table-wrap">
+  <table>
+    <tr>
+      {{ sort_th('Название', 'title', sorting) }}
+      {{ sort_th('Категория', 'category', sorting) }}
+      {{ sort_th('Год', 'year', sorting) }}
+      {{ sort_th('Размер', 'size', sorting) }}
+      {{ sort_th('Порядок', 'sort', sorting) }}
+      {{ sort_th('Статус', 'status', sorting) }}
+      <th></th>
+    </tr>
+    {% for d in items %}
+      <tr id="row-{{ d.id }}" class="{{ 'is-editing' if edit and edit.id == d.id }}">
+        <td><a href="{{ d.href }}" target="_blank">{{ d.title }}</a></td>
+        <td>{{ d.category or '—' }}</td>
+        <td>{{ d.year or '—' }}</td>
+        <td>{{ d.size_kb ~ ' КБ' if d.size_kb else '—' }}</td>
+        <td>{{ d.sort }}</td>
+        <td>{{ publish_toggle('document', d, 'опубликован', 'скрыт') }}</td>
+        <td><div class="row-actions">
+          <a class="btn btn--ghost btn--sm" href="{{ url_for('admin.documents', edit=d.id) }}#form">Изменить</a>
+          <form method="post" action="{{ url_for('admin.document_delete', item_id=d.id) }}" onsubmit="return confirm('Удалить документ?')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn--danger btn--sm" type="submit">Удалить</button></form>
+        </div></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="7">Документов не найдено.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+<p class="hint">Найдено: {{ items | length }}.</p>
 {% endblock %}

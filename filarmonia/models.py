@@ -1,12 +1,35 @@
 """Модели базы данных Смоленской областной филармонии."""
-from datetime import datetime, date
+from datetime import datetime
+
+import re
+import sqlite3
 
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import event, inspect, text
+from sqlalchemy.engine import Engine
 from werkzeug.security import check_password_hash, generate_password_hash
+
+from .utils import utcnow
 
 db = SQLAlchemy()
 
 UPLOADS_URL = "/static/uploads/"
+
+
+@event.listens_for(Engine, "connect")
+def _sqlite_unicode_lower(dbapi_connection, _record):
+    """Поиск без учёта регистра для русских букв на SQLite.
+
+    `ilike` на SQLite превращается в `lower(колонка) LIKE lower(запрос)`, а
+    встроенный lower в SQLite переводит в строчные только латиницу: «Концерт»
+    не находился по запросу «концерт». Подменяем его питоновским str.lower.
+    PostgreSQL на боевом сервере понимает регистр кириллицы сам, его не трогаем.
+    """
+    if isinstance(dbapi_connection, sqlite3.Connection):
+        dbapi_connection.create_function(
+            "lower", 1, lambda value: value.lower() if isinstance(value, str) else value,
+            deterministic=True,
+        )
 
 
 class HasMedia:
@@ -37,7 +60,7 @@ class User(db.Model):
     role = db.Column(db.String(32), nullable=False, default="editor")  # admin | editor
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     last_login_at = db.Column(db.DateTime)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
     def set_password(self, raw: str) -> None:
         self.password_hash = generate_password_hash(raw)
@@ -77,8 +100,12 @@ class Setting(db.Model):
 
 
 # Меню/страницы
-class Page(db.Model):
-    """Статическая страница (Об учреждении, Услуги, Отчёты, НПА и т.д.)."""
+class Page(db.Model, HasMedia):
+    """Статическая страница (Об учреждении, Услуги, Отчёты, НПА и т.д.).
+
+    К странице можно прикрепить фото и видео: так на «Структуре и органах
+    управления» размещают схему, а фото «Истории» идут в карусель на главной.
+    """
 
     __tablename__ = "pages"
 
@@ -90,15 +117,20 @@ class Page(db.Model):
     sort = db.Column(db.Integer, default=100)
     is_published = db.Column(db.Boolean, default=True, nullable=False)
     show_in_menu = db.Column(db.Boolean, default=True, nullable=False)
-    template = db.Column(db.String(32), default="page")  # page | documents | contacts
+    # page | documents | contacts | pushkin | benefits
+    template = db.Column(db.String(32), default="page")
     seo_description = db.Column(db.String(400), default="")
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
 
     children = db.relationship(
         "Page",
         backref=db.backref("parent", remote_side=[id]),
         order_by="Page.sort",
         cascade="all",
+    )
+    media = db.relationship(
+        "MediaItem", backref="page", order_by="MediaItem.sort",
+        cascade="all, delete-orphan",
     )
 
     @property
@@ -155,6 +187,17 @@ class Venue(db.Model):
     map_embed = db.Column(db.Text, default="")  # код интерактивной карты
 
 
+# Метки жанров для «Музыкального маршрута»: по ним подбираются концерты
+# под ответы посетителя. Ключ хранится в базе, подпись видит редактор.
+ROUTE_TAGS = [
+    ("calm", "Спокойное вдохновение"),
+    ("romance", "Тёплая романтика"),
+    ("energy", "Энергия и драйв"),
+    ("discover", "Новые открытия"),
+    ("family", "Для семьи с детьми"),
+]
+
+
 class Category(db.Model):
     """Жанр или категория события: классика, детям, джаз, органная музыка."""
 
@@ -164,6 +207,11 @@ class Category(db.Model):
     name = db.Column(db.String(160), nullable=False)
     slug = db.Column(db.String(160), unique=True, nullable=False)
     sort = db.Column(db.Integer, default=100)
+    route_tags = db.Column(db.String(200), default="")  # ключи ROUTE_TAGS через запятую
+
+    @property
+    def tags(self) -> set:
+        return {t for t in (self.route_tags or "").split(",") if t}
 
 
 class Event(db.Model, HasMedia):
@@ -175,7 +223,7 @@ class Event(db.Model, HasMedia):
     title = db.Column(db.String(300), nullable=False)
     slug = db.Column(db.String(300), unique=True, nullable=False)
     poster = db.Column(db.String(300), default="")  # афиша (вертикальная)
-    cover = db.Column(db.String(300), default="")   # широкое фото для карточки
+    cover = db.Column(db.String(300), default="")   # горизонтальное фото для карточки
     starts_at = db.Column(db.DateTime, nullable=False, index=True)
     duration_min = db.Column(db.Integer)
     age_limit = db.Column(db.String(8), default="6+")
@@ -190,17 +238,19 @@ class Event(db.Model, HasMedia):
 
     ticket_url = db.Column(db.String(500), default="")  # ссылка билетной системы
     tickets_left = db.Column(db.String(80), default="")  # «осталось более 100 билетов»
+    hall_widget = db.Column(db.Text, default="")  # код схемы зала (виджет Яндекс Афиши)
 
     # Блоки, которые редактор включает и выключает на своё усмотрение
     show_pushkin = db.Column(db.Boolean, default=False, nullable=False)
     pushkin_text = db.Column(db.Text, default="")
     show_benefits = db.Column(db.Boolean, default=False, nullable=False)
     benefits_text = db.Column(db.Text, default="")
+    show_media = db.Column(db.Boolean, default=True, nullable=False)
 
     is_published = db.Column(db.Boolean, default=True, nullable=False)
     is_new = db.Column(db.Boolean, default=False, nullable=False)
     is_featured = db.Column(db.Boolean, default=False, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
     venue = db.relationship("Venue", backref="events")
     category = db.relationship("Category", backref="events")
@@ -227,6 +277,22 @@ class Event(db.Model, HasMedia):
     @property
     def is_past(self) -> bool:
         return self.starts_at < datetime.now()
+
+    @property
+    def card_image(self) -> str:
+        """Картинка для карточки: горизонтальное фото, иначе первое из галереи, иначе афиша."""
+        if self.cover:
+            return UPLOADS_URL + self.cover
+        first = next(iter(self.photos), None)
+        if first:
+            return first.src
+        return (UPLOADS_URL + self.poster) if self.poster else ""
+
+    @property
+    def age_number(self):
+        """Возрастное ограничение числом: «6+» -> 6. Без отметки — None."""
+        digits = "".join(ch for ch in (self.age_limit or "") if ch.isdigit())
+        return int(digits) if digits else None
 
     @property
     def price_label(self) -> str:
@@ -259,7 +325,7 @@ class EventBadge(db.Model):
 
 # Медиагалерея
 class MediaItem(db.Model):
-    """Фото или видео. Прикрепляется к событию, коллективу или новости.
+    """Фото или видео. Прикрепляется к событию, коллективу, новости или странице.
 
     Видео можно загрузить файлом либо вставить ссылкой на VK Видео, RuTube,
     Дзен, MAX — ссылка автоматически превращается в код проигрывателя.
@@ -275,36 +341,16 @@ class MediaItem(db.Model):
     preview = db.Column(db.String(300), default="")   # обложка видео
     title = db.Column(db.String(300), default="")
     sort = db.Column(db.Integer, default=100)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
     event_id = db.Column(db.Integer, db.ForeignKey("events.id"))
     collective_id = db.Column(db.Integer, db.ForeignKey("collectives.id"))
     news_id = db.Column(db.Integer, db.ForeignKey("news.id"))
-    album_id = db.Column(db.Integer, db.ForeignKey("albums.id"))
+    page_id = db.Column(db.Integer, db.ForeignKey("pages.id"))
 
     @property
     def src(self) -> str:
         return (UPLOADS_URL + self.file) if self.file else self.url
-
-
-class Album(db.Model, HasMedia):
-    """Альбом общей фото- и видеогалереи сайта."""
-
-    __tablename__ = "albums"
-
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(300), nullable=False)
-    slug = db.Column(db.String(300), unique=True, nullable=False)
-    cover = db.Column(db.String(300), default="")
-    year = db.Column(db.Integer, default=lambda: date.today().year)
-    description = db.Column(db.Text, default="")
-    is_published = db.Column(db.Boolean, default=True, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    media = db.relationship(
-        "MediaItem", backref="album", order_by="MediaItem.sort",
-        cascade="all, delete-orphan",
-    )
 
 
 # Коллективы
@@ -344,8 +390,10 @@ class News(db.Model, HasMedia):
     image = db.Column(db.String(300), default="")
     lead = db.Column(db.Text, default="")
     content = db.Column(db.Text, default="")
-    published_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    published_at = db.Column(db.DateTime, default=utcnow, index=True)
     is_published = db.Column(db.Boolean, default=True, nullable=False)
+    # Два вида новости: с фото и видео или только текст
+    show_media = db.Column(db.Boolean, default=True, nullable=False)
 
     media = db.relationship(
         "MediaItem", backref="news", order_by="MediaItem.sort",
@@ -405,6 +453,84 @@ class Appeal(db.Model):
     subject = db.Column(db.String(300), default="")
     message = db.Column(db.Text, nullable=False)
     consent = db.Column(db.Boolean, default=False, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
     is_processed = db.Column(db.Boolean, default=False, nullable=False)
     note = db.Column(db.Text, default="")
+
+
+class ActionLog(db.Model):
+    """Журнал действий в админке: кто, когда и что изменил или удалил.
+
+    Имя сотрудника и название объекта хранятся строкой: запись журнала должна
+    пережить и удаление сотрудника, и удаление самого объекта.
+    """
+
+    __tablename__ = "action_log"
+
+    id = db.Column(db.Integer, primary_key=True)
+    created_at = db.Column(db.DateTime, default=utcnow, index=True)
+    user_id = db.Column(db.Integer)
+    user_name = db.Column(db.String(200), default="")
+    action = db.Column(db.String(32), nullable=False)       # create | update | delete | ...
+    object_type = db.Column(db.String(32), default="")      # event | news | page | ...
+    object_id = db.Column(db.Integer)
+    title = db.Column(db.String(400), default="")
+    details = db.Column(db.String(400), default="")
+
+
+def referenced_uploads() -> set:
+    """Имена всех файлов из каталога загрузок, на которые ещё ссылается база.
+
+    Файл удаляют с диска, только если его нет в этом наборе: одно и то же фото
+    может стоять у нескольких записей (копия события делит фото с оригиналом).
+    """
+    columns = (
+        Event.poster, Event.cover, MediaItem.file, MediaItem.preview, News.image,
+        Collective.logo, Document.file, Banner.image,
+    )
+    names = set()
+    for column in columns:
+        names.update(v for (v,) in db.session.query(column).filter(column.isnot(None)) if v)
+    names.update(v for (v,) in db.session.query(Setting.value).filter(Setting.kind == "file") if v)
+    # Фото, вставленные прямо в текст описаний, страниц и новостей
+    texts = (
+        Event.description, Event.performers, Event.benefits_text, Event.pushkin_text,
+        News.content, Page.content, Collective.description, Collective.contacts, Setting.value,
+    )
+    pattern = re.compile(re.escape(UPLOADS_URL) + r"([\w.\-]+)")
+    for column in texts:
+        for (value,) in db.session.query(column).filter(column.like(f"%{UPLOADS_URL}%")):
+            names.update(pattern.findall(value or ""))
+    return names
+
+
+def upgrade_schema() -> list:
+    """Дописывает в существующие таблицы колонки, появившиеся в моделях.
+
+    `create_all` создаёт только недостающие таблицы, а в уже созданные новых
+    колонок не добавляет — без этого обновлённый сайт падал бы на старой базе.
+    Удалённые из моделей колонки остаются в базе нетронутыми: данные не теряются.
+    Возвращает список добавленных колонок вида «таблица.колонка».
+    """
+    inspector = inspect(db.engine)
+    existing_tables = set(inspector.get_table_names())
+    added = []
+    for table in db.metadata.sorted_tables:
+        if table.name not in existing_tables:
+            continue
+        present = {c["name"] for c in inspector.get_columns(table.name)}
+        for column in table.columns:
+            if column.name in present:
+                continue
+            ddl = f"ALTER TABLE {table.name} ADD COLUMN {column.name} " \
+                  f"{column.type.compile(dialect=db.engine.dialect)}"
+            default = column.default.arg if column.default is not None else None
+            if isinstance(default, bool):
+                ddl += f" DEFAULT {'TRUE' if default else 'FALSE'} NOT NULL"
+            elif isinstance(default, (int, str)):
+                ddl += " DEFAULT " + (str(default) if isinstance(default, int)
+                                      else "'" + default.replace("'", "''") + "'")
+            db.session.execute(text(ddl))
+            added.append(f"{table.name}.{column.name}")
+    db.session.commit()
+    return added

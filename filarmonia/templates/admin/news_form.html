@@ -7,9 +7,18 @@
   <a class="btn btn--ghost" href="{{ url_for('admin.news') }}">К списку</a>
 </div>
 <form method="post" enctype="multipart/form-data">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <section class="panel">
     <div class="field"><label for="title">Заголовок *</label>
       <input id="title" type="text" name="title" value="{{ item.title or '' }}" required></div>
+    {% set with_media = item.show_media or not item.id %}
+    <fieldset class="field" style="border:0;padding:0;margin-left:0">
+      <legend style="font-size:.88rem;margin-bottom:6px">Вид новости</legend>
+      <div class="checkline"><input id="layout-media" type="radio" name="layout" value="media" {{ 'checked' if with_media }}>
+        <label for="layout-media">Текст с фото и видео</label></div>
+      <div class="checkline"><input id="layout-text" type="radio" name="layout" value="text" {{ 'checked' if not with_media }}>
+        <label for="layout-text">Только текст — фотография и галерея на сайте не выводятся</label></div>
+    </fieldset>
     <div class="grid grid--2">
       <div class="field"><label for="published_at">Дата публикации</label>
         <input id="published_at" type="datetime-local" name="published_at"
@@ -20,7 +29,7 @@
     <div class="field"><label for="lead">Короткий анонс</label>
       <textarea id="lead" name="lead" style="min-height:70px">{{ item.lead or '' }}</textarea></div>
     <div class="field"><label for="content">Текст</label>
-      <textarea id="content" name="content" class="code">{{ item.content or '' }}</textarea></div>
+      <textarea id="content" name="content" data-rich>{{ item.content or '' }}</textarea></div>
     <div class="checkline"><input id="is_published" type="checkbox" name="is_published" {{ 'checked' if item.is_published or not item.id }}>
       <label for="is_published">Опубликовано</label></div>
     <button class="btn btn--primary" type="submit">Сохранить</button>
@@ -30,6 +39,7 @@
   {{ media_manager('news', item.id, item.media) }}
   <section class="panel">
     <form method="post" action="{{ url_for('admin.news_delete', item_id=item.id) }}" onsubmit="return confirm('Удалить новость?')">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button class="btn btn--danger" type="submit">Удалить новость</button></form>
   </section>
 {% endif %}

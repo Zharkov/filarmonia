@@ -1,7 +1,42 @@
 {% extends "public/base.html" %}
-{% from "public/_macros.html" import event_card %}
+{% from "public/_macros.html" import event_card, img_src %}
 {% block title %}{{ ev.starts_at | ru_date }} — {{ ev.title }}{% endblock %}
 {% block description %}{{ ev.annotation or ev.description | strip_tags(180) }}{% endblock %}
+{% block og_type %}article{% endblock %}
+{% block og_image %}
+  {%- if ev.poster %}<meta property="og:image" content="{{ request.host_url }}static/uploads/{{ ev.poster }}">{% endif %}
+{% endblock %}
+
+{% block head %}
+{#- Микроразметка концерта: Яндекс и Google показывают такие события
+    отдельной карточкой с датой, площадкой и ценой -#}
+<script type="application/ld+json">
+{{ {
+  "@context": "https://schema.org",
+  "@type": "Event",
+  "name": ev.title,
+  "startDate": ev.starts_at.isoformat(),
+  "eventStatus": "https://schema.org/EventScheduled",
+  "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+  "description": ev.annotation or ev.description | strip_tags(300),
+  "image": (request.host_url ~ 'static/uploads/' ~ ev.poster) if ev.poster else None,
+  "typicalAgeRange": ev.age_limit or None,
+  "location": {
+    "@type": "Place",
+    "name": ev.venue.name,
+    "address": ev.venue.address or settings.get('address', ''),
+  } if ev.venue else None,
+  "organizer": {"@type": "Organization", "name": ev.organizer} if ev.organizer else None,
+  "offers": {
+    "@type": "Offer",
+    "price": ev.price_min,
+    "priceCurrency": "RUB",
+    "url": ev.ticket_url or request.base_url,
+    "availability": "https://schema.org/InStock",
+  } if ev.price_min else None,
+} | compact | tojson }}
+</script>
+{% endblock %}
 
 {% block breadcrumbs %}
 <div class="wrap breadcrumbs">
@@ -15,12 +50,11 @@
   <h1>{{ ev.title }}</h1>
 
   <div class="event">
-    <!-- ---------------- афиша с всплывающими баннерами ---------------- -->
     <div>
       <div class="event__posterwrap">
         {% if ev.poster %}
           <a href="#" data-photo="/static/uploads/{{ ev.poster }}" data-photo-alt="{{ ev.title }}">
-            <img class="event__poster" src="/static/uploads/{{ ev.poster }}" alt="Афиша: {{ ev.title }}">
+            <img class="event__poster" {{ img_src('/static/uploads/' ~ ev.poster, '(max-width: 860px) 100vw, 420px') }} alt="Афиша: {{ ev.title }}">
           </a>
         {% endif %}
 
@@ -41,7 +75,6 @@
       {% if ev.poster %}<p class="event__gallerylink">Нажмите на афишу, чтобы увеличить</p>{% endif %}
     </div>
 
-    <!-- ---------------- реквизиты и покупка ---------------- -->
     <div>
       <div class="event__facts">
         <div class="fact">
@@ -79,25 +112,18 @@
       </div>
 
       <div class="event__price">{{ ev.price_label }}</div>
-      <div class="event__buy">
-        {% if ev.ticket_url %}
-          <a class="btn btn--primary" href="{{ ev.ticket_url }}" rel="noopener" target="_blank">Купить билет</a>
-        {% endif %}
-        <a class="btn btn--ghost" href="tel:{{ settings.get('phone_raw', '+74812383181') }}">Заказать по телефону</a>
-      </div>
       {% if ev.tickets_left %}<p class="event__note">{{ ev.tickets_left }}</p>{% endif %}
 
-      <!-- ---------- блоки, которые редактор включает и выключает ---------- -->
       {% if ev.show_benefits and ev.benefits_text %}
         <div class="block">
-          <h4>Льготы</h4>
+          <h2>Льготы</h2>
           {{ ev.benefits_text | safe }}
         </div>
       {% endif %}
 
       {% if ev.show_pushkin %}
         <div class="block block--pushkin">
-          <h4>Оплата Пушкинской картой</h4>
+          <h2>Оплата Пушкинской картой</h2>
           {{ (ev.pushkin_text or settings.get('pushkin_default', '<p>Билет можно оплатить Пушкинской картой через приложение «Госуслуги Культура» или на сайте билетного оператора.</p>')) | safe }}
         </div>
       {% endif %}
@@ -121,22 +147,28 @@
     </div>
   </div>
 
-  <!-- ---------------- галерея события ---------------- -->
+  {% if ev.hall_widget %}
+    <section class="section" id="hall">
+      <h2>Схема зала</h2>
+      <div class="hall-widget">{{ ev.hall_widget | safe }}</div>
+    </section>
+  {% endif %}
+
   {% set photos, videos = ev.photos, ev.videos %}
-  {% if photos or videos %}
+  {% if ev.show_media and (photos or videos) %}
     <section class="section">
       <h2>Фото и видео</h2>
       {% if videos %}
-        <div class="video-grid" style="margin-bottom:26px">
+        <div class="video-grid video-grid--spaced">
           {% for v in videos %}
-            <figure style="margin:0">
+            <figure class="video-figure">
               <div class="video-frame">
                 {% if v.embed %}{{ v.embed | safe }}
                 {% elif v.url %}{{ v.url | video_embed }}
                 {% elif v.file %}<video controls preload="metadata" src="/static/uploads/{{ v.file }}"
                                         {% if v.preview %}poster="/static/uploads/{{ v.preview }}"{% endif %}></video>{% endif %}
               </div>
-              {% if v.title %}<figcaption class="hint" style="margin-top:8px">{{ v.title }}</figcaption>{% endif %}
+              {% if v.title %}<figcaption class="hint video-figure__caption">{{ v.title }}</figcaption>{% endif %}
             </figure>
           {% endfor %}
         </div>
@@ -145,11 +177,19 @@
         <div class="gallery-grid">
           {% for p in photos %}
             <a href="{{ p.src }}" data-photo="{{ p.src }}" data-photo-alt="{{ p.title }}">
-              <img src="{{ p.src }}" alt="{{ p.title or ev.title }}" loading="lazy">
+              <img {{ img_src(p.src, '(max-width: 620px) 50vw, 25vw') }} alt="{{ p.title or ev.title }}" loading="lazy">
             </a>
           {% endfor %}
         </div>
       {% endif %}
+    </section>
+  {% endif %}
+
+  {% if ev.venue and ev.venue.map_embed %}
+    <section class="section">
+      <h2>Как добраться</h2>
+      {% if ev.venue.address %}<p>{{ ev.venue.address }}</p>{% endif %}
+      <div class="map">{{ ev.venue.map_embed | safe }}</div>
     </section>
   {% endif %}
 
