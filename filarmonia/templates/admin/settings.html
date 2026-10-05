@@ -8,7 +8,9 @@
   {% for group, rows in grouped.items() %}
     <section class="panel">
       <h2 style="margin-top:0">{{ group }}</h2>
-      {% for row in rows %}
+      {#- Галочка «показывать» соцсети стоит рядом с адресом, а не отдельным полем -#}
+      {% for row in rows if not row.key.endswith('_show') %}
+        {% set show_key = row.key ~ '_show' %}
         <div class="field">
           <label for="{{ row.key }}">{{ row.title or row.key }}</label>
           {% if row.kind == 'html' and row.key not in widget_keys %}
@@ -25,6 +27,10 @@
               <label for="{{ row.key }}">Включено</label></div>
           {% else %}
             <input id="{{ row.key }}" type="text" name="{{ row.key }}" value="{{ row.value }}">
+            {% if show_key in values %}
+              <div class="checkline"><input type="checkbox" id="{{ show_key }}" name="{{ show_key }}" {{ 'checked' if values[show_key] }}>
+                <label for="{{ show_key }}">Показывать значок на сайте</label></div>
+            {% endif %}
           {% endif %}
         </div>
       {% endfor %}

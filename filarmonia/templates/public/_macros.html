@@ -5,10 +5,18 @@
 src="{{ url }}"{% set variants = url | srcset %}{% if variants %} srcset="{{ variants }}" sizes="{{ sizes }}"{% endif %}
 {%- endmacro %}
 
+{#- Кнопка «Купить билет». С ID сеанса Яндекс Афиши скрипт открывает окно
+    покупки поверх страницы. Без него, без ключа в «Настройках» или без
+    скрипта это обычная ссылка: на билетную систему, иначе на страницу события. -#}
+{% macro buy_button(ev, cls) -%}
+<a class="{{ cls }}" href="{{ ev.ticket_url or ev.url }}"
+   {%- if ev.ticket_url %} rel="noopener" target="_blank"{% endif %}
+   {%- if ev.yandex_id %} data-ya-session="{{ ev.yandex_id }}"{% endif %}>{{ icon('ticket') }} Купить билет</a>
+{%- endmacro %}
+
 {#- Карточка концерта: горизонтальное фото, плавно уходящее в тёмный фон.
     Поверх фото — дата, отметки «Пушкинская карта» и «Есть льготы», время и возраст.
-    Жанр на карточке не выводится. Кнопка «Купить билет» ведёт по ссылке
-    билетной системы, а пока её нет — на страницу события. -#}
+    Жанр на карточке не выводится. -#}
 {% macro event_card(ev) %}
 <article class="ecard">
   <div class="ecard__top">
@@ -45,15 +53,23 @@ src="{{ url }}"{% set variants = url | srcset %}{% if variants %} srcset="{{ var
         <div class="ecard__pricelabel">Стоимость билета</div>
         <div class="ecard__price">{{ ev.price_label }}</div>
       </div>
-      {% if ev.ticket_url %}
-        <a class="ecard__buy" href="{{ ev.ticket_url }}" rel="noopener" target="_blank"
-           data-ticket-event="{{ ev.id }}">{{ icon('ticket') }} Купить билет</a>
-      {% else %}
-        <a class="ecard__buy" href="{{ ev.url }}" data-ticket-event="{{ ev.id }}">{{ icon('ticket') }} Купить билет</a>
-      {% endif %}
+      {{ buy_button(ev, 'ecard__buy') }}
     </div>
   </div>
 </article>
+{% endmacro %}
+
+{#- Карусель карточек со стрелками ‹ ›. С адресом more_url, когда посетитель
+    докручивает до конца, подгружаются следующие концерты из афиши.
+    Без скрипта ленту можно прокрутить пальцем или колёсиком. -#}
+{% macro event_carousel(events, label, more_url=None) %}
+<div class="ecarousel" data-ecarousel {% if more_url %}data-more="{{ more_url }}"{% endif %}>
+  <div class="ecarousel__track" data-ecarousel-track tabindex="0" role="region" aria-label="{{ label }}">
+    {% for ev in events %}{{ event_card(ev) }}{% endfor %}
+  </div>
+  <button class="ecarousel__arrow ecarousel__arrow--prev" type="button" data-ecarousel-prev aria-label="Назад">‹</button>
+  <button class="ecarousel__arrow ecarousel__arrow--next" type="button" data-ecarousel-next aria-label="Вперёд">›</button>
+</div>
 {% endmacro %}
 
 {#- Карточка новости. У новости «только текст» картинки нет совсем. -#}
@@ -71,10 +87,12 @@ src="{{ url }}"{% set variants = url | srcset %}{% if variants %} srcset="{{ var
 </article>
 {% endmacro %}
 
+{#- Строка афиши: горизонтальное фото 16:9, как в карточках на главной,
+    исполнители под датой и две кнопки — покупка и страница события. -#}
 {% macro event_row(ev) %}
 <article class="eventrow">
-  <a class="eventrow__poster" href="{{ ev.url }}">
-    {% if ev.poster %}<img {{ img_src('/static/uploads/' ~ ev.poster, '170px') }} alt="Афиша: {{ ev.title }}" loading="lazy">{% endif %}
+  <a class="eventrow__poster" href="{{ ev.url }}" tabindex="-1" aria-hidden="true">
+    {% if ev.card_image %}<img {{ img_src(ev.card_image, '(max-width: 620px) 100vw, 320px') }} alt="" loading="lazy">{% endif %}
     {% if ev.age_limit %}<span class="card__age">{{ ev.age_limit }}</span>{% endif %}
   </a>
   <div>
@@ -83,6 +101,9 @@ src="{{ url }}"{% set variants = url | srcset %}{% if variants %} srcset="{{ var
     <div class="eventrow__when">
       {{ ev.starts_at | ru_date }} · {{ ev.starts_at | ru_weekday }} · {{ ev.starts_at.strftime('%H:%M') }}
     </div>
+    {% if ev.performers %}
+      <div class="eventrow__performers"><span>Исполнители:</span> {{ ev.performers | strip_tags(220) }}</div>
+    {% endif %}
     <div class="eventrow__meta">
       {{ ev.category.name if ev.category }}{% if ev.tickets_left %} · {{ ev.tickets_left }}{% endif %}
     </div>
@@ -91,7 +112,10 @@ src="{{ url }}"{% set variants = url | srcset %}{% if variants %} srcset="{{ var
   </div>
   <div class="eventrow__side">
     <div class="eventrow__price">{{ ev.price_label }}</div>
-    <a class="btn btn--primary" href="{{ ev.url }}">{{ 'Билеты и описание' if ev.ticket_url else 'Подробнее' }}</a>
+    <div class="eventrow__btns">
+      {{ buy_button(ev, 'btn btn--primary') }}
+      <a class="btn btn--ghost" href="{{ ev.url }}">Подробнее</a>
+    </div>
   </div>
 </article>
 {% endmacro %}
@@ -100,9 +124,8 @@ src="{{ url }}"{% set variants = url | srcset %}{% if variants %} srcset="{{ var
     Выходные красным, дни без концертов приглушены и не нажимаются,
     название месяца в шапке меняется при прокрутке. -#}
 {% macro daystrip(days, active=None, base='/afisha') %}
-<div class="cal" data-cal>
+<div class="cal" data-cal role="group" aria-label="Календарь концертов">
   <div class="cal__head">
-    <h2 class="cal__title">Календарь событий</h2>
     <span class="cal__month" data-cal-month aria-live="polite">{{ days[0].date | ru_month }} {{ days[0].date.year }}</span>
     <div class="cal__nav">
       <button class="cal__arrow" type="button" data-cal-prev aria-label="Предыдущие дни">‹</button>
@@ -153,17 +176,18 @@ src="{{ url }}"{% set variants = url | srcset %}{% if variants %} srcset="{{ var
 {% endif %}
 {% endmacro %}
 
-{#- Ссылки на соцсети из «Настроек». Пустой адрес — значок не выводится. -#}
+{#- Ссылки на соцсети из «Настроек». Пустой адрес или снятая галочка
+    «Показывать» — значок не выводится. Если галочки в базе ещё нет, значок виден. -#}
 {% macro social_links(settings, modifier='') %}
 {% set networks = [
      ('social_vk', 'ВКонтакте', 'vk'), ('social_tg', 'Telegram', 'tg'),
      ('social_ok', 'Одноклассники', 'ok'), ('social_max', 'MAX', 'max'),
    ] %}
 {% set ns = namespace(any=false) %}
-{% for key, _, _ in networks if settings.get(key) %}{% set ns.any = true %}{% endfor %}
+{% for key, _, _ in networks if settings.get(key) and settings.get(key ~ '_show') != '' %}{% set ns.any = true %}{% endfor %}
 {% if ns.any %}
 <ul class="social {{ modifier }}">
-  {% for key, name, glyph in networks if settings.get(key) %}
+  {% for key, name, glyph in networks if settings.get(key) and settings.get(key ~ '_show') != '' %}
     <li><a href="{{ settings.get(key) }}" rel="noopener" target="_blank" aria-label="{{ name }}" title="{{ name }}">{{ icon(glyph) }}</a></li>
   {% endfor %}
 </ul>

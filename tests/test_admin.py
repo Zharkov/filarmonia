@@ -153,6 +153,45 @@ def test_edit_user_and_duplicate_login(app, admin):
         assert user.check_password("secret123")  # пустой пароль при правке не меняет его
 
 
+def test_user_form_keeps_input_on_error(app, admin):
+    r = admin.post("/admin/users", data={"login": "novikova", "name": "Анна Новикова",
+                                         "password": "123", "role": "admin", "is_active": "1"})
+    html = text(r)
+    assert r.status_code == 200 and "не короче 8 символов" in html
+    assert 'value="novikova"' in html and 'value="Анна Новикова"' in html
+    assert '<option value="admin" selected>' in html
+    with app.app_context():
+        assert User.query.filter_by(login="novikova").first() is None
+
+
+def test_save_and_view(app, admin):
+    r = admin.post("/admin/news/new", data={"title": "Черновик новости", "then": "view"},
+                   content_type="multipart/form-data")
+    assert r.headers["Location"].endswith("/novosti/chernovik-novosti")
+    html = text(admin.get("/novosti/chernovik-novosti"))
+    assert "Скрыто с сайта." in html and "Вернуться к редактированию" in html
+    assert app.test_client().get("/novosti/chernovik-novosti").status_code == 404
+
+
+def test_social_icon_can_be_hidden(app, admin):
+    with app.app_context():
+        for key, value, kind in (("social_tg", "https://t.me/filarmonia", "text"),
+                                 ("social_tg_show", "1", "bool"),
+                                 ("social_max", "https://max.ru/filarmonia", "text")):
+            db.session.add(Setting(key=key, value=value, kind=kind, group="Соцсети"))
+        db.session.commit()
+    guest = app.test_client()
+    html = text(guest.get("/"))
+    assert "t.me/filarmonia" in html and "max.ru/filarmonia" in html
+
+    admin.post("/admin/settings", data={"social_tg": "https://t.me/filarmonia",
+                                        "social_max": "https://max.ru/filarmonia"})
+    html = text(guest.get("/"))
+    assert "t.me/filarmonia" not in html and "max.ru/filarmonia" in html
+    with app.app_context():
+        assert Setting.get("social_tg") == "https://t.me/filarmonia"
+
+
 def test_cannot_lock_yourself_out(app, admin):
     with app.app_context():
         admin_id = User.query.filter_by(login="admin").first().id

@@ -249,6 +249,122 @@
     });
   });
 
+  /* Карусель карточек концертов. Стрелки листают на ширину ленты.
+     С data-more у ленты, когда до конца остаётся меньше экрана,
+     подгружаются следующие концерты; пустой ответ — афиша кончилась. */
+  document.querySelectorAll("[data-ecarousel]").forEach(function (box) {
+    var track = box.querySelector("[data-ecarousel-track]");
+    var prev = box.querySelector("[data-ecarousel-prev]");
+    var next = box.querySelector("[data-ecarousel-next]");
+    var moreUrl = box.getAttribute("data-more");
+    var loading = false;
+
+    function step() {
+      var card = track.firstElementChild;
+      if (!card) return track.clientWidth;
+      var gap = parseFloat(getComputedStyle(track).columnGap) || 0;
+      var perView = Math.max(1, Math.floor((track.clientWidth + gap) / (card.offsetWidth + gap)));
+      return perView * (card.offsetWidth + gap);
+    }
+
+    function loadMore() {
+      if (!moreUrl || loading || !window.fetch) return;
+      loading = true;
+      var sep = moreUrl.indexOf("?") < 0 ? "?" : "&";
+      fetch(moreUrl + sep + "offset=" + track.children.length)
+        .then(function (r) {
+          if (!r.ok) throw new Error(r.status);
+          return r.text();
+        })
+        .then(function (html) {
+          var holder = document.createElement("div");
+          holder.innerHTML = html;
+          var added = holder.querySelectorAll(".ecard");
+          if (!added.length) moreUrl = null;
+          added.forEach(function (card) { track.appendChild(card); });
+          bindYandex(track);
+          loading = false;
+          update();
+        })
+        .catch(function () { moreUrl = null; loading = false; });
+    }
+
+    function update() {
+      prev.disabled = track.scrollLeft <= 2;
+      var left = track.scrollWidth - track.clientWidth - track.scrollLeft;
+      next.disabled = left <= 2 && !moreUrl;
+      if (left < track.clientWidth) loadMore();
+    }
+
+    prev.addEventListener("click", function () { track.scrollBy({ left: -step(), behavior: "smooth" }); });
+    next.addEventListener("click", function () { track.scrollBy({ left: step(), behavior: "smooth" }); });
+    box.classList.add("is-ready");
+    onScrollFrame(track, update);
+  });
+
+  /* Плавное появление разделов главной. Раздел, ушедший с экрана, снова
+     прячется, чтобы появиться ещё раз — и при прокрутке вниз, и вверх. */
+  var reveals = document.querySelectorAll("[data-reveal]");
+  if (reveals.length && "IntersectionObserver" in window &&
+      !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    root.classList.add("js-reveal");
+    var revealer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        var el = entry.target;
+        if (entry.isIntersecting) {
+          el.classList.add("is-visible");
+        } else {
+          el.classList.remove("is-visible");
+          // Ушёл вверх — при обратной прокрутке выедет сверху
+          el.setAttribute("data-from", entry.boundingClientRect.top < 0 ? "above" : "below");
+        }
+      });
+    }, { threshold: 0, rootMargin: "0px 0px -12% 0px" });
+    reveals.forEach(function (el) { revealer.observe(el); });
+  }
+
+  /* Яндекс Афиша: ключ и регион приходят из «Настроек» атрибутами body.
+     Скрипт продавца грузится один раз; кнопка с ID сеанса открывает окно
+     покупки, а без ключа остаётся обычной ссылкой. */
+  var yaKey = document.body.getAttribute("data-ya-key");
+  var YA = "YandexTicketsDealer";
+
+  function bindYandex(scope) {
+    if (!yaKey) return;
+    scope.querySelectorAll("[data-ya-session]:not([data-ya-bound])").forEach(function (btn) {
+      btn.setAttribute("data-ya-bound", "");
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        var id = btn.getAttribute("data-ya-session");
+        window[YA].push(["getDealer", function (dealer) { dealer.open({ id: id, type: "session" }); }]);
+      });
+    });
+  }
+
+  if (yaKey) {
+    var dealer = window[YA] = window[YA] || [];
+    dealer.push(["setDefaultClientKey", yaKey]);
+    dealer.push(["setDefaultRegionId", +document.body.getAttribute("data-ya-region") || 12]);
+    var yaScript = document.createElement("script");
+    yaScript.async = true;
+    yaScript.src = "https://widget.afisha.yandex.ru/dealer/dealer.js";
+    document.head.appendChild(yaScript);
+    bindYandex(document);
+
+    /* Встроенный виджет на странице события */
+    document.querySelectorAll("[data-ya-widget]").forEach(function (section) {
+      var frame = section.querySelector("[data-ya-widget-frame]");
+      section.hidden = false;
+      window[YA].push(["getDealer", function (d) {
+        var widget = d.Widget(section.getAttribute("data-ya-widget"), "session", {
+          target: frame,
+          onRequestClose: function () { widget.unmount(); widget.destroy(); section.hidden = true; },
+        });
+        widget.mount({ style: { height: "600px" } });
+      }]);
+    });
+  }
+
   /* Музыкальный маршрут: вопросы по одному, подборка без перезагрузки.
      Без скрипта видны все три вопроса, и форма уходит на главную обычным запросом. */
   var routeForm = document.querySelector("[data-route]");
@@ -284,6 +400,7 @@
         })
         .then(function (html) {
           routeResult.innerHTML = html;
+          bindYandex(routeResult);
           routeForm.classList.add("is-done");
           bindReset();
           // Адрес с ответами можно отправить другу — подборка откроется сразу

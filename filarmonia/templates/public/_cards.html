@@ -1,0 +1,3 @@
+{#- Порция карточек для карусели: скрипт запрашивает её при прокрутке до конца -#}
+{% from "public/_macros.html" import event_card %}
+{% for ev in events %}{{ event_card(ev) }}{% endfor %}

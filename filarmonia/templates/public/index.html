@@ -1,5 +1,5 @@
 {% extends "public/base.html" %}
-{% from "public/_macros.html" import event_card, daystrip, news_card, icon, img_src %}
+{% from "public/_macros.html" import event_carousel, daystrip, news_card, icon, img_src %}
 
 {% block hero %}
 {% set has_video = settings.get('hero_video') or settings.get('hero_video_url') %}
@@ -40,23 +40,33 @@
 {% endblock %}
 
 {% block content %}
-<section class="section">
+<section class="section" data-reveal>
   <div class="wrap">
     <div class="section__head">
       <h2>Ближайшие концерты</h2>
       <a class="btn btn--ghost btn--sm" href="{{ url_for('public.afisha') }}">Вся афиша</a>
     </div>
     {% if upcoming %}
-      <div class="cards">
-        {% for ev in upcoming %}{{ event_card(ev) }}{% endfor %}
-      </div>
+      {{ event_carousel(upcoming, 'Ближайшие концерты', url_for('public.more_cards')) }}
     {% else %}
       <p class="empty">Ближайшие концерты пока не опубликованы. Добавьте события в разделе «Афиша» админки.</p>
     {% endif %}
   </div>
 </section>
 
-<section class="section route" id="marshrut">
+<section class="section route" id="marshrut" data-reveal>
+  {#- Плывущий нотный стан на фоне: чистое украшение, диктору не читается -#}
+  <div class="route__waves" aria-hidden="true">
+    <svg viewBox="0 0 2400 300" preserveAspectRatio="none" focusable="false">
+      <g fill="none" stroke="currentColor" stroke-width="1.2">
+        <path d="M0 120 Q100 74 200 120 T400 120 T600 120 T800 120 T1000 120 T1200 120 T1400 120 T1600 120 T1800 120 T2000 120 T2200 120 T2400 120"/>
+        <path d="M0 134 Q100 88 200 134 T400 134 T600 134 T800 134 T1000 134 T1200 134 T1400 134 T1600 134 T1800 134 T2000 134 T2200 134 T2400 134"/>
+        <path d="M0 148 Q100 102 200 148 T400 148 T600 148 T800 148 T1000 148 T1200 148 T1400 148 T1600 148 T1800 148 T2000 148 T2200 148 T2400 148"/>
+        <path d="M0 162 Q100 116 200 162 T400 162 T600 162 T800 162 T1000 162 T1200 162 T1400 162 T1600 162 T1800 162 T2000 162 T2200 162 T2400 162"/>
+        <path d="M0 176 Q100 130 200 176 T400 176 T600 176 T800 176 T1000 176 T1200 176 T1400 176 T1600 176 T1800 176 T2000 176 T2200 176 T2400 176"/>
+      </g>
+    </svg>
+  </div>
   <div class="wrap">
     <div class="route__intro">
       <div class="kicker">Подбор концерта</div>
@@ -92,7 +102,7 @@
 </section>
 
 {% set photos = history.photos if history else [] %}
-<section class="section place" id="zdanie">
+<section class="section place" id="zdanie" data-reveal>
   <div class="wrap place__grid {{ 'place__grid--solo' if not photos }}">
     {% if photos %}
       <div class="carousel" data-carousel>
@@ -100,7 +110,6 @@
           {% for p in photos %}
             <figure class="carousel__slide">
               <img {{ img_src(p.src, '(max-width: 1080px) 100vw, 700px') }} alt="{{ p.title or 'Здание филармонии' }}" loading="lazy">
-              {% if p.title %}<figcaption>{{ p.title }}</figcaption>{% endif %}
             </figure>
           {% endfor %}
         </div>
@@ -136,7 +145,7 @@
   </div>
 </section>
 
-<section class="section section--tint">
+<section class="section section--tint" data-reveal>
   <div class="wrap">
     <div class="section__head">
       <h2>Новости</h2>
@@ -149,7 +158,7 @@
 </section>
 
 {% if settings.get('pos_widget') or main_banners %}
-<section class="section section--flush">
+<section class="section section--flush" data-reveal>
   <div class="wrap">
     {% if settings.get('pos_widget') %}
       <div class="pos-widget">{{ settings.get('pos_widget') | safe }}</div>
@@ -174,16 +183,26 @@
 </section>
 {% endif %}
 
+{#- Бегущая строка баннеров справа налево. Лента — два одинаковых набора:
+    когда первый уезжает целиком, анимация незаметно начинается заново.
+    Баннеров мало — набор повторяется, чтобы лента не обрывалась на широком экране.
+    Повторы скрыты от экранного диктора и клавиатуры. -#}
 {% if banners %}
-<section class="section section--tint">
+{% set repeats = ((8 / banners | length) | round(0, 'ceil') | int) %}
+<section class="section section--tint" data-reveal>
   <div class="wrap">
-    <div class="partners">
-      {% for b in banners %}
-        <a href="{{ b.url }}" title="{{ b.title }}" rel="noopener" target="_blank">
-          {% if b.image %}<img src="/static/uploads/{{ b.image }}" alt="{{ b.title }}" loading="lazy">
-          {% else %}<span class="partners__text">{{ b.title }}</span>{% endif %}
-        </a>
-      {% endfor %}
+    <div class="partners" style="--marquee-time: {{ banners | length * repeats * 4 }}s">
+      <div class="partners__track">
+        {% for copy in range(repeats * 2) %}
+          {% for b in banners %}
+            <a href="{{ b.url }}" title="{{ b.title }}" rel="noopener" target="_blank"
+               {% if copy %}aria-hidden="true" tabindex="-1"{% endif %}>
+              {% if b.image %}<img src="/static/uploads/{{ b.image }}" alt="{{ b.title if not copy }}" loading="lazy">
+              {% else %}<span class="partners__text">{{ b.title }}</span>{% endif %}
+            </a>
+          {% endfor %}
+        {% endfor %}
+      </div>
     </div>
   </div>
 </section>

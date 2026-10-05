@@ -1,5 +1,5 @@
 {% extends "public/base.html" %}
-{% from "public/_macros.html" import event_card, img_src %}
+{% from "public/_macros.html" import event_carousel, buy_button, img_src %}
 {% block title %}{{ ev.starts_at | ru_date }} — {{ ev.title }}{% endblock %}
 {% block description %}{{ ev.annotation or ev.description | strip_tags(180) }}{% endblock %}
 {% block og_type %}article{% endblock %}
@@ -81,6 +81,12 @@
           <div class="fact__label">Дата и время</div>
           <div class="fact__value">{{ ev.starts_at | ru_date }}, {{ ev.starts_at | ru_weekday }}, {{ ev.starts_at.strftime('%H:%M') }}</div>
         </div>
+        {% if ev.performers %}
+        <div class="fact">
+          <div class="fact__label">Исполнители</div>
+          <div class="fact__value fact__value--rich">{{ ev.performers | safe }}</div>
+        </div>
+        {% endif %}
         {% if ev.venue %}
         <div class="fact">
           <div class="fact__label">Площадка</div>
@@ -112,6 +118,9 @@
       </div>
 
       <div class="event__price">{{ ev.price_label }}</div>
+      {% if not ev.is_past and (ev.yandex_id or ev.ticket_url) %}
+        <div class="event__buy">{{ buy_button(ev, 'btn btn--primary') }}</div>
+      {% endif %}
       {% if ev.tickets_left %}<p class="event__note">{{ ev.tickets_left }}</p>{% endif %}
 
       {% if ev.show_benefits and ev.benefits_text %}
@@ -132,11 +141,6 @@
         <div class="prose">{{ ev.description | safe }}</div>
       {% endif %}
 
-      {% if ev.performers %}
-        <h2>В концерте принимают участие</h2>
-        <div class="prose">{{ ev.performers | safe }}</div>
-      {% endif %}
-
       {% if ev.collectives %}
         <p>
           {% for c in ev.collectives %}
@@ -146,6 +150,15 @@
       {% endif %}
     </div>
   </div>
+
+  {#- Встроенный виджет покупки. Скрыт, пока скрипт его не покажет:
+      без ключа Яндекс Афиши в «Настройках» на странице не будет пустого блока -#}
+  {% if ev.yandex_id and not ev.is_past %}
+    <section class="section" id="bilety" data-ya-widget="{{ ev.yandex_id }}" hidden>
+      <h2>Купить билет</h2>
+      <div class="ya-widget" data-ya-widget-frame></div>
+    </section>
+  {% endif %}
 
   {% if ev.hall_widget %}
     <section class="section" id="hall">
@@ -196,7 +209,7 @@
   {% if similar %}
     <section class="section">
       <div class="section__head"><h2>Ближайшие концерты</h2></div>
-      <div class="cards">{% for e in similar %}{{ event_card(e) }}{% endfor %}</div>
+      {{ event_carousel(similar, 'Ближайшие концерты') }}
     </section>
   {% endif %}
 </div>

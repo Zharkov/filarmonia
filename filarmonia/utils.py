@@ -422,6 +422,24 @@ def parse_int(value, default=None):
         return default
 
 
+YANDEX_ID = re.compile(r"[\w.\-]+@\d+")
+
+
+def yandex_session_id(value: str) -> str:
+    """ID сеанса Яндекс Афиши из формы: «ticketsteam-825@496249».
+
+    Редактор может вставить и весь код кнопки из письма Яндекса — ID
+    вытаскивается из него. Пусто — пусто; что-то иное — ValueError.
+    """
+    value = (value or "").strip()
+    if not value:
+        return ""
+    found = YANDEX_ID.search(value)
+    if not found:
+        raise ValueError("ID сеанса Яндекс Афиши выглядит так: ticketsteam-825@496249.")
+    return found.group(0)
+
+
 def plural(number, one: str, few: str, many: str) -> str:
     """«1 материал», «2 материала», «5 материалов» — число со склонённым словом."""
     number = int(number or 0)

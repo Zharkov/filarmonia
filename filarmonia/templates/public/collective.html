@@ -1,5 +1,5 @@
 {% extends "public/base.html" %}
-{% from "public/_macros.html" import event_card, img_src %}
+{% from "public/_macros.html" import event_carousel, img_src %}
 {% block title %}{{ item.name }}{% endblock %}
 {% block breadcrumbs %}
 <div class="wrap breadcrumbs">
@@ -48,7 +48,7 @@
   {% if events %}
     <section class="section">
       <div class="section__head"><h2>Ближайшие выступления</h2></div>
-      <div class="cards">{% for e in events %}{{ event_card(e) }}{% endfor %}</div>
+      {{ event_carousel(events, 'Ближайшие выступления') }}
     </section>
   {% endif %}
 </div>

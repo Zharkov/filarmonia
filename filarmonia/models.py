@@ -233,10 +233,13 @@ class Event(db.Model, HasMedia):
     category_id = db.Column(db.Integer, db.ForeignKey("categories.id"))
     annotation = db.Column(db.Text, default="")        # короткий анонс для карточки
     description = db.Column(db.Text, default="")       # основной текст
-    performers = db.Column(db.Text, default="")        # блок «В концерте принимают участие»
+    performers = db.Column(db.Text, default="")        # «Исполнители»
     organizer = db.Column(db.String(300), default="")
 
     ticket_url = db.Column(db.String(500), default="")  # ссылка билетной системы
+    # ID сеанса в Яндекс Афише, например ticketsteam-825@496249: по нему
+    # кнопки «Купить билет» открывают окно покупки
+    yandex_id = db.Column(db.String(120), default="")
     tickets_left = db.Column(db.String(80), default="")  # «осталось более 100 билетов»
     hall_widget = db.Column(db.Text, default="")  # код схемы зала (виджет Яндекс Афиши)
 

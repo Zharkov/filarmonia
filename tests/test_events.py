@@ -4,7 +4,7 @@ import os
 
 from conftest import create_event, png, text
 
-from filarmonia.models import db, Event, MediaItem, EventBadge
+from filarmonia.models import db, Event, MediaItem, EventBadge, Setting
 
 RUTUBE_URL = "https://rutube.ru/video/" + "a1b2c3d4" * 4 + "/"
 
@@ -192,6 +192,45 @@ def test_toggle_publish_from_list(app, admin):
     assert r.is_json and r.json["published"] is False and "скрыто с сайта" in r.json["message"]
     # Сообщение не должно всплыть ещё раз при следующем открытии страницы
     assert "скрыто с сайта" not in text(admin.get("/admin/events?scope=all"))
+
+
+def test_yandex_session_id(app, admin):
+    snippet = ("<button onclick=\"window['YandexTicketsDealer'].push(['getDealer', function(dealer) "
+               "{ dealer.open({ id: 'ticketsteam-825@496249', type: 'session' }) }])\">Купить билет</button>")
+    create_event(admin, yandex_id=snippet, performers="<p>Симфонический оркестр</p>")
+    with app.app_context():
+        assert Event.query.first().yandex_id == "ticketsteam-825@496249"
+
+    with app.app_context():
+        Setting.set("yandex_client_key", "test-key")
+        db.session.commit()
+    html = text(admin.get("/afisha/testovyy-koncert"))
+    assert 'data-ya-session="ticketsteam-825@496249"' in html
+    assert 'data-ya-widget="ticketsteam-825@496249"' in html and 'data-ya-key="test-key"' in html
+    # «Исполнители» — строка в таблице фактов, а не отдельный блок
+    assert "Исполнители" in html and "принимают участие" not in html
+
+    afisha = text(admin.get("/afisha"))
+    assert 'data-ya-session="ticketsteam-825@496249"' in afisha and "Подробнее" in afisha
+    assert "Симфонический оркестр" in afisha
+
+    r = create_event(admin, title="Другой концерт", yandex_id="не тот код")
+    assert "ID сеанса Яндекс Афиши выглядит так" in text(r)
+
+
+def test_carousel_loads_more(app, admin):
+    for day in range(1, 9):
+        create_event(admin, title=f"Концерт {day}", starts_at=f"2030-12-{day:02d}T19:00",
+                     show_pushkin="1" if day % 2 else "")
+    home = text(admin.get("/"))
+    assert "data-ecarousel" in home and "Концерт 6" in home and "Концерт 7" not in home
+
+    more = text(admin.get("/kartochki-afishi?offset=6"))
+    assert "Концерт 7" in more and "Концерт 8" in more and "Концерт 6" not in more
+    assert text(admin.get("/kartochki-afishi?offset=60")).strip() == ""
+
+    pushkin = text(admin.get("/kartochki-afishi?flag=pushkin&offset=0"))
+    assert "Концерт 1" in pushkin and "Концерт 2" not in pushkin
 
 
 def test_draft_visible_only_to_staff(app, admin):

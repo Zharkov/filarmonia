@@ -5,7 +5,7 @@
 <div class="page-head">
   <div><h1>{{ item.title or 'Новая страница' }}</h1></div>
   <div style="display:flex;gap:10px">
-    {% if item.id %}<a class="btn btn--ghost" href="{{ item.url }}" target="_blank">На сайте</a>{% endif %}
+    {% if item.id %}<a class="btn btn--ghost" href="{{ item.url }}" target="_blank">{{ 'Посмотреть на сайте' if item.is_published else 'Предпросмотр (скрыто с сайта)' }}</a>{% endif %}
     <a class="btn btn--ghost" href="{{ url_for('admin.pages') }}">К списку</a>
   </div>
 </div>
@@ -40,7 +40,7 @@
       <label for="is_published">Опубликована</label></div>
     <div class="checkline"><input id="show_in_menu" type="checkbox" name="show_in_menu" {{ 'checked' if item.show_in_menu or not item.id }}>
       <label for="show_in_menu">Доступна для добавления в меню</label></div>
-    <button class="btn btn--primary" type="submit">Сохранить</button>
+    <button class="btn btn--primary" type="submit">Сохранить</button> <button class="btn btn--ghost" type="submit" name="then" value="view" title="Сохранить и открыть, как страница выглядит на сайте. Пока не отмечено «Опубликовано», её видят только сотрудники">Сохранить и посмотреть</button>
   </section>
 </form>
 {% if item.id %}

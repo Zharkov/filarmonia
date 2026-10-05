@@ -54,11 +54,15 @@
         <input id="price_max" type="number" name="price_max" value="{{ ev.price_max or '' }}"></div>
     </div>
 
-    <div class="grid grid--2">
+    <div class="grid grid--3">
+      <div class="field"><label for="yandex_id">ID сеанса в Яндекс Афише</label>
+        <input id="yandex_id" type="text" name="yandex_id" value="{{ ev.yandex_id or '' }}"
+               placeholder="ticketsteam-825@496249">
+        <div class="hint">По нему кнопка «Купить билет» открывает покупку в Яндекс Афише.</div></div>
       <div class="field"><label for="ticket_url">Ссылка на покупку билета</label>
         <input id="ticket_url" type="url" name="ticket_url" value="{{ ev.ticket_url or '' }}"
                placeholder="Ссылка билетной системы">
-        <div class="hint">Ведёт кнопка «Купить билет» на карточке концерта. Пусто — кнопка ведёт на страницу события.</div></div>
+        <div class="hint">Если ID Яндекс Афиши не задан, кнопка «Купить билет» ведёт сюда. Пусто — на страницу события.</div></div>
       <div class="field"><label for="tickets_left">Наличие билетов</label>
         <input id="tickets_left" type="text" name="tickets_left" value="{{ ev.tickets_left or '' }}"
                placeholder="осталось более 100 билетов"></div>
@@ -90,7 +94,7 @@
       <textarea id="description" name="description" data-rich>{{ ev.description or '' }}</textarea>
       </div>
 
-    <div class="field"><label for="performers">В концерте принимают участие</label>
+    <div class="field"><label for="performers">Исполнители</label>
       <textarea id="performers" name="performers" data-rich="small">{{ ev.performers or '' }}</textarea></div>
 
     <div class="field"><label>Коллективы филармонии в этой программе</label>
@@ -144,7 +148,7 @@
       <label for="is_new">Отметка «Новинка» (фильтр в афише)</label></div>
     <div class="checkline"><input id="is_featured" type="checkbox" name="is_featured" {{ 'checked' if ev.is_featured }}>
       <label for="is_featured">Показывать в подборке на главной</label></div>
-    <button class="btn btn--primary" type="submit">Сохранить событие</button>
+    <button class="btn btn--primary" type="submit">Сохранить событие</button> <button class="btn btn--ghost" type="submit" name="then" value="view" title="Сохранить и открыть, как страница выглядит на сайте. Пока не отмечено «Опубликовано», её видят только сотрудники">Сохранить и посмотреть</button>
   </section>
 </form>
 

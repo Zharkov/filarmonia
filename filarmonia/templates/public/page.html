@@ -1,5 +1,5 @@
 {% extends "public/base.html" %}
-{% from "public/_macros.html" import event_card, img_src %}
+{% from "public/_macros.html" import event_carousel, img_src %}
 {% block title %}{{ pg.title }}{% endblock %}
 {% block description %}{{ pg.seo_description or pg.content | strip_tags(180) }}{% endblock %}
 {% block breadcrumbs %}
@@ -17,12 +17,9 @@
   {% if photos %}
     <div class="gallery-grid gallery-grid--spaced page-photos">
       {% for p in photos %}
-        <figure class="page-photo">
-          <a href="{{ p.src }}" data-photo="{{ p.src }}" data-photo-alt="{{ p.title or pg.title }}">
-            <img {{ img_src(p.src, '(max-width: 620px) 50vw, 25vw') }} alt="{{ p.title or pg.title }}" loading="lazy">
-          </a>
-          {% if p.title %}<figcaption class="hint">{{ p.title }}</figcaption>{% endif %}
-        </figure>
+        <a href="{{ p.src }}" data-photo="{{ p.src }}" data-photo-alt="{{ p.title or pg.title }}">
+          <img {{ img_src(p.src, '(max-width: 620px) 50vw, 25vw') }} alt="{{ p.title or pg.title }}" loading="lazy">
+        </a>
       {% endfor %}
     </div>
   {% endif %}
@@ -48,7 +45,7 @@
         <h2>{{ 'Концерты по Пушкинской карте' if pg.template == 'pushkin' else 'Концерты со льготами' }}</h2>
       </div>
       {% if events %}
-        <div class="cards">{% for ev in events %}{{ event_card(ev) }}{% endfor %}</div>
+        {{ event_carousel(events, 'Концерты', url_for('public.more_cards', flag=pg.template)) }}
       {% else %}
         <p class="empty">Ближайшие концерты с этой отметкой пока не опубликованы.</p>
       {% endif %}

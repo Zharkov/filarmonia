@@ -31,7 +31,8 @@
 <link rel="stylesheet" href="{{ asset_url('css/site.css') }}">
 {% block head %}{% endblock %}
 </head>
-<body>
+{#- Ключ и регион Яндекс Афиши: по ним site.js подключает окно покупки билетов -#}
+<body{% if settings.get('yandex_client_key') %} data-ya-key="{{ settings.get('yandex_client_key') }}" data-ya-region="{{ settings.get('yandex_region_id', '12') }}"{% endif %}>
 
 <a class="skip-link" href="#main">Перейти к содержимому</a>
 
@@ -73,8 +74,9 @@
 <header class="header">
   <div class="wrap header__row">
     <a class="logo" href="{{ url_for('public.index') }}">
-      <span class="logo__mark" aria-hidden="true">Ф</span>
-      <span class="logo__text">Смоленская областная филармония</span>
+      <img class="logo__img" src="{{ asset_url('img/logo.png') }}" width="769" height="223" alt="{{ site_name }}">
+      {#- В режиме «Скрыть изображения» вместо картинки видно название -#}
+      <span class="logo__text" aria-hidden="true">{{ site_name }}</span>
     </a>
 
     <nav class="nav" data-nav aria-label="Главное меню">
@@ -112,7 +114,10 @@
     <div class="wrap"><p class="draft-note" role="status">
       <strong>Скрыто с сайта.</strong> Посетители эту страницу не видят — вы смотрите её как сотрудник.
       Чтобы опубликовать, отметьте «Опубликовано» в админке.
+      {% if g.edit_url %}<a href="{{ g.edit_url }}">Вернуться к редактированию</a>{% endif %}
     </p></div>
+  {% elif g.edit_url %}
+    <div class="wrap"><p class="staff-note"><a href="{{ g.edit_url }}">Редактировать в админке</a></p></div>
   {% endif %}
   {% block breadcrumbs %}{% endblock %}
   {% with messages = get_flashed_messages(with_categories=true) %}

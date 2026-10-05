@@ -20,10 +20,10 @@ bp = Blueprint("public", __name__)
 PER_PAGE_AFISHA = 15
 PER_PAGE_NEWS = 12
 SEARCH_LIMIT = 20
-HOME_EVENTS = 6
+# Сколько карточек в карусели сразу и сколько подгружается при прокрутке
+CAROUSEL_BATCH = 6
+SIMILAR_EVENTS = 8
 CALENDAR_DAYS = 60
-# Сколько концертов показывать на страницах «Пушкинская карта» и «Льготное посещение»
-FLAGGED_EVENTS = 5
 ROUTE_RESULTS = 6
 
 # «Музыкальный маршрут»: три вопроса и варианты ответа (ключ, подпись)
@@ -57,28 +57,38 @@ def cards():
     )
 
 
-def check_published(item) -> None:
+def upcoming_cards(flag: str = ""):
+    """Предстоящие опубликованные концерты для каруселей, по порядку дат.
+
+    flag — «pushkin» или «benefits»: только концерты с этой отметкой.
+    Порядок с id в конце нужен, чтобы подгрузка по смещению не теряла
+    и не повторяла концерты, идущие в одно время.
+    """
+    q = cards().filter(Event.is_published.is_(True), Event.starts_at >= datetime.now())
+    if flag in FLAGGED_PAGES:
+        q = q.filter(FLAGGED_PAGES[flag][0].is_(True))
+    return q.order_by(Event.starts_at, Event.id)
+
+
+def check_published(item, edit_url: str = "") -> None:
     """Скрытую запись видят только сотрудники, вошедшие в админку; остальным — 404.
 
     Шаблон получает пометку и показывает плашку «Скрыто с сайта», чтобы редактор
-    не принял предпросмотр за опубликованную страницу.
+    не принял предпросмотр за опубликованную страницу. Сотруднику там же
+    ссылка обратно в форму редактирования.
     """
     if not item.is_published:
         if not g.get("user"):
             abort(404)
         g.draft = True
+    if g.get("user"):
+        g.edit_url = edit_url
 
 
 # Главная
 @bp.route("/")
 def index():
-    now = datetime.now()
-    upcoming = (
-        cards().filter(Event.is_published.is_(True), Event.starts_at >= now)
-        .order_by(Event.starts_at)
-        .limit(HOME_EVENTS)
-        .all()
-    )
+    upcoming = upcoming_cards().limit(CAROUSEL_BATCH).all()
     news = (
         News.query.filter_by(is_published=True)
         .order_by(News.published_at.desc())
@@ -271,18 +281,17 @@ def afisha():
 @bp.route("/afisha/<slug>")
 def event(slug):
     ev = Event.query.filter_by(slug=slug).first_or_404()
-    check_published(ev)
-    similar = (
-        cards().filter(
-            Event.is_published.is_(True),
-            Event.id != ev.id,
-            Event.starts_at >= datetime.now(),
-        )
-        .order_by(Event.starts_at)
-        .limit(4)
-        .all()
-    )
+    check_published(ev, url_for("admin.event_form", event_id=ev.id))
+    similar = upcoming_cards().filter(Event.id != ev.id).limit(SIMILAR_EVENTS).all()
     return render_template("public/event.html", ev=ev, similar=similar)
+
+
+@bp.route("/kartochki-afishi")
+def more_cards():
+    """Следующая порция карточек для карусели: скрипт дописывает их в конец ленты."""
+    offset = max(utils.parse_int(request.args.get("offset"), 0), 0)
+    events = upcoming_cards(request.args.get("flag", "")).offset(offset).limit(CAROUSEL_BATCH).all()
+    return render_template("public/_cards.html", events=events)
 
 
 # Коллективы
@@ -295,7 +304,7 @@ def collectives():
 @bp.route("/kollektivy/<slug>")
 def collective(slug):
     item = Collective.query.filter_by(slug=slug).first_or_404()
-    check_published(item)
+    check_published(item, url_for("admin.collective_form", item_id=item.id))
     events = (
         cards().filter(
             Event.is_published.is_(True),
@@ -303,7 +312,7 @@ def collective(slug):
             Event.collectives.any(id=item.id),
         )
         .order_by(Event.starts_at)
-        .limit(6)
+        .limit(SIMILAR_EVENTS)
         .all()
     )
     return render_template("public/collective.html", item=item, events=events)
@@ -324,7 +333,7 @@ def news_list():
 @bp.route("/novosti/<slug>")
 def news_item(slug):
     item = News.query.filter_by(slug=slug).first_or_404()
-    check_published(item)
+    check_published(item, url_for("admin.news_form", item_id=item.id))
     other = (
         News.query.filter(News.is_published.is_(True), News.id != item.id)
         .order_by(News.published_at.desc())
@@ -346,7 +355,7 @@ FLAGGED_PAGES = {
 @bp.route("/info/<slug>")
 def page(slug):
     pg = Page.query.filter_by(slug=slug).first_or_404()
-    check_published(pg)
+    check_published(pg, url_for("admin.page_form", item_id=pg.id))
     documents, venues, events, afisha_filter = [], [], [], None
     if pg.template == "documents":
         documents = (
@@ -359,14 +368,8 @@ def page(slug):
         # с адресами и картами, которые заданы в разделе «Площадки и жанры»
         venues = Venue.query.order_by(Venue.name).all()
     elif pg.template in FLAGGED_PAGES:
-        flag, afisha_filter = FLAGGED_PAGES[pg.template]
-        events = (
-            cards().filter(Event.is_published.is_(True), flag.is_(True),
-                               Event.starts_at >= datetime.now())
-            .order_by(Event.starts_at)
-            .limit(FLAGGED_EVENTS)
-            .all()
-        )
+        afisha_filter = FLAGGED_PAGES[pg.template][1]
+        events = upcoming_cards(pg.template).limit(CAROUSEL_BATCH).all()
     return render_template("public/page.html", pg=pg, documents=documents, venues=venues,
                            events=events, afisha_filter=afisha_filter)
 

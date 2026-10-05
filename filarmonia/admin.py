@@ -212,6 +212,12 @@ def save(item, message: str):
     flash(message, "ok")
 
 
+def after_save(item, edit_url: str):
+    """Куда вести после сохранения: «Сохранить и посмотреть» открывает запись
+    на сайте (черновик там видят только сотрудники), обычное — обратно в форму."""
+    return redirect(item.url if request.form.get("then") == "view" else edit_url)
+
+
 def files_of(item) -> list:
     """Файлы, которые принадлежат записи: афиша, обложка, фото галереи."""
     names = []
@@ -400,6 +406,7 @@ def event_form(event_id=None):
             ev.performers = rich("performers")
             ev.organizer = f.get("organizer", "").strip()
             ev.ticket_url = f.get("ticket_url", "").strip()
+            ev.yandex_id = utils.yandex_session_id(f.get("yandex_id", ""))
             ev.tickets_left = f.get("tickets_left", "").strip()
             # Код виджета вставляется на страницу как есть — его правит только администратор
             if g.user.is_admin:
@@ -424,7 +431,7 @@ def event_form(event_id=None):
 
         save(ev, "Событие сохранено.")
         release_files(old_files)
-        return redirect(url_for("admin.event_form", event_id=ev.id))
+        return after_save(ev, url_for("admin.event_form", event_id=ev.id))
 
     return render_template("admin/event_form.html", ev=ev, **_event_refs())
 
@@ -685,7 +692,7 @@ def collective_form(item_id=None):
             return render_template("admin/collective_form.html", item=item)
         save(item, "Коллектив сохранён.")
         release_files(old_files)
-        return redirect(url_for("admin.collective_form", item_id=item.id))
+        return after_save(item, url_for("admin.collective_form", item_id=item.id))
     return render_template("admin/collective_form.html", item=item)
 
 
@@ -734,7 +741,7 @@ def news_form(item_id=None):
             return render_template("admin/news_form.html", item=item)
         save(item, "Новость сохранена.")
         release_files(old_files)
-        return redirect(url_for("admin.news_form", item_id=item.id))
+        return after_save(item, url_for("admin.news_form", item_id=item.id))
     return render_template("admin/news_form.html", item=item)
 
 
@@ -794,7 +801,7 @@ def page_form(item_id=None):
         item.is_published = bool(f.get("is_published"))
         item.show_in_menu = bool(f.get("show_in_menu"))
         save(item, "Страница сохранена.")
-        return redirect(url_for("admin.page_form", item_id=item.id))
+        return after_save(item, url_for("admin.page_form", item_id=item.id))
     return render_template("admin/page_form.html", item=item, parents=parents,
                            templates=PAGE_TEMPLATES)
 
@@ -1099,7 +1106,8 @@ def settings_page():
     grouped = {}
     for row in rows:
         grouped.setdefault(row.group, []).append(row)
-    return render_template("admin/settings.html", grouped=grouped, widget_keys=WIDGET_SETTINGS)
+    return render_template("admin/settings.html", grouped=grouped, widget_keys=WIDGET_SETTINGS,
+                           values={row.key: row.value for row in rows})
 
 
 # Пользователи
@@ -1110,7 +1118,6 @@ def users():
         f = request.form
         item_id = utils.parse_int(f.get("id"))
         item = get_or_404(User, item_id) if item_id else User()
-        back = url_for("admin.users", edit=item_id) if item_id else url_for("admin.users")
         login_name = f.get("login", "").strip()
         password = f.get("password", "").strip()
         role = f.get("role") if f.get("role") in ("admin", "editor") else "editor"
@@ -1136,8 +1143,12 @@ def users():
                 item.set_password(password)
             save(item, "Сотрудник сохранён.")
             return redirect(url_for("admin.users"))
-        return redirect(back)
+        # Ошибка: показываем ту же форму с введёнными данными, а не пустую
+        return users_page(edit=item if item.id else None, form=f)
+    return users_page(edit=edited(User))
 
+
+def users_page(edit=None, form=None):
     q = User.query
     search = search_text()
     if search:
@@ -1152,7 +1163,7 @@ def users():
         default="login", tiebreak=User.id,
     )
     return render_template("admin/users.html", items=q.all(), search=search, sorting=sorting,
-                           edit=edited(User))
+                           edit=edit, form=form)
 
 
 @bp.route("/users/<int:item_id>/delete", methods=["POST"])

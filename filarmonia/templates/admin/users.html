@@ -6,6 +6,11 @@
 <p class="subtitle">Доступ к управлению сайтом.</p>
 
 {% set e = edit %}
+{#- После ошибки в форме остаются введённые значения, а не данные из базы -#}
+{% set v = form or {
+     'login': e.login if e else '', 'name': e.name if e else '',
+     'role': e.role if e else 'editor', 'is_active': (e.is_active if e else true),
+   } %}
 <section class="panel {{ 'panel--editing' if e }}" style="margin-top:20px" id="form">
   <h2 style="margin-top:0">{{ 'Изменить сотрудника «' ~ e.login ~ '»' if e else 'Добавить сотрудника' }}</h2>
   <form method="post" autocomplete="off">
@@ -14,16 +19,16 @@
     {% set is_me = e and e.id == current_user.id %}
     <div class="grid grid--4">
       <div class="field"><label for="u-login">Логин *</label>
-        <input id="u-login" type="text" name="login" value="{{ e.login if e }}" required></div>
+        <input id="u-login" type="text" name="login" value="{{ v.get('login', '') }}" required></div>
       <div class="field"><label for="u-name">Имя</label>
-        <input id="u-name" type="text" name="name" value="{{ e.name if e }}"></div>
+        <input id="u-name" type="text" name="name" value="{{ v.get('name', '') }}"></div>
       <div class="field"><label for="u-pass">{{ 'Новый пароль' if e else 'Пароль' }} (от 8 символов)</label>
-        <input id="u-pass" type="password" name="password" autocomplete="new-password">
+        <input id="u-pass" type="password" name="password" autocomplete="new-password" minlength="8"{{ ' required' if not e }}>
         {% if e %}<div class="hint">Оставьте пустым, чтобы не менять.</div>{% endif %}</div>
       <div class="field"><label for="u-role">Права</label>
         <select id="u-role" name="role" {{ 'disabled' if is_me }}>
-          <option value="editor" {{ 'selected' if e and e.role == 'editor' }}>Редактор</option>
-          <option value="admin" {{ 'selected' if e and e.role == 'admin' }}>Администратор</option>
+          <option value="editor" {{ 'selected' if v.get('role') != 'admin' }}>Редактор</option>
+          <option value="admin" {{ 'selected' if v.get('role') == 'admin' }}>Администратор</option>
         </select>
         {% if is_me %}<input type="hidden" name="role" value="admin">
           <div class="hint">Свои права изменить нельзя.</div>{% endif %}</div>
@@ -31,7 +36,7 @@
     {% if is_me %}
       <input type="hidden" name="is_active" value="1">
     {% else %}
-      <div class="checkline"><input id="ua" type="checkbox" name="is_active" {{ 'checked' if not e or e.is_active }}>
+      <div class="checkline"><input id="ua" type="checkbox" name="is_active" {{ 'checked' if v.get('is_active') }}>
         <label for="ua">Доступ разрешён</label></div>
       <p class="hint" style="margin-top:-4px">Снимите галочку, чтобы временно закрыть вход, не удаляя сотрудника. Действует сразу, даже если он сейчас в админке.</p>
     {% endif %}
