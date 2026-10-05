@@ -37,9 +37,11 @@
     {% endif %}
 
     <div class="side__foot">
-      {{ current_user.name or current_user.login }}<br>
-      <a href="{{ url_for('public.index') }}" target="_blank" style="padding:0;color:#fff">Открыть сайт</a> ·
-      <a href="{{ url_for('admin.logout') }}" style="padding:0;color:#fff">Выйти</a>
+      <div class="side__user">{{ current_user.name or current_user.login }}</div>
+      <div class="side__actions">
+        <a href="{{ url_for('public.index') }}" target="_blank">Открыть сайт</a>
+        <a href="{{ url_for('admin.logout') }}">Выйти</a>
+      </div>
     </div>
   </aside>
 

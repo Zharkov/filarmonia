@@ -384,27 +384,31 @@ html[data-theme] .ecard__when { position: static; padding: 8px 16px 0; }
 .event__gallerylink { margin-top: 12px; font-size: .92rem; color: var(--ink-soft); }
 
 /* всплывающие баннеры поверх афиши */
+/* Угол афиши со своими баннерами: столбик, баннеры не накладываются */
+.pins { position: absolute; z-index: 3; display: flex; flex-direction: column; gap: 8px; max-width: 82%; }
+.pins--top-left { left: 0; top: 18px; align-items: flex-start; }
+.pins--top-right { right: 0; top: 18px; align-items: flex-end; }
+.pins--bottom-left { left: 0; bottom: 18px; align-items: flex-start; }
+.pins--bottom-right { right: 0; bottom: 18px; align-items: flex-end; }
+/* Раскрытая подсказка должна лечь поверх соседних баннеров */
+.pin:hover, .pin:focus, .pin.is-open { z-index: 2; }
 .pin {
-  position: absolute; z-index: 3; display: inline-flex; align-items: center; gap: 8px;
+  position: relative; display: inline-flex; align-items: center; gap: 8px;
   padding: 9px 14px; font-size: .88rem; font-weight: 600; color: var(--on-brick); background: var(--brick);
-  border: 0; cursor: pointer; max-width: 82%; text-align: left; line-height: 1.25;
+  border: 0; cursor: pointer; max-width: 100%; text-align: left; line-height: 1.25;
   box-shadow: 0 6px 18px rgba(0, 0, 0, .22); font-family: var(--f-text);
 }
 .pin--gold { background: var(--gold); }
 .pin--ink { background: var(--ink); }
 .pin--light { background: #fff; color: var(--ink); }
-.pin--top-left { left: 0; top: 18px; }
-.pin--top-right { right: 0; top: 18px; }
-.pin--bottom-left { left: 0; bottom: 18px; }
-.pin--bottom-right { right: 0; bottom: 18px; }
 .pin__hint {
   position: absolute; left: 0; top: calc(100% + 8px); width: 260px; background: var(--paper);
   color: var(--ink); border: 1px solid var(--line); box-shadow: var(--shadow); padding: 12px 14px;
   font-weight: 400; font-size: .88rem; opacity: 0; visibility: hidden; transform: translateY(-6px);
   transition: opacity .18s, transform .18s, visibility .18s; z-index: 6;
 }
-.pin--bottom-left .pin__hint, .pin--bottom-right .pin__hint { top: auto; bottom: calc(100% + 8px); }
-.pin--top-right .pin__hint, .pin--bottom-right .pin__hint { left: auto; right: 0; }
+.pins--bottom-left .pin__hint, .pins--bottom-right .pin__hint { top: auto; bottom: calc(100% + 8px); }
+.pins--top-right .pin__hint, .pins--bottom-right .pin__hint { left: auto; right: 0; }
 .pin:hover .pin__hint, .pin:focus .pin__hint, .pin.is-open .pin__hint { opacity: 1; visibility: visible; transform: translateY(0); }
 
 .event__facts { border-top: 2px solid var(--ink); }

@@ -20,6 +20,7 @@ JINJA_FILTERS = {
     "ru_month_short": utils.ru_month_short,
     "ru_duration": utils.ru_duration,
     "strip_tags": utils.strip_tags,
+    "map_point": utils.map_point,
     "plural": utils.plural,
     "compact": utils.compact,
     "video_embed": lambda url: Markup(utils.video_embed(url)),

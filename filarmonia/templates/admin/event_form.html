@@ -58,7 +58,7 @@
       <div class="field"><label for="yandex_id">ID сеанса в Яндекс Афише</label>
         <input id="yandex_id" type="text" name="yandex_id" value="{{ ev.yandex_id or '' }}"
                placeholder="ticketsteam-825@496249">
-        <div class="hint">По нему кнопка «Купить билет» открывает покупку в Яндекс Афише.</div></div>
+        <div class="hint">Свой у каждого концерта, выдаёт Яндекс Афиша. По нему кнопка «Купить билет» открывает окно покупки, а на странице события появляется схема зала с выбором мест.</div></div>
       <div class="field"><label for="ticket_url">Ссылка на покупку билета</label>
         <input id="ticket_url" type="url" name="ticket_url" value="{{ ev.ticket_url or '' }}"
                placeholder="Ссылка билетной системы">
@@ -105,10 +105,10 @@
       </select>
       <div class="hint">Удерживайте Ctrl, чтобы выбрать несколько.</div></div>
 
-    <div class="field"><label for="hall_widget">Схема зала</label>
+    <div class="field"><label for="hall_widget">Схема зала (другой билетной системы)</label>
       <textarea id="hall_widget" name="hall_widget" class="code" style="min-height:70px"
                 {{ 'readonly' if not current_user.is_admin }}>{{ ev.hall_widget or '' }}</textarea>
-      <div class="hint">Код виджета продажи билетов со схемой зала (Яндекс Афиша). Выводится под описанием концерта. Пусто — блока нет.
+      <div class="hint">Для концертов, которые продаются не через Яндекс Афишу: код виджета со схемой зала от билетной системы. Если задан ID сеанса Яндекс Афиши, это поле не нужно и на сайт не выводится.
         {% if not current_user.is_admin %}Код вставляется на страницу как есть, поэтому менять его может только администратор.{% endif %}</div></div>
 
     <div class="checkline">

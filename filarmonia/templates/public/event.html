@@ -58,18 +58,23 @@
           </a>
         {% endif %}
 
-        {% for b in ev.badges %}
-          {% if b.url %}
-            <a class="pin pin--{{ b.style }} pin--{{ b.position }}" href="{{ b.url }}" rel="noopener">
-              {{ b.text }}
-              {% if b.hint %}<span class="pin__hint">{{ b.hint }}</span>{% endif %}
-            </a>
-          {% else %}
-            <button class="pin pin--{{ b.style }} pin--{{ b.position }}" type="button">
-              {{ b.text }}
-              {% if b.hint %}<span class="pin__hint">{{ b.hint }}</span>{% endif %}
-            </button>
-          {% endif %}
+        {#- Баннеры одного угла встают столбиком друг под другом, а не друг на друга -#}
+        {% for position, group in ev.badges | groupby('position') %}
+          <div class="pins pins--{{ position }}">
+            {% for b in group %}
+              {% if b.url %}
+                <a class="pin pin--{{ b.style }}" href="{{ b.url }}" rel="noopener">
+                  {{ b.text }}
+                  {% if b.hint %}<span class="pin__hint">{{ b.hint }}</span>{% endif %}
+                </a>
+              {% else %}
+                <button class="pin pin--{{ b.style }}" type="button">
+                  {{ b.text }}
+                  {% if b.hint %}<span class="pin__hint">{{ b.hint }}</span>{% endif %}
+                </button>
+              {% endif %}
+            {% endfor %}
+          </div>
         {% endfor %}
       </div>
       {% if ev.poster %}<p class="event__gallerylink">Нажмите на афишу, чтобы увеличить</p>{% endif %}
@@ -160,7 +165,8 @@
     </section>
   {% endif %}
 
-  {% if ev.hall_widget %}
+  {#- Со схемой Яндекс Афиши вторая схема зала была бы лишней -#}
+  {% if ev.hall_widget and not ev.yandex_id %}
     <section class="section" id="hall">
       <h2>Схема зала</h2>
       <div class="hall-widget">{{ ev.hall_widget | safe }}</div>

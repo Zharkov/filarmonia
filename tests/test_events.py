@@ -49,8 +49,11 @@ def test_badge_on_poster(app, admin):
     admin.post(f"/admin/events/{eid}/badges", data={
         "text": "Пушкинская карта", "hint": "Оплата через Госуслуги Культура",
         "position": "top-left", "style": "brick"})
+    admin.post(f"/admin/events/{eid}/badges", data={"text": "Премьера", "position": "top-left"})
     html = text(admin.get("/afisha/testovyy-koncert"))
-    assert 'class="pin pin--brick pin--top-left"' in html and "Госуслуги Культура" in html
+    assert 'class="pin pin--brick"' in html and "Госуслуги Культура" in html
+    # Два баннера в одном углу — в одном столбике, а не друг на друге
+    assert html.count('class="pins pins--top-left"') == 1 and "Премьера" in html
 
 
 def test_media_photos_and_video(app, admin):

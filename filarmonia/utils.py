@@ -422,6 +422,21 @@ def parse_int(value, default=None):
         return default
 
 
+def map_point(value: str) -> str:
+    """«Широта, долгота» из настроек → «долгота,широта» для Яндекс Карт.
+
+    Яндекс ждёт координаты в обратном порядке, а копируются они из карт
+    как «54.78, 32.04». Неразборчивое значение — пустая строка.
+    """
+    parts = re.findall(r"-?\d+(?:\.\d+)?", value or "")
+    if len(parts) != 2:
+        return ""
+    lat, lon = (float(p) for p in parts)
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        return ""
+    return f"{lon:.6f},{lat:.6f}"
+
+
 YANDEX_ID = re.compile(r"[\w.\-]+@\d+")
 
 

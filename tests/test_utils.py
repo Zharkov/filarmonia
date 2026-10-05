@@ -81,3 +81,11 @@ def test_migrations_build_same_schema(tmp_path):
     with app.app_context(), db.engine.connect() as connection:
         diff = compare_metadata(MigrationContext.configure(connection), db.metadata)
     assert diff == []
+
+
+def test_map_point():
+    from filarmonia.utils import map_point
+    # Из Яндекс Карт координаты копируются как «широта, долгота», виджету нужен обратный порядок
+    assert map_point("54.781496, 32.048407") == "32.048407,54.781496"
+    assert map_point("54.78,32.05") == "32.050000,54.780000"
+    assert map_point("") == "" and map_point("ул. Глинки") == "" and map_point("200, 32") == ""

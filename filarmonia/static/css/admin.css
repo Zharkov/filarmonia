@@ -45,6 +45,13 @@ h3 { font-size: 1rem; margin: 0 0 10px; }
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
 .side__foot { margin-top: 24px; padding: 16px 22px 0; border-top: 1px solid rgba(255,255,255,.12); font-size: .86rem; color: rgba(255,255,255,.6); }
+.side__user { margin-bottom: 10px; }
+.side__actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.side .side__actions a {
+  padding: 6px 12px; border: 1px solid rgba(255,255,255,.28); border-radius: 6px;
+  color: #fff; font-size: .86rem;
+}
+.side .side__actions a:hover { background: rgba(255,255,255,.1); }
 
 .main { padding: 26px 32px 70px; max-width: 1180px; }
 .page-head { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }

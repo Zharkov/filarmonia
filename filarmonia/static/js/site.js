@@ -227,6 +227,34 @@
     });
   });
 
+  /* Автопрокрутка каруселей. Листает, только пока карусель на экране и вкладка
+     открыта. Наведение мыши или фокус клавиатуры останавливают её, касание
+     и стрелки откладывают следующий шаг. При «уменьшить движение» в системе —
+     не листает вовсе. */
+  var reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function autoplay(box, advance, delay) {
+    if (reducedMotion) return;
+    var hovered = false, focused = false, onScreen = true, timer = null;
+    function restart() {
+      clearInterval(timer);
+      timer = setInterval(function () {
+        if (!hovered && !focused && onScreen && !document.hidden) advance();
+      }, delay);
+    }
+    box.addEventListener("mouseenter", function () { hovered = true; });
+    box.addEventListener("mouseleave", function () { hovered = false; restart(); });
+    box.addEventListener("focusin", function () { focused = true; });
+    box.addEventListener("focusout", function () { focused = false; });
+    box.addEventListener("pointerdown", restart);
+    box.addEventListener("click", restart);
+    if ("IntersectionObserver" in window) {
+      new IntersectionObserver(function (entries) {
+        onScreen = entries[0].isIntersecting;
+      }).observe(box);
+    }
+    restart();
+  }
+
   /* Карусель фотографий здания */
   document.querySelectorAll("[data-carousel]").forEach(function (box) {
     var track = box.querySelector("[data-carousel-track]");
@@ -247,6 +275,7 @@
       var i = current();
       dots.forEach(function (dot, n) { dot.setAttribute("aria-current", n === i ? "true" : "false"); });
     });
+    autoplay(box, function () { go(current() + 1); }, 5000);
   });
 
   /* Карусель карточек концертов. Стрелки листают на ширину ленты.
@@ -300,6 +329,16 @@
     next.addEventListener("click", function () { track.scrollBy({ left: step(), behavior: "smooth" }); });
     box.classList.add("is-ready");
     onScrollFrame(track, update);
+
+    // Дошли до конца и больше подгружать нечего — возвращаемся к началу
+    autoplay(box, function () {
+      var atEnd = track.scrollWidth - track.clientWidth - track.scrollLeft <= 2;
+      if (atEnd && !moreUrl && !loading) {
+        track.scrollTo({ left: 0, behavior: "smooth" });
+      } else if (!atEnd) {
+        track.scrollBy({ left: step(), behavior: "smooth" });
+      }
+    }, 6000);
   });
 
   /* Плавное появление разделов главной. Раздел, ушедший с экрана, снова

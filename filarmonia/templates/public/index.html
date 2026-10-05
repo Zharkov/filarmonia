@@ -138,8 +138,11 @@
       {% if settings.get('history_map') %}
         {{ settings.get('history_map') | safe }}
       {% else %}
-        <iframe src="https://yandex.ru/map-widget/v1/?text={{ settings.get('address', 'Смоленск, ул. Глинки, 3') | urlencode }}&amp;z=16"
-                title="Карта: {{ settings.get('address', 'Смоленск, ул. Глинки, 3') }}" loading="lazy" allowfullscreen></iframe>
+        {#- Карта с меткой на здании. Без координат — поиск по адресу, но метки там нет -#}
+        {% set point = settings.get('map_point', '54.781496, 32.048407') | map_point %}
+        {% set address = settings.get('address', 'Смоленск, ул. Глинки, 3') %}
+        <iframe src="https://yandex.ru/map-widget/v1/?{% if point %}ll={{ point }}&amp;z=17&amp;pt={{ point }},pm2rdl{% else %}text={{ address | urlencode }}&amp;z=16{% endif %}"
+                title="Карта: {{ address }}" loading="lazy" allowfullscreen></iframe>
       {% endif %}
     </div>
   </div>
