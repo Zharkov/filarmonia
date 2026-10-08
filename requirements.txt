@@ -16,7 +16,7 @@ alembic==1.20.0
 # Зависимости пакетов выше
 Werkzeug==3.1.9
 Jinja2==3.1.6
-MarkupSafe==3.0.2
+MarkupSafe==3.0.4
 itsdangerous==2.2.0
 click==8.5.0
 blinker==1.9.0
