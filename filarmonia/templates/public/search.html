@@ -1,5 +1,7 @@
 {% extends "public/base.html" %}
 {% block title %}Поиск по сайту{% endblock %}
+{#- Результаты поиска — бесконечное число страниц, в выдаче им не место -#}
+{% block head %}<meta name="robots" content="noindex, follow">{% endblock %}
 {% block content %}
 <div class="wrap">
   <h1>Поиск</h1>

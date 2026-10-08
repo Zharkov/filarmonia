@@ -17,7 +17,7 @@
             <textarea id="{{ row.key }}" name="{{ row.key }}" data-rich="small">{{ row.value }}</textarea>
           {% elif row.kind == 'textarea' or row.kind == 'html' %}
             <textarea id="{{ row.key }}" name="{{ row.key }}" class="code">{{ row.value }}</textarea>
-            {% if row.key in widget_keys %}<div class="hint">Код вставляется на страницу без изменений — копируйте его целиком с сайта сервиса.</div>{% endif %}
+            {% if row.key in widget_keys %}<div class="hint">Код вставляется на страницу без изменений — скопируйте его полностью с сайта сервиса.</div>{% endif %}
           {% elif row.kind == 'file' %}
             <input id="{{ row.key }}" type="file" name="f_{{ row.key }}"
                    accept="{{ 'video/mp4,video/webm' if 'video' in row.key else 'image/*' }}">

@@ -1,4 +1,4 @@
-"""Вход в админку, права и защита."""
+"""Вход в панель администратора, права и защита."""
 from conftest import PASSWORD, login, make_app, text
 
 from filarmonia.models import db, User

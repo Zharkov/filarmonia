@@ -1,13 +1,8 @@
 {% extends "public/base.html" %}
-{% from "public/_macros.html" import event_carousel, img_src %}
+{% from "public/_macros.html" import event_carousel, img_src, breadcrumbs %}
 {% block title %}{{ pg.title }}{% endblock %}
 {% block description %}{{ pg.seo_description or pg.content | strip_tags(180) }}{% endblock %}
-{% block breadcrumbs %}
-<div class="wrap breadcrumbs">
-  <a href="{{ url_for('public.index') }}">Главная</a> /
-  {% if pg.parent %}<a href="{{ pg.parent.url }}">{{ pg.parent.title }}</a> / {% endif %}{{ pg.title }}
-</div>
-{% endblock %}
+{% block breadcrumbs %}{{ breadcrumbs([('Главная', url_for('public.index'))] + ([(pg.parent.title, pg.parent.url)] if pg.parent else []) + [(pg.title, None)]) }}{% endblock %}
 {% block content %}
 <div class="wrap">
   <h1>{{ pg.title }}</h1>

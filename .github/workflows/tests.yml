@@ -5,6 +5,9 @@ name: Проверки
 on:
   push:
   pull_request:
+  # Раз в неделю — даже без новых коммитов: уязвимости в пакетах находят постоянно
+  schedule:
+    - cron: "0 5 * * 1"
 
 jobs:
   tests:
@@ -13,8 +16,19 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version-file: ".python-version"
           cache: pip
           cache-dependency-path: requirements-dev.txt
       - run: pip install -r requirements-dev.txt
       - run: python app.py test
+
+  # Известные уязвимости в закреплённых версиях пакетов (база PyPI/OSV)
+  dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+      - run: pip install pip-audit
+      - run: pip-audit -r requirements.txt

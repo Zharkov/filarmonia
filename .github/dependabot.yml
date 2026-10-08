@@ -1,0 +1,13 @@
+# Dependabot раз в неделю предлагает pull request с обновлением пакетов
+# из requirements.txt и действий GitHub. Каждое обновление проходит проверки CI.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly

@@ -1,9 +1,7 @@
 {% extends "public/base.html" %}
-{% from "public/_macros.html" import pagination, news_card %}
+{% from "public/_macros.html" import pagination, news_card, breadcrumbs %}
 {% block title %}Новости{% endblock %}
-{% block breadcrumbs %}
-<div class="wrap breadcrumbs"><a href="{{ url_for('public.index') }}">Главная</a> / Новости</div>
-{% endblock %}
+{% block breadcrumbs %}{{ breadcrumbs([('Главная', url_for('public.index')), ('Новости', None)]) }}{% endblock %}
 {% block content %}
 <div class="wrap">
   <h1>Новости</h1>

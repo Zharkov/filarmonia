@@ -10,7 +10,7 @@
 <form class="filters" method="get" style="margin-top:20px">
   {{ keep_sort() }}
   <input type="text" name="q" value="{{ search }}" placeholder="Имя, тема, почта или телефон" aria-label="Поиск">
-  <select name="status" onchange="this.form.submit()" aria-label="Статус">
+  <select name="status" data-autosubmit aria-label="Статус">
     <option value="">Любой статус</option>
     <option value="new" {{ 'selected' if request.args.get('status') == 'new' }}>Новые</option>
     <option value="done" {{ 'selected' if request.args.get('status') == 'done' }}>Обработанные</option>

@@ -1,6 +1,7 @@
 """Сайт Смоленской областной филармонии. Фабрика приложения."""
 import os
-from datetime import datetime
+import time
+from types import SimpleNamespace
 
 from flask import Flask, render_template, g, session, url_for
 from flask_wtf.csrf import CSRFError, CSRFProtect
@@ -10,7 +11,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import build_config, INSECURE_SECRET_KEY
 from .models import db, Setting, MenuItem, User
-from . import utils
+from . import schema, utils, web
 
 JINJA_FILTERS = {
     "ru_date": utils.ru_date,
@@ -29,8 +30,51 @@ JINJA_FILTERS = {
 }
 
 # Статика кэшируется браузером надолго: имена загруженных файлов уникальны,
-# а к стилям и скриптам дописывается номер версии (см. asset_url)
+# а к стилям и скриптам дописывается номер версии (см. asset_url).
+# Для версионных адресов web.cache_headers поднимает срок до года.
 STATIC_MAX_AGE = 30 * 24 * 3600
+
+# Настройки и меню нужны каждой странице. Чтобы не ходить за ними в базу
+# на каждый запрос, они хранятся в памяти процесса столько секунд. После
+# сохранения в панели процесс, принявший правку, сбрасывает их сразу,
+# остальные процессы gunicorn — не позже чем через этот срок.
+SITE_DATA_TTL = 30
+_site_data = {"expires": 0.0, "settings": {}, "menu": []}
+
+
+def site_data() -> dict:
+    """Настройки и главное меню — из памяти, если они свежие."""
+    if time.time() >= _site_data["expires"]:
+        items = (
+            MenuItem.query.options(
+                joinedload(MenuItem.page),
+                joinedload(MenuItem.children).joinedload(MenuItem.page),
+            )
+            .filter_by(parent_id=None, is_published=True)
+            .order_by(MenuItem.sort)
+            .all()
+        )
+        # Простые объекты вместо записей базы: те после запроса отвязаны от
+        # сессии, и обращение к незагруженному полю обрывало бы страницу
+        menu = [
+            SimpleNamespace(
+                title=item.title, href=item.href, is_published=True,
+                children=[SimpleNamespace(title=c.title, href=c.href, is_published=True)
+                          for c in sorted(item.children, key=lambda c: (c.sort or 0, c.id))
+                          if c.is_published],
+            )
+            for item in items
+        ]
+        _site_data.update(
+            settings={row.key: row.value for row in Setting.query.all()},
+            menu=menu, expires=time.time() + SITE_DATA_TTL,
+        )
+    return _site_data
+
+
+def reset_site_data() -> None:
+    """Сбросить настройки и меню в памяти — после их правки в панели."""
+    _site_data["expires"] = 0.0
 
 csrf = CSRFProtect()
 
@@ -50,7 +94,10 @@ def create_app(**config_overrides) -> Flask:
 
     db.init_app(app)
     csrf.init_app(app)
+    web.init_app(app)
     app.jinja_env.filters.update(JINJA_FILTERS)
+    # Микроразметка Schema.org: {{ schema.event(ev, settings) | tojson }}
+    app.jinja_env.globals["schema"] = schema
 
     from .public import bp as public_bp
     from .admin import bp as admin_bp
@@ -61,21 +108,17 @@ def create_app(**config_overrides) -> Flask:
     @app.context_processor
     def inject_globals():
         """Данные, доступные во всех шаблонах."""
+        # В проверках у каждого теста своя база, поэтому память не используется
+        if app.testing:
+            reset_site_data()
+        data = site_data()
         return {
-            "settings": {row.key: row.value for row in Setting.query.all()},
+            "settings": data["settings"],
             # Подпункты и страницы, на которые ведут пункты, приезжают одним
             # запросом вместе с меню. Иначе адрес каждого пункта подгружался
             # отдельно: 14 лишних запросов к базе на каждой странице сайта.
-            "main_menu": (
-                MenuItem.query.options(
-                    joinedload(MenuItem.page),
-                    joinedload(MenuItem.children).joinedload(MenuItem.page),
-                )
-                .filter_by(parent_id=None, is_published=True)
-                .order_by(MenuItem.sort)
-                .all()
-            ),
-            "now": datetime.now(),
+            "main_menu": data["menu"],
+            "now": utils.now_msk(),
             "current_user": g.get("user"),
             "asset_url": asset_url,
         }
@@ -97,15 +140,11 @@ def create_app(**config_overrides) -> Flask:
         user_id = session.get("user_id")
         user = db.session.get(User, user_id) if user_id else None
         # Доступ и права проверяются на каждом запросе, а не только при входе:
-        # иначе отключённый сотрудник работал бы в админке до своего выхода
+        # иначе отключённый сотрудник работал бы в панели администратора до своего выхода
         if user_id and (user is None or not user.is_active):
             session.pop("user_id", None)
             user = None
         g.user = user
-
-    @app.errorhandler(404)
-    def not_found(_error):
-        return render_template("public/404.html"), 404
 
     @app.errorhandler(CSRFError)
     def csrf_expired(_error):

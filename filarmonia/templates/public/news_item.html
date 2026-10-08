@@ -1,17 +1,13 @@
 {% extends "public/base.html" %}
-{% from "public/_macros.html" import news_card, img_src %}
+{% from "public/_macros.html" import news_card, img_src, breadcrumbs %}
 {% block title %}{{ item.title }}{% endblock %}
 {% block description %}{{ item.lead or item.content | strip_tags(180) }}{% endblock %}
 {% block og_type %}article{% endblock %}
 {% block og_image %}
-  {%- if item.image and item.show_media %}<meta property="og:image" content="{{ request.host_url }}static/uploads/{{ item.image }}">{% endif %}
+  {%- if item.image and item.show_media %}<meta property="og:image" content="{{ site_url('/static/uploads/' ~ item.image) }}">{% endif %}
 {% endblock %}
-{% block breadcrumbs %}
-<div class="wrap breadcrumbs">
-  <a href="{{ url_for('public.index') }}">Главная</a> /
-  <a href="{{ url_for('public.news_list') }}">Новости</a> / {{ item.title | truncate(40) }}
-</div>
-{% endblock %}
+{% block head %}<script type="application/ld+json">{{ schema.news_article(item, settings) | tojson }}</script>{% endblock %}
+{% block breadcrumbs %}{{ breadcrumbs([('Главная', url_for('public.index')), ('Новости', url_for('public.news_list')), (item.title, None)], item.title | truncate(40)) }}{% endblock %}
 {% block content %}
 <div class="wrap">
   <article>

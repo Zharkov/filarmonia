@@ -18,7 +18,7 @@
 </head>
 <body>
 <div class="tools">
-  <button type="button" onclick="window.print()">Печать / сохранить в PDF</button>
+  <button type="button" data-print>Печать / сохранить в PDF</button>
   <a href="{{ url_for('admin.appeal_view', item_id=item.id) }}">← к обращению</a>
 </div>
 
@@ -42,5 +42,6 @@
 <div class="message">{{ item.message }}</div>
 
 <p style="margin-top:28px;font-size:12px">Распечатано {{ now | ru_datetime }}.</p>
+<script src="{{ asset_url('js/admin.js') }}"></script>
 </body>
 </html>

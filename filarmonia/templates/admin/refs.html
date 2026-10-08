@@ -33,7 +33,7 @@
             <td style="width:1%"><div class="row-actions">
               <a class="btn btn--ghost btn--sm" href="{{ url_for('admin.refs', edit=v.id) }}#form">Изменить</a>
               <form method="post" action="{{ url_for('admin.ref_delete', kind='venue', item_id=v.id) }}"
-                    onsubmit="return confirm('Удалить площадку?')">
+                    data-confirm="Удалить площадку?">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button class="btn btn--danger btn--sm" type="submit">Удалить</button></form>
             </div></td></tr>
@@ -57,8 +57,8 @@
       <button class="btn btn--primary" type="submit">Добавить категорию</button>
     </form>
     <p class="hint" style="margin-top:18px">
-      Метки решают, какие концерты «Музыкальный маршрут» на главной предложит посетителю
-      по его ответам. Концерты с отметкой «Новинка» сами считаются «новыми открытиями».
+      Метки определяют, какие концерты «Музыкальный маршрут» на главной странице предложит посетителю
+      по его ответам. Концерты с отметкой «Новинка» автоматически относятся к «новым открытиям».
     </p>
     <div class="table-wrap">
       <table>

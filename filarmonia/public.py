@@ -1,19 +1,19 @@
 """Публичная часть сайта."""
-import time
 from datetime import datetime, timedelta, date
 
 from flask import (
     Blueprint, render_template, request, abort, redirect, url_for,
     flash, make_response, current_app, g,
 )
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import joinedload, selectinload
 
 from .models import (
     db, Event, Venue, Category, Collective, News, Page, Document,
     Banner, Appeal, Setting,
 )
-from . import utils
+from . import throttle, utils
+from .web import site_url
 
 bp = Blueprint("public", __name__)
 
@@ -23,6 +23,8 @@ SEARCH_LIMIT = 20
 # Сколько карточек в карусели сразу и сколько подгружается при прокрутке
 CAROUSEL_BATCH = 6
 SIMILAR_EVENTS = 8
+# Концерты старше этого срока не попадают в карту сайта
+SITEMAP_ARCHIVE_DAYS = 365
 CALENDAR_DAYS = 60
 ROUTE_RESULTS = 6
 
@@ -64,14 +66,14 @@ def upcoming_cards(flag: str = ""):
     Порядок с id в конце нужен, чтобы подгрузка по смещению не теряла
     и не повторяла концерты, идущие в одно время.
     """
-    q = cards().filter(Event.is_published.is_(True), Event.starts_at >= datetime.now())
+    q = cards().filter(Event.is_published.is_(True), Event.starts_at >= utils.now_msk())
     if flag in FLAGGED_PAGES:
         q = q.filter(FLAGGED_PAGES[flag][0].is_(True))
     return q.order_by(Event.starts_at, Event.id)
 
 
 def check_published(item, edit_url: str = "") -> None:
-    """Скрытую запись видят только сотрудники, вошедшие в админку; остальным — 404.
+    """Скрытую запись видят только сотрудники, вошедшие в панель администратора; остальным — 404.
 
     Шаблон получает пометку и показывает плашку «Скрыто с сайта», чтобы редактор
     не принял предпросмотр за опубликованную страницу. Сотруднику там же
@@ -146,7 +148,7 @@ def _route_pick(who: str, mood: str, when: str) -> dict:
     предлагаются вовсе. Если совпадений нет, показываем ближайшее в этот срок,
     чтобы посетитель не упирался в пустой экран.
     """
-    now = datetime.now()
+    now = utils.now_msk()
     # «Неделя» и «месяц» отсчитываются от сегодняшнего дня, а не по календарю:
     # иначе в воскресенье «на этой неделе» сводилось бы к одному вечеру
     ends = _day_end(now.date() + timedelta(days={"today": 0, "week": 6, "month": 30}[when]))
@@ -187,7 +189,7 @@ def _route_pick(who: str, mood: str, when: str) -> dict:
 
 def _day_strip(days: int = 21):
     """Лента ближайших дней с отметкой, есть ли в этот день концерты."""
-    start = date.today()
+    start = utils.now_msk().date()
     busy = {
         starts_at.date()
         for (starts_at,) in db.session.query(Event.starts_at).filter(
@@ -236,7 +238,7 @@ def afisha():
         if date_to:
             q = q.filter(Event.starts_at <= _day_end(date_to))
         if not show_past and not date_from:
-            q = q.filter(Event.starts_at >= datetime.now())
+            q = q.filter(Event.starts_at >= utils.now_msk())
 
     if venue_slug:
         q = q.join(Venue).filter(Venue.slug == venue_slug)
@@ -308,7 +310,7 @@ def collective(slug):
     events = (
         cards().filter(
             Event.is_published.is_(True),
-            Event.starts_at >= datetime.now(),
+            Event.starts_at >= utils.now_msk(),
             Event.collectives.any(id=item.id),
         )
         .order_by(Event.starts_at)
@@ -385,19 +387,15 @@ def documents():
 
 
 # Интернет-приёмная
-# Время последней отправки с адреса — чтобы форму не забивали роботы.
-# Словарь в памяти процесса, как и счётчик попыток входа в админке.
-_last_appeal = {}
+# Время последней отправки с адреса хранится в таблице throttles — чтобы форму
+# не забивали роботы. Счётчик общий для всех процессов сайта.
+def _appeal_key() -> str:
+    return f"appeal:{request.remote_addr or ''}"
 
 
 def appeal_too_soon() -> bool:
     """Правда, если с этого адреса только что уже отправляли обращение."""
-    window = current_app.config["APPEAL_INTERVAL_SECONDS"]
-    now = time.time()
-    for addr, sent in list(_last_appeal.items()):
-        if now - sent > window:
-            del _last_appeal[addr]
-    return now - _last_appeal.get(request.remote_addr or "", 0.0) < window
+    return throttle.seconds_since(_appeal_key()) < current_app.config["APPEAL_INTERVAL_SECONDS"]
 
 
 @bp.route("/obrashcheniya", methods=["GET", "POST"])
@@ -426,7 +424,7 @@ def appeals():
                 )
             )
             db.session.commit()
-            _last_appeal[request.remote_addr or ""] = time.time()
+            throttle.hit(_appeal_key(), current_app.config["APPEAL_INTERVAL_SECONDS"])
             flash("Обращение принято. Ответ придёт в течение 30 дней.", "ok")
             return redirect(url_for("public.appeals"))
     pg = Page.query.filter_by(slug="internet-priemnaya").first()
@@ -483,19 +481,24 @@ def search():
 def sitemap():
     urls = [(u, None) for u in ("/", "/afisha", "/kollektivy", "/novosti",
                                 "/dokumenty", "/obrashcheniya")]
-    # Адрес строится из slug, дата обновления подсказывает поисковику,
-    # что переобходить. У коллективов своей даты нет — отдаём без неё.
+    # Адрес строится из slug, дата изменения подсказывает поисковику,
+    # что переобходить. У записей, созданных до появления поля updated_at,
+    # берётся дата создания или публикации. Концерты старше года не включаем.
+    archive_border = utils.now_msk() - timedelta(days=SITEMAP_ARCHIVE_DAYS)
     sources = (
-        (Event, "/afisha/", Event.created_at),
-        (Collective, "/kollektivy/", None),
-        (News, "/novosti/", News.published_at),
-        (Page, "/info/", Page.updated_at),
+        (Event, "/afisha/", func.coalesce(Event.updated_at, Event.created_at),
+         Event.starts_at >= archive_border),
+        (Collective, "/kollektivy/", Collective.updated_at, None),
+        (News, "/novosti/", func.coalesce(News.updated_at, News.published_at), None),
+        (Page, "/info/", Page.updated_at, None),
     )
-    for model, prefix, changed in sources:
-        columns = (model.slug, changed) if changed is not None else (model.slug,)
-        for row in db.session.query(*columns).filter(model.is_published.is_(True)):
-            urls.append((prefix + row[0], row[1] if changed is not None else None))
-    body = render_template("public/sitemap.xml", urls=urls, host=request.host_url.rstrip("/"))
+    for model, prefix, changed, condition in sources:
+        q = db.session.query(model.slug, changed).filter(model.is_published.is_(True))
+        if condition is not None:
+            q = q.filter(condition)
+        for slug, when in q:
+            urls.append((prefix + slug, when))
+    body = render_template("public/sitemap.xml", urls=urls, host=site_url())
     resp = make_response(body)
     resp.headers["Content-Type"] = "application/xml; charset=utf-8"
     return resp
@@ -507,9 +510,16 @@ def robots():
         # Тестовая копия сайта: закрыта от поисковиков целиком
         body = "User-agent: *\nDisallow: /\n"
     else:
+        # Закрыты служебные адреса: панель, результаты поиска (бесконечное
+        # число страниц) и куски разметки, которые подгружает скрипт
         body = (
-            "User-agent: *\nDisallow: /admin\n"
-            f"Sitemap: {request.host_url}sitemap.xml\n"
+            "User-agent: *\n"
+            "Disallow: /admin\n"
+            "Disallow: /poisk\n"
+            "Disallow: /kartochki-afishi\n"
+            "Disallow: /marshrut\n"
+            "Disallow: /csp-report\n"
+            f"Sitemap: {site_url('/sitemap.xml')}\n"
         )
     resp = make_response(body)
     resp.headers["Content-Type"] = "text/plain; charset=utf-8"

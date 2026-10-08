@@ -1,0 +1,62 @@
+{#- Общие части форм записей с адресом на сайте: события, новости, коллективы, страницы -#}
+
+{#- Адрес страницы. У новой записи составляется из названия, пока его не поправили
+    вручную; занятый адрес скрипт сразу заменяет свободным. Без скрипта адрес
+    составляется при сохранении. source — поле с названием. -#}
+{% macro slug_field(item, kind, prefix, source="#title") %}
+<div class="field"><label for="slug">Адрес страницы</label>
+  <div class="slug-input">
+    <span class="slug-input__prefix">{{ prefix }}</span>
+    <input id="slug" type="text" name="slug" value="{{ item.slug or '' }}"
+           placeholder="формируется из названия" autocomplete="off" spellcheck="false"
+           data-slug data-slug-kind="{{ kind }}" data-slug-id="{{ item.id or '' }}"
+           data-slug-source="{{ source }}" data-slug-url="{{ url_for('admin.slug_suggest') }}">
+  </div>
+  <div class="hint" data-slug-hint>
+    {%- if item.id -%}
+      При изменении адреса ранее опубликованные ссылки на страницу перестанут работать.
+    {%- else -%}
+      Формируется автоматически из названия. При необходимости адрес можно изменить: допускаются латинские буквы, цифры и дефис.
+    {%- endif -%}
+  </div>
+  {% if item.id %}<button class="btn btn--ghost btn--sm slug-reset" type="button" data-slug-reset>Сформировать по названию</button>{% endif %}
+</div>
+{% endmacro %}
+
+{#- Панель кнопок в конце страницы: прилипает к нижнему краю экрана, поэтому видна всегда.
+    Стоит вне формы (ниже идут отдельные формы галереи и баннеров) и связана
+    с ней атрибутом form: form_id — id формы записи.
+    «Сохранить» нажимается, только когда в форме что-то изменили.
+    Новая запись — черновик: на сайт она попадает только кнопкой «Опубликовать». -#}
+{% macro form_actions(item, form_id="record-form") %}
+{% set published = item.id and item.is_published %}
+<div class="form-actions" data-actions-for="{{ form_id }}">
+  <div class="form-actions__status">
+    {% if published %}
+      <span class="badge badge--on">Опубликовано</span>
+      <span class="form-actions__note">отображается на сайте</span>
+    {% else %}
+      <span class="badge badge--draft">Черновик</span>
+      <span class="form-actions__note">на сайте не отображается, предварительный просмотр доступен только сотрудникам</span>
+    {% endif %}
+    <span class="form-actions__dirty" data-dirty-note hidden>Есть несохранённые изменения</span>
+  </div>
+  <div class="form-actions__buttons">
+    {% if published %}
+      <button class="btn btn--primary" type="submit" form="{{ form_id }}" data-needs-change data-save-default>Сохранить</button>
+      <button class="btn btn--ghost" type="submit" form="{{ form_id }}" name="then" value="view"
+              data-clean-href="{{ item.url }}" data-clean-label="Посмотреть на сайте"
+              data-dirty-label="Сохранить и посмотреть">Сохранить и посмотреть</button>
+      <button class="btn btn--danger" type="submit" form="{{ form_id }}" name="publish" value="0"
+              data-confirm="Снять запись с публикации? Она перестанет отображаться на сайте и будет сохранена как черновик.">Снять с публикации</button>
+    {% else %}
+      <button class="btn btn--ghost" type="submit" form="{{ form_id }}" data-needs-change data-save-default>Сохранить черновик</button>
+      <button class="btn btn--ghost" type="submit" form="{{ form_id }}" name="then" value="view"
+              {% if item.id %}data-clean-href="{{ item.url }}"{% else %}data-needs-change{% endif %}
+              title="Сохранить черновик и открыть предварительный просмотр страницы. Посетителям сайта страница недоступна">Предпросмотр</button>
+      <button class="btn btn--primary" type="submit" form="{{ form_id }}" name="publish" value="1"
+              {{ 'data-needs-change' if not item.id }}>Опубликовать</button>
+    {% endif %}
+  </div>
+</div>
+{% endmacro %}

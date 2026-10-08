@@ -1,5 +1,6 @@
 {% extends "admin/base.html" %}
 {% from "admin/_media.html" import media_manager %}
+{% from "admin/_form.html" import slug_field, form_actions %}
 {% block title %}{{ item.name or 'Новый коллектив' }}{% endblock %}
 {% block content %}
 <div class="page-head">
@@ -10,11 +11,14 @@
   </div>
 </div>
 
-<form method="post" enctype="multipart/form-data">
+<form method="post" enctype="multipart/form-data" id="record-form" data-track-changes {{ 'data-unsaved' if unsaved }}>
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <section class="panel">
-    <div class="field"><label for="name">Название *</label>
-      <input id="name" type="text" name="name" value="{{ item.name or '' }}" required></div>
+    <div class="grid grid--2">
+      <div class="field"><label for="name">Название *</label>
+        <input id="name" type="text" name="name" value="{{ item.name or '' }}" required></div>
+      {{ slug_field(item, "collective", "/kollektivy/", source="#name") }}
+    </div>
     <div class="grid grid--2">
       <div class="field"><label for="lead">Художественный руководитель</label>
         <input id="lead" type="text" name="lead" value="{{ item.lead or '' }}"></div>
@@ -29,9 +33,6 @@
       <textarea id="contacts" name="contacts" data-rich="small">{{ item.contacts or '' }}</textarea></div>
     <div class="field"><label for="logo">Логотип или фото</label><input id="logo" type="file" name="logo" accept="image/*">
       {% if item.logo %}<img src="/static/uploads/{{ item.logo }}" alt="" style="max-width:120px;margin-top:8px">{% endif %}</div>
-    <div class="checkline"><input id="is_published" type="checkbox" name="is_published" {{ 'checked' if item.is_published or not item.id }}>
-      <label for="is_published">Опубликован</label></div>
-    <button class="btn btn--primary" type="submit">Сохранить</button> <button class="btn btn--ghost" type="submit" name="then" value="view" title="Сохранить и открыть, как страница выглядит на сайте. Пока не отмечено «Опубликовано», её видят только сотрудники">Сохранить и посмотреть</button>
   </section>
 </form>
 
@@ -39,9 +40,10 @@
   {{ media_manager('collective', item.id, item.media) }}
   <section class="panel">
     <form method="post" action="{{ url_for('admin.collective_delete', item_id=item.id) }}"
-          onsubmit="return confirm('Удалить коллектив?')">
+          data-confirm="Удалить коллектив?">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button class="btn btn--danger" type="submit">Удалить коллектив</button></form>
   </section>
 {% endif %}
+{{ form_actions(item) }}
 {% endblock %}

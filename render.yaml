@@ -6,7 +6,7 @@
 #
 # База (SQLite) и демо-картинки создаются на этапе сборки, поэтому при каждом
 # деплое или пробуждении уснувшего free-сервиса контент возвращается к демо-состоянию:
-# всё, что внесено через админку, теряется. Как сделать данные постоянными —
+# всё, что внесено через панель администратора, теряется. Как сделать данные постоянными —
 # в конце DEPLOY-RENDER.md.
 
 services:
@@ -23,10 +23,14 @@ services:
     # галереях): на боевом сервере он не нужен, поэтому его нет в requirements.txt.
     buildCommand: pip install -r requirements.txt imageio-ffmpeg==0.6.0 && python app.py seed
 
-    # $PORT задаёт Render. Таймаут увеличен: через админку загружают файлы до 64 МБ.
+    # $PORT задаёт Render. Таймаут увеличен: через панель администратора загружают файлы до 64 МБ.
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
 
     envVars:
+      # Та же версия Python, что в .python-version и в проверках CI
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+
       # Render сгенерирует случайную строку сам
       - key: SECRET_KEY
         generateValue: true

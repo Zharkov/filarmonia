@@ -176,6 +176,18 @@ src="{{ url }}"{% set variants = url | srcset %}{% if variants %} srcset="{{ var
 {% endif %}
 {% endmacro %}
 
+{#- Хлебные крошки и их микроразметка BreadcrumbList.
+    trail — [(название, адрес), …]; последний пункт — текущая страница, без ссылки.
+    short — укороченное название последнего пункта для показа (полное идёт в разметку). -#}
+{% macro breadcrumbs(trail, short='') %}
+<div class="wrap breadcrumbs">
+  {%- for title, href in trail %}
+    {%- if not loop.last %}<a href="{{ href }}">{{ title }}</a> / {% else %}{{ short or title }}{% endif %}
+  {%- endfor %}
+</div>
+<script type="application/ld+json">{{ schema.breadcrumbs(trail) | tojson }}</script>
+{% endmacro %}
+
 {#- Ссылки на соцсети из «Настроек». Пустой адрес или снятая галочка
     «Показывать» — значок не выводится. Если галочки в базе ещё нет, значок виден. -#}
 {% macro social_links(settings, modifier='') %}

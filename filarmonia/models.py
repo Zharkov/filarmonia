@@ -1,5 +1,4 @@
 """Модели базы данных Смоленской областной филармонии."""
-from datetime import datetime
 
 import re
 import sqlite3
@@ -9,7 +8,7 @@ from sqlalchemy import event, inspect, text
 from sqlalchemy.engine import Engine
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from .utils import utcnow
+from .utils import now_msk, utcnow
 
 db = SQLAlchemy()
 
@@ -49,7 +48,7 @@ class HasMedia:
 
 # Пользователи
 class User(db.Model):
-    """Сотрудник, работающий с админкой."""
+    """Сотрудник, работающий с панелью администратора."""
 
     __tablename__ = "users"
 
@@ -254,6 +253,8 @@ class Event(db.Model, HasMedia):
     is_new = db.Column(db.Boolean, default=False, nullable=False)
     is_featured = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=utcnow)
+    # Дата изменения — для карты сайта: по ней поисковик решает, что переобойти
+    updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
 
     venue = db.relationship("Venue", backref="events")
     category = db.relationship("Category", backref="events")
@@ -279,7 +280,7 @@ class Event(db.Model, HasMedia):
 
     @property
     def is_past(self) -> bool:
-        return self.starts_at < datetime.now()
+        return self.starts_at < now_msk()
 
     @property
     def card_image(self) -> str:
@@ -372,6 +373,7 @@ class Collective(db.Model, HasMedia):
     contacts = db.Column(db.Text, default="")          # открывается в баннере
     sort = db.Column(db.Integer, default=100)
     is_published = db.Column(db.Boolean, default=True, nullable=False)
+    updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
 
     media = db.relationship(
         "MediaItem", backref="collective", order_by="MediaItem.sort",
@@ -397,6 +399,7 @@ class News(db.Model, HasMedia):
     is_published = db.Column(db.Boolean, default=True, nullable=False)
     # Два вида новости: с фото и видео или только текст
     show_media = db.Column(db.Boolean, default=True, nullable=False)
+    updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
 
     media = db.relationship(
         "MediaItem", backref="news", order_by="MediaItem.sort",
@@ -462,7 +465,7 @@ class Appeal(db.Model):
 
 
 class ActionLog(db.Model):
-    """Журнал действий в админке: кто, когда и что изменил или удалил.
+    """Журнал действий в панели администратора: кто, когда и что изменил или удалил.
 
     Имя сотрудника и название объекта хранятся строкой: запись журнала должна
     пережить и удаление сотрудника, и удаление самого объекта.
@@ -479,6 +482,33 @@ class ActionLog(db.Model):
     object_id = db.Column(db.Integer)
     title = db.Column(db.String(400), default="")
     details = db.Column(db.String(400), default="")
+
+
+class Throttle(db.Model):
+    """Счётчик частых действий: неудачные входы, отправка обращений.
+
+    Хранится в базе, а не в памяти процесса: у gunicorn несколько процессов,
+    и счётчик в памяти каждого из них умножал бы лимит на их число, а
+    перезапуск сайта обнулял бы блокировку.
+    """
+
+    __tablename__ = "throttles"
+
+    key = db.Column(db.String(300), primary_key=True)   # «login:логин:адрес», «appeal:адрес»
+    count = db.Column(db.Integer, default=0, nullable=False)
+    last_at = db.Column(db.Float, default=0.0, nullable=False, index=True)  # время Unix
+
+
+class Redirect(db.Model):
+    """Постоянное перенаправление со старого адреса (например, прежнего сайта)."""
+
+    __tablename__ = "redirects"
+
+    id = db.Column(db.Integer, primary_key=True)
+    old_path = db.Column(db.String(500), unique=True, nullable=False)   # «/afisha/old-page.html»
+    new_url = db.Column(db.String(500), nullable=False)                 # «/afisha» или полный адрес
+    hits = db.Column(db.Integer, default=0, nullable=False)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
 
 def referenced_uploads() -> set:

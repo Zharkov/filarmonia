@@ -3,7 +3,7 @@
 {% block title %}Сводка{% endblock %}
 {% block content %}
 <div class="page-head">
-  <div><h1>Сводка</h1><p class="subtitle">Что происходит на сайте прямо сейчас</p></div>
+  <div><h1>Сводка</h1><p class="subtitle">Текущее состояние сайта</p></div>
   <a class="btn btn--primary" href="{{ url_for('admin.event_form') }}">Добавить событие</a>
 </div>
 
@@ -37,7 +37,7 @@
         <td><a href="{{ ev.url }}" target="_blank">на сайте</a></td>
       </tr>
     {% else %}
-      <tr><td colspan="5">Предстоящих событий нет. <a href="{{ url_for('admin.event_form') }}">Добавьте первое</a>.</td></tr>
+      <tr><td colspan="5">Предстоящих событий нет. <a href="{{ url_for('admin.event_form') }}">Добавить событие</a>.</td></tr>
     {% endfor %}
   </table>
 </div>

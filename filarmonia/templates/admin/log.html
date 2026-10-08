@@ -3,20 +3,20 @@
 {% block title %}Журнал действий{% endblock %}
 {% block content %}
 <h1>Журнал действий</h1>
-<p class="subtitle">Кто, когда и что создал, изменил или удалил в админке.</p>
+<p class="subtitle">Кто, когда и что создал, изменил или удалил в панели администратора.</p>
 
 <form class="filters" method="get" style="margin-top:20px">
   {{ keep_sort() }}
   <input type="text" name="q" value="{{ search }}" placeholder="Название объекта" aria-label="Поиск по названию">
-  <select name="user" onchange="this.form.submit()" aria-label="Сотрудник">
+  <select name="user" data-autosubmit aria-label="Сотрудник">
     <option value="">Все сотрудники</option>
     {% for u in users %}<option value="{{ u.id }}" {{ 'selected' if request.args.get('user') == u.id | string }}>{{ u.name or u.login }}</option>{% endfor %}
   </select>
-  <select name="type" onchange="this.form.submit()" aria-label="Раздел">
+  <select name="type" data-autosubmit aria-label="Раздел">
     <option value="">Все разделы</option>
     {% for key, label in object_labels | dictsort(by='value') %}<option value="{{ key }}" {{ 'selected' if request.args.get('type') == key }}>{{ label }}</option>{% endfor %}
   </select>
-  <select name="action" onchange="this.form.submit()" aria-label="Действие">
+  <select name="action" data-autosubmit aria-label="Действие">
     <option value="">Любое действие</option>
     {% for key, label in action_labels.items() %}<option value="{{ key }}" {{ 'selected' if request.args.get('action') == key }}>{{ label }}</option>{% endfor %}
   </select>

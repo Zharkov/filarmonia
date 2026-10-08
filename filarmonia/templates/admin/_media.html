@@ -2,8 +2,8 @@
 <section id="media" class="panel">
   <h2 style="margin-top:0">Галерея: фото и видео</h2>
   <p class="hint" style="margin-bottom:16px">
-    Фотографии можно выбрать пачкой. Видео — либо файлом .mp4, либо ссылкой на
-    VK Видео, RuTube, Дзен или YouTube: ссылка сама превращается в проигрыватель.
+    Можно выбрать несколько фотографий одновременно. Видео — либо файлом .mp4, либо ссылкой на
+    VK Видео, RuTube, Дзен или YouTube: по ссылке на странице автоматически встраивается видеоплеер.
   </p>
 
   <div class="grid grid--2">
@@ -27,7 +27,7 @@
       <h3>Добавить видео</h3>
       <div class="field"><label>Ссылка на видео</label>
         <input type="url" name="url" placeholder="https://rutube.ru/video/... или https://vk.com/video-123_456">
-        <div class="hint">Или загрузите файл ниже — что-то одно.</div></div>
+        <div class="hint">Укажите ссылку либо загрузите файл ниже.</div></div>
       <div class="field"><label>Файл .mp4 / .webm</label><input type="file" name="file" accept="video/mp4,video/webm"></div>
       <div class="field"><label>Обложка видео</label><input type="file" name="preview" accept="image/*"></div>
       <div class="field"><label>Подпись</label><input type="text" name="title"></div>
@@ -37,7 +37,7 @@
 
   {% if media %}
     <h3 style="margin-top:26px">Загружено ({{ media | length }})</h3>
-    <p class="hint" style="margin-bottom:12px">Порядок здесь — порядок на сайте. Стрелки ← → переставляют материал на одно место.</p>
+    <p class="hint" style="margin-bottom:12px">Материалы выводятся на сайте в указанном здесь порядке. Стрелки ← → перемещают материал на одну позицию.</p>
     <div class="thumbs">
       {% for m in media %}
         <div class="thumb">
@@ -63,7 +63,7 @@
                         title="Поставить позже" aria-label="Поставить позже" {{ 'disabled' if loop.last }}>→</button>
               </form>
               <form method="post" action="{{ url_for('admin.media_delete', media_id=m.id) }}"
-                    onsubmit="return confirm('Удалить этот материал?')">
+                    data-confirm="Удалить этот материал?">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button class="btn btn--danger btn--sm" type="submit">Удалить</button>
               </form>

@@ -1,0 +1,61 @@
+{% extends "admin/base.html" %}
+{% from "admin/_table.html" import sort_th, keep_sort, reset_link %}
+{% block title %}Перенаправления{% endblock %}
+{% block content %}
+<h1>Перенаправления</h1>
+<p class="subtitle">Постоянные перенаправления (301) со старых адресов: страниц прежнего сайта, переименованных
+  разделов, ссылок из печатных материалов. Посетитель и поисковик, пришедшие по старому адресу,
+  попадают на новую страницу, а поисковик переносит на неё накопленный вес.</p>
+
+{% set e = edit %}
+<section class="panel {{ 'panel--editing' if e }}" style="margin-top:20px" id="form">
+  <h2 style="margin-top:0">{{ 'Изменить перенаправление' if e else 'Добавить перенаправление' }}</h2>
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% if e %}<input type="hidden" name="id" value="{{ e.id }}">{% endif %}
+    <div class="grid grid--2">
+      <div class="field"><label for="r-old">Старый адрес *</label>
+        <input id="r-old" type="text" name="old_path" value="{{ e.old_path if e }}" required
+               placeholder="/afisha/koncert.html или https://старый-сайт.ru/afisha/koncert.html">
+        <div class="hint">Можно вставить адрес целиком — сохранится только путь после домена.</div></div>
+      <div class="field"><label for="r-new">Новый адрес *</label>
+        <input id="r-new" type="text" name="new_url" value="{{ e.new_url if e }}" required
+               placeholder="/afisha или https://…">
+        <div class="hint">Путь на этом сайте, начиная с «/», или полный адрес https://.</div></div>
+    </div>
+    <button class="btn btn--primary" type="submit">{{ 'Сохранить изменения' if e else 'Добавить' }}</button>
+    {% if e %}<a class="btn btn--ghost" href="{{ url_for('admin.redirects') }}">Отмена</a>{% endif %}
+  </form>
+</section>
+
+<form class="filters" method="get">
+  {{ keep_sort() }}
+  <input type="text" name="q" value="{{ search }}" placeholder="Старый или новый адрес" aria-label="Поиск">
+  <button class="btn btn--ghost btn--sm" type="submit">Найти</button>
+  {{ reset_link(['q']) }}
+</form>
+
+<div class="table-wrap">
+  <table>
+    <tr>
+      {{ sort_th('Старый адрес', 'old', sorting) }}
+      {{ sort_th('Новый адрес', 'new', sorting) }}
+      {{ sort_th('Переходов', 'hits', sorting) }}
+      <th></th>
+    </tr>
+    {% for r in items %}
+      <tr id="row-{{ r.id }}" class="{{ 'is-editing' if edit and edit.id == r.id }}">
+        <td><code>{{ r.old_path }}</code></td>
+        <td><a href="{{ r.new_url }}" target="_blank">{{ r.new_url | truncate(60) }}</a></td>
+        <td>{{ r.hits }}</td>
+        <td><div class="row-actions">
+          <a class="btn btn--ghost btn--sm" href="{{ url_for('admin.redirects', edit=r.id) }}#form">Изменить</a>
+          <form method="post" action="{{ url_for('admin.redirect_delete', item_id=r.id) }}" data-confirm="Удалить перенаправление?">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn--danger btn--sm" type="submit">Удалить</button></form>
+        </div></td>
+      </tr>
+    {% else %}<tr><td colspan="4">Перенаправлений нет.</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

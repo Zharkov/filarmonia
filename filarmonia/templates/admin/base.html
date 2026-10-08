@@ -9,7 +9,7 @@
 <body>
 <div class="layout">
   <aside class="side">
-    <div class="side__brand">Управление сайтом<small>Смоленская областная филармония</small></div>
+    <div class="side__brand">Управление сайтом</div>
 
     <div class="side__group">Содержание</div>
     <a href="{{ url_for('admin.dashboard') }}" class="{{ 'is-active' if request.endpoint == 'admin.dashboard' }}">Сводка</a>
@@ -28,7 +28,8 @@
     <div class="side__group">Оформление</div>
     <a href="{{ url_for('admin.menu') }}" class="{{ 'is-active' if (request.endpoint or '').startswith('admin.menu') }}">Меню</a>
     <a href="{{ url_for('admin.banners') }}" class="{{ 'is-active' if (request.endpoint or '').startswith('admin.banner') }}">Баннеры</a>
-    <a href="{{ url_for('admin.refs') }}" class="{{ 'is-active' if (request.endpoint or '').startswith('admin.ref') }}">Площадки и жанры</a>
+    <a href="{{ url_for('admin.refs') }}" class="{{ 'is-active' if (request.endpoint or '').startswith('admin.ref') and not (request.endpoint or '').startswith('admin.redirect') }}">Площадки и жанры</a>
+    <a href="{{ url_for('admin.redirects') }}" class="{{ 'is-active' if (request.endpoint or '').startswith('admin.redirect') }}">Перенаправления</a>
     {# Эти разделы открыты только администратору — редактору их не показываем #}
     {% if current_user and current_user.is_admin %}
       <a href="{{ url_for('admin.settings_page') }}" class="{{ 'is-active' if (request.endpoint or '').startswith('admin.settings') }}">Настройки</a>
@@ -40,7 +41,10 @@
       <div class="side__user">{{ current_user.name or current_user.login }}</div>
       <div class="side__actions">
         <a href="{{ url_for('public.index') }}" target="_blank">Открыть сайт</a>
-        <a href="{{ url_for('admin.logout') }}">Выйти</a>
+        <form class="side__logout" method="post" action="{{ url_for('admin.logout') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit">Выйти</button>
+        </form>
       </div>
     </div>
   </aside>
@@ -54,44 +58,9 @@
     {% block content %}{% endblock %}
   </main>
 </div>
-<script src="{{ asset_url('js/admin.js') }}"></script>
-<script>
-/* Визуальный редактор текста (Jodit). Весит под мегабайт, поэтому грузится
-   только на страницах, где есть поле с разметкой: textarea[data-rich].
-   Без скрипта поле остаётся обычным, и HTML вводится вручную. */
-(function () {
-  var fields = document.querySelectorAll("textarea[data-rich]");
-  if (!fields.length) return;
-  var css = document.createElement("link");
-  css.rel = "stylesheet";
-  css.href = "{{ asset_url('vendor/jodit/jodit.min.css') }}";
-  document.head.appendChild(css);
-  var script = document.createElement("script");
-  script.src = "{{ asset_url('vendor/jodit/jodit.min.js') }}";
-  script.onload = function () {
-    fields.forEach(function (field) {
-      Jodit.make(field, {
-        language: "ru",
-        height: field.getAttribute("data-rich") === "small" ? 220 : 420,
-        toolbarAdaptive: false,
-        buttons: "paragraph,bold,italic,underline,strikethrough,|,ul,ol,|,link,image,table,|," +
-                 "hr,eraser,|,undo,redo,|,source,fullsize",
-        controls: {
-          paragraph: { list: { p: "Обычный текст", h2: "Заголовок", h3: "Подзаголовок",
-                               h4: "Малый заголовок", blockquote: "Цитата" } }
-        },
-        // Текст из Word вставляется без его шрифтов, цветов и пустых стилей
-        askBeforePasteHTML: false,
-        askBeforePasteFromWord: false,
-        defaultActionOnPaste: "insert_clear_html",
-        // Картинки — только ссылкой: вставка файлом раздула бы базу
-        uploader: { insertImageAsBase64URI: false },
-        showCharsCounter: false, showWordsCounter: false, showXPathInStatusbar: false
-      });
-    });
-  };
-  document.body.appendChild(script);
-})();
-</script>
+{#- Адреса визуального редактора: admin.js подгружает его только там, где есть поле с разметкой -#}
+<script src="{{ asset_url('js/admin.js') }}"
+        data-jodit-js="{{ asset_url('vendor/jodit/jodit.min.js') }}"
+        data-jodit-css="{{ asset_url('vendor/jodit/jodit.min.css') }}"></script>
 </body>
 </html>

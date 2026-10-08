@@ -163,9 +163,32 @@
     });
   }
 
-  /* Видео в шапке: звук и пауза */
+  /* Видео в шапке. Загружается после всей страницы, чтобы не отнимать канал
+     у первого экрана, и только на широком экране без режима экономии трафика
+     и без просьбы уменьшить анимацию. На телефоне остаётся картинка.
+     Кнопка звука появляется, когда видео действительно играет. */
   var heroVideo = document.querySelector("[data-hero-video]");
   var soundBtn = document.querySelector("[data-hero-sound]");
+  if (heroVideo) {
+    var connection = navigator.connection || {};
+    var wantVideo = heroVideo.hasAttribute("data-always") || (
+      window.matchMedia("(min-width: 768px)").matches &&
+      !window.matchMedia("(prefers-reduced-motion: reduce)").matches &&
+      !connection.saveData && !/(^|-)2g$/.test(connection.effectiveType || ""));
+    var startVideo = function () {
+      heroVideo.addEventListener("playing", function () {
+        heroVideo.classList.add("is-playing");
+        if (soundBtn) soundBtn.hidden = false;
+      }, { once: true });
+      heroVideo.src = heroVideo.getAttribute("data-src");
+      var played = heroVideo.play();
+      if (played && played.catch) played.catch(function () { /* автозапуск запрещён — остаётся картинка */ });
+    };
+    if (wantVideo) {
+      if (document.readyState === "complete") startVideo();
+      else window.addEventListener("load", startVideo, { once: true });
+    }
+  }
   if (heroVideo && soundBtn) {
     soundBtn.addEventListener("click", function () {
       heroVideo.muted = !heroVideo.muted;
@@ -176,8 +199,42 @@
       soundBtn.querySelector("[data-sound-off]").hidden = on;
     });
   }
-  if (heroVideo && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    heroVideo.pause();
+
+  /* Кнопка «Наверх». Видна, когда страницу прокрутили больше чем на полтора
+     экрана. С клавиатуры фокус переходит в начало страницы, чтобы следующий
+     Tab шёл по шапке, а не продолжал с середины. При просьбе уменьшить
+     анимацию прокрутка мгновенная. */
+  var toTop = document.querySelector("[data-to-top]");
+  if (toTop) {
+    var toTopShown = false;
+    var syncToTop = function () {
+      var show = window.scrollY > window.innerHeight * 1.5;
+      if (show === toTopShown) return;
+      toTopShown = show;
+      if (show) {
+        toTop.hidden = false;
+        window.requestAnimationFrame(function () { toTop.classList.add("is-visible"); });
+      } else {
+        toTop.classList.remove("is-visible");
+        toTop.hidden = true;
+      }
+    };
+    var toTopPending = false;
+    window.addEventListener("scroll", function () {
+      if (toTopPending) return;
+      toTopPending = true;
+      window.requestAnimationFrame(function () { toTopPending = false; syncToTop(); });
+    }, { passive: true });
+    syncToTop();
+    toTop.addEventListener("click", function (e) {
+      var still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      window.scrollTo({ top: 0, behavior: still ? "auto" : "smooth" });
+      // e.detail === 0 — нажали клавишей, а не мышью
+      if (e.detail === 0) {
+        var first = document.querySelector(".logo");
+        if (first) first.focus({ preventScroll: true });
+      }
+    });
   }
 
   /* Пересчёт по прокрутке — не чаще одного раза за кадр */

@@ -4,10 +4,10 @@
          python app.py seed --reset    — очистить базу и создать заново
 
 Тексты концертов, новостей и коллективов здесь демонстрационные:
-их заменяют настоящими через админку.
+их заменяют настоящими через панель администратора.
 """
 import os
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from sqlalchemy import text
 
@@ -15,7 +15,7 @@ from .models import (
     db, User, Setting, Page, MenuItem, Venue, Category, Event, EventBadge,
     Collective, News, Document, Banner, MediaItem, Appeal,
 )
-from .utils import slugify
+from .utils import now_msk, slugify
 from . import demo, maintenance, migrate
 
 # Учётная запись администратора. На сервере, доступном из интернета, пароль
@@ -315,7 +315,7 @@ BUILDING_PHOTOS = [
     "Филармония вечером",
 ]
 
-# Демонстрационные обращения: чтобы раздел «Обращения граждан» в админке
+# Демонстрационные обращения: чтобы раздел «Обращения граждан» в панели администратора
 # не был пустым. Перед вводом в эксплуатацию их удаляют.
 # (имя, почта, телефон, тема, текст, дней назад, обработано, пометка)
 APPEALS = [
@@ -461,7 +461,7 @@ def run(app, reset=False, rebuild_menu=False):
         venues = Venue.query.all()
         if Event.query.count() == 0:
             for i, spec in enumerate(EVENTS):
-                starts = (datetime.now() + timedelta(days=spec["days"])).replace(
+                starts = (now_msk() + timedelta(days=spec["days"])).replace(
                     hour=spec["hour"], minute=spec["minute"], second=0, microsecond=0
                 )
                 category = Category.query.filter_by(name=spec["cat"]).first()
@@ -532,7 +532,7 @@ def run(app, reset=False, rebuild_menu=False):
                     title=title, slug=slugify(title), lead=lead, content=content,
                     image=demo.photo(f"news-{i}.jpg", title, i + 51, (1400, 900)) if with_media else "",
                     show_media=with_media,
-                    published_at=datetime.now() - timedelta(days=i * 3 + 1),
+                    published_at=now_msk() - timedelta(days=i * 3 + 1),
                 ))
             db.session.commit()
 
@@ -554,18 +554,18 @@ def run(app, reset=False, rebuild_menu=False):
             for name, email, phone, subject, message, days, processed, note in APPEALS:
                 db.session.add(Appeal(
                     name=name, email=email, phone=phone, subject=subject, message=message,
-                    consent=True, created_at=datetime.now() - timedelta(days=days),
+                    consent=True, created_at=now_msk() - timedelta(days=days),
                     is_processed=processed, note=note,
                 ))
             db.session.commit()
 
-    # Демо-картинки рисуются напрямую, мимо загрузки через админку, —
+    # Демо-картинки рисуются напрямую, мимо загрузки через панель администратора, —
     # уменьшенные копии для них делаем отдельно
     maintenance.make_all_variants(app)
     with app.app_context():
         print("База наполнена.")
         if os.environ.get("ADMIN_PASSWORD"):
             # Пароль в логи сборки не пишем
-            print(f"Админка: /admin  — логин {ADMIN_LOGIN}, пароль из ADMIN_PASSWORD")
+            print(f"Панель администратора: /admin  — логин {ADMIN_LOGIN}, пароль из ADMIN_PASSWORD")
         else:
-            print(f"Админка: /admin  — логин {ADMIN_LOGIN}, пароль {ADMIN_PASSWORD}")
+            print(f"Панель администратора: /admin  — логин {ADMIN_LOGIN}, пароль {ADMIN_PASSWORD}")

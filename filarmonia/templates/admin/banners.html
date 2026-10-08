@@ -3,7 +3,7 @@
 {% block title %}Баннеры{% endblock %}
 {% block content %}
 <h1>Баннеры</h1>
-<p class="subtitle">Госуслуги, bus.gov.ru, партнёры и другие ссылки-картинки.
+<p class="subtitle">Госуслуги, bus.gov.ru, партнёры и другие графические ссылки.
   Место «Главная, крупно» — широкий баннер «Госуслуги. Решаем вместе» над лентой партнёров.</p>
 
 {% set e = edit %}
@@ -38,11 +38,11 @@
 <form class="filters" method="get">
   {{ keep_sort() }}
   <input type="text" name="q" value="{{ search }}" placeholder="Название или ссылка" aria-label="Поиск">
-  <select name="place" onchange="this.form.submit()" aria-label="Место">
+  <select name="place" data-autosubmit aria-label="Место">
     <option value="">Все места</option>
     {% for value, label in places %}<option value="{{ value }}" {{ 'selected' if request.args.get('place') == value }}>{{ label }}</option>{% endfor %}
   </select>
-  <select name="status" onchange="this.form.submit()" aria-label="Статус">
+  <select name="status" data-autosubmit aria-label="Статус">
     <option value="">Любой статус</option>
     <option value="on" {{ 'selected' if request.args.get('status') == 'on' }}>Показываются</option>
     <option value="off" {{ 'selected' if request.args.get('status') == 'off' }}>Скрытые</option>
@@ -72,7 +72,7 @@
         <td>{{ publish_toggle('banner', b, 'показывается', 'скрыт') }}</td>
         <td><div class="row-actions">
           <a class="btn btn--ghost btn--sm" href="{{ url_for('admin.banners', edit=b.id) }}#form">Изменить</a>
-          <form method="post" action="{{ url_for('admin.banner_delete', item_id=b.id) }}" onsubmit="return confirm('Удалить баннер?')">
+          <form method="post" action="{{ url_for('admin.banner_delete', item_id=b.id) }}" data-confirm="Удалить баннер?">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button class="btn btn--danger btn--sm" type="submit">Удалить</button></form>
         </div></td>

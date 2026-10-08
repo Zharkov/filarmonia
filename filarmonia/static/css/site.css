@@ -2,6 +2,59 @@
    Палитра взята от смоленской крепостной стены (кирпич), зала
    (глубокий индиго) и бумаги концертной программки. */
 
+/* Шрифты (перенесены сюда из fonts/fonts.css: на один блокирующий запрос меньше).
+   Шрифты лежат рядом с сайтом, а не на fonts.gstatic.com: российский хостинг
+   не должен зависеть от внешнего домена, а запрос к нему задерживал отрисовку.
+
+   Файлы вариативные — один на все начертания, отсюда диапазон font-weight.
+   Срез cyrillic нужен для текста, latin — для цифр, дат и латинских названий;
+   браузер скачивает только тот, который реально понадобился на странице.
+   font-display: swap — текст читается сразу запасным шрифтом, без пустоты. */
+
+/* Заголовки — Tercia (font-family: Tercia, Georgia, serif). Шрифт коммерческий,
+   файлов в проекте пока нет: используется Tercia, установленный у посетителя,
+   иначе Georgia. Когда филармония передаст лицензионные файлы, положить их сюда
+   как tercia-regular.woff2 и tercia-bold.woff2 и дописать в src ниже:
+     url('../fonts/tercia-regular.woff2') format('woff2')  — в первый блок,
+     url('../fonts/tercia-bold.woff2') format('woff2')     — во второй. */
+
+@font-face {
+  font-family: 'Tercia';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Tercia'), local('Tercia Regular'), local('Tercia-Regular');
+}
+
+@font-face {
+  font-family: 'Tercia';
+  font-style: normal;
+  font-weight: 600 700;
+  font-display: swap;
+  src: local('Tercia Bold'), local('Tercia-Bold'), local('Tercia');
+}
+
+@font-face {
+  font-family: 'Golos Text';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('../fonts/golos-text-cyrillic.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+@font-face {
+  font-family: 'Golos Text';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('../fonts/golos-text-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+
 :root {
   --paper: #ffffff;
   --tint: #f2f1ee;          /* подложка секций */
@@ -163,6 +216,7 @@ p { margin: 0 0 1em; max-width: 72ch; }
 .topbar a { color: var(--on-ink); opacity: .85; }
 .topbar__row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 0; flex-wrap: wrap; }
 .topbar__links { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.nav__item--narrow { display: none; }
 
 .header { border-bottom: 1px solid var(--line); background: var(--paper); position: sticky; top: 0; z-index: 40; }
 .header__row { display: flex; align-items: center; gap: 28px; padding: 14px 0; }
@@ -202,6 +256,10 @@ html[data-theme="wb"] .logo__img { filter: grayscale(1) invert(1); }
 .hero { position: relative; background: var(--ink); color: var(--on-ink); overflow: hidden; }
 .hero__media { position: absolute; inset: 0; }
 .hero__media video, .hero__media img { width: 100%; height: 100%; object-fit: cover; }
+/* Видео ложится поверх картинки, когда начинает играть */
+.hero__media video { position: absolute; inset: 0; opacity: 0; transition: opacity .6s; }
+.hero__media video.is-playing { opacity: 1; }
+.hero__sound[hidden] { display: none; }
 .hero__media::after {
   content: ""; position: absolute; inset: 0;
   background: linear-gradient(105deg, rgba(20, 24, 33, .88) 0%, rgba(20, 24, 33, .6) 45%, rgba(20, 24, 33, .25) 100%);
@@ -335,6 +393,21 @@ html[data-theme] .ecard__when { position: static; padding: 8px 16px 0; }
   display: grid; place-items: center; box-shadow: var(--shadow);
 }
 .ecarousel__arrow:hover { border-color: var(--ink); }
+
+/* Кнопка «Наверх» — в духе стрелок карусели. Размер в rem: в версии для
+   слабовидящих растёт вместе с шрифтом, цвета — из тех же переменных темы */
+.to-top {
+  position: fixed; right: 24px; bottom: 24px; z-index: 40;
+  width: 3rem; height: 3rem; border-radius: 50%; border: 1px solid var(--line);
+  background: var(--paper); color: var(--ink); box-shadow: var(--shadow); cursor: pointer;
+  display: grid; place-items: center;
+  opacity: 0; transform: translateY(10px); transition: opacity .2s, transform .2s;
+}
+.to-top.is-visible { opacity: 1; transform: none; }
+.to-top[hidden] { display: none; }
+.to-top:hover { border-color: var(--ink); }
+.to-top svg { width: 1.4rem; height: 1.4rem; }
+html[data-theme] .to-top { border-width: 2px; border-color: var(--ink); }
 .ecarousel__arrow--prev { left: -22px; }
 .ecarousel__arrow--next { right: -22px; }
 .ecarousel__arrow:disabled { opacity: 0; pointer-events: none; }
@@ -730,6 +803,13 @@ html[data-theme] .bigbanner__btn { background: var(--ink); color: var(--paper); 
 }
 
 @media (max-width: 620px) {
+  /* Служебная полоса в одну строку: телефон и версия для слабовидящих.
+     Остальное — в меню и подвале, чтобы полоса не занимала треть экрана */
+  .topbar__row { flex-wrap: nowrap; gap: 10px; padding: 6px 0; }
+  .topbar__links { gap: 10px; flex-wrap: nowrap; }
+  .topbar__wide { display: none; }
+  .topbar .a11y__btn { white-space: nowrap; padding: 4px 10px; font-size: .8rem; }
+  .nav__item--narrow { display: block; }
   .cards { grid-template-columns: minmax(0, 1fr); gap: 18px; }
   .card__age { font-size: .68rem; padding: 2px 5px; right: 6px; top: 6px; }
   .cal__head { gap: 10px; }
@@ -743,6 +823,7 @@ html[data-theme] .bigbanner__btn { background: var(--ink); color: var(--paper); 
   .partners a { width: 150px; }
   .logo__img { height: 40px; }
   .hero__sound { right: 14px; bottom: 14px; }
+  .to-top { right: 14px; bottom: 14px; }
   .route__option span { padding: 10px 16px; }
   .gallery-grid { grid-template-columns: repeat(2, 1fr); }
   .footer__cols { grid-template-columns: 1fr; }

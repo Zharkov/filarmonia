@@ -2,6 +2,7 @@
 
     python app.py                  запустить сайт: http://127.0.0.1:8000
     python app.py --port 5000      на другом порту
+    python app.py --debug          с отладкой и перезагрузкой при правке кода
     python app.py seed             создать таблицы и наполнить демо-контентом
     python app.py seed --reset     очистить базу и наполнить заново
     python app.py seed --menu      пересобрать главное меню по образцу
@@ -43,10 +44,13 @@ def main(argv=None) -> int:
     commands = parser.add_subparsers(dest="command")
 
     run_cmd = commands.add_parser("run", help="запустить сайт (по умолчанию)")
-    run_cmd.add_argument("--host", default="0.0.0.0", help="адрес, по умолчанию 0.0.0.0")
+    # Только этот компьютер: отладчик Werkzeug позволяет выполнять код,
+    # и открывать его в сеть по умолчанию нельзя
+    run_cmd.add_argument("--host", default="127.0.0.1",
+                         help="адрес, по умолчанию 127.0.0.1 (только этот компьютер)")
     run_cmd.add_argument("--port", type=int, default=8000, help="порт, по умолчанию 8000")
-    run_cmd.add_argument("--no-debug", action="store_true",
-                         help="без режима отладки и перезагрузки")
+    run_cmd.add_argument("--debug", action="store_true",
+                         help="режим отладки: перезагрузка при правке и отладчик в браузере")
 
     seed_cmd = commands.add_parser("seed", help="наполнить базу демо-контентом")
     seed_cmd.add_argument("--reset", action="store_true",
@@ -123,8 +127,15 @@ def main(argv=None) -> int:
         from filarmonia import migrate
 
         migrate.upgrade(app)
-    print(f"Сайт: http://127.0.0.1:{args.port}   Админка: /admin")
-    app.run(host=args.host, port=args.port, debug=not args.no_debug)
+    print(f"Сайт: http://127.0.0.1:{args.port}   Панель администратора: /admin")
+    debug = args.debug
+    if debug and (app.config["SESSION_COOKIE_SECURE"] or app.config["TRUST_PROXY"]):
+        print("Режим отладки на боевых настройках отключён: отладчик позволяет выполнять код на сервере.")
+        debug = False
+    if debug and args.host not in ("127.0.0.1", "localhost", "::1"):
+        print(f"ВНИМАНИЕ: отладчик доступен по адресу {args.host} — любой, кто видит этот адрес, "
+              "может выполнить код на компьютере.")
+    app.run(host=args.host, port=args.port, debug=debug)
     return 0
 
 

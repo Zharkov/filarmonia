@@ -9,6 +9,7 @@
 приложение на временной базе.
 """
 import os
+from datetime import timedelta
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
@@ -16,7 +17,7 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 # см. filarmonia.check_secret_key.
 INSECURE_SECRET_KEY = "change-me-in-production"
 
-# Расширения, разрешённые к загрузке через админку
+# Расширения, разрешённые к загрузке через панель администратора
 ALLOWED_IMAGE_EXT = {"jpg", "jpeg", "png", "webp", "gif"}
 ALLOWED_VIDEO_EXT = {"mp4", "webm"}
 ALLOWED_DOC_EXT = {"pdf", "doc", "docx", "xls", "xlsx", "odt", "rtf", "zip"}
@@ -48,7 +49,7 @@ def build_config(**overrides) -> dict:
         "IMAGE_MAX_SIDE": int(os.environ.get("IMAGE_MAX_SIDE", "2000")),
         "IMAGE_QUALITY": int(os.environ.get("IMAGE_QUALITY", "85")),
 
-        # Защита входа в админку от подбора пароля: сколько неудач подряд
+        # Защита входа в панель администратора от подбора пароля: сколько неудач подряд
         # с одной пары «логин + адрес» и на сколько секунд после этого запирать.
         "LOGIN_MAX_ATTEMPTS": int(os.environ.get("LOGIN_MAX_ATTEMPTS", "5")),
         "LOGIN_LOCKOUT_SECONDS": int(os.environ.get("LOGIN_LOCKOUT_SECONDS", "900")),
@@ -70,6 +71,21 @@ def build_config(**overrides) -> dict:
         # добавляется <meta name="robots" content="noindex">. Нужно для
         # тестовых копий сайта, чтобы они не попадали в поиск.
         "SITE_NOINDEX": bool(int(os.environ.get("SITE_NOINDEX", "0"))),
+
+        # Адрес сайта для канонических ссылок, карты сайта и микроразметки,
+        # например https://smolensk-filarmonia.ru. Пусто — адрес берётся из запроса
+        # (годится для разработки; на боевом сервере задать обязательно).
+        "SITE_URL": os.environ.get("SITE_URL", "").rstrip("/"),
+
+        # Сеанс сотрудника: не дольше рабочего дня и до часа без действий
+        "PERMANENT_SESSION_LIFETIME": timedelta(hours=int(os.environ.get("SESSION_HOURS", "8"))),
+        "SESSION_IDLE_SECONDS": int(os.environ.get("SESSION_IDLE_MINUTES", "60")) * 60,
+
+        # Сжатие ответов самим приложением. За nginx с gzip можно выключить (0)
+        "COMPRESS_RESPONSES": bool(int(os.environ.get("COMPRESS_RESPONSES", "1"))),
+
+        # Файл журнала с ротацией. Пусто — журнал только в поток ошибок
+        "LOG_FILE": os.environ.get("LOG_FILE", ""),
     }
     config.update(overrides)
     return config

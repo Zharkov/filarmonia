@@ -1,10 +1,8 @@
 {% extends "public/base.html" %}
-{% from "public/_macros.html" import event_row, daystrip, pagination %}
+{% from "public/_macros.html" import event_row, daystrip, pagination, breadcrumbs %}
 {% block title %}Афиша{% endblock %}
 
-{% block breadcrumbs %}
-<div class="wrap breadcrumbs"><a href="{{ url_for('public.index') }}">Главная</a> / Афиша</div>
-{% endblock %}
+{% block breadcrumbs %}{{ breadcrumbs([('Главная', url_for('public.index')), ('Афиша', None)]) }}{% endblock %}
 
 {% block content %}
 <div class="wrap">

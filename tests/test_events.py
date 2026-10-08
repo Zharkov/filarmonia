@@ -101,7 +101,7 @@ def test_copy_event(app, admin):
     admin.post("/admin/media/add", data={"owner": "event", "owner_id": str(eid), "kind": "photo",
                                          "file": (png(), "f.png")}, content_type="multipart/form-data")
     r = admin.post(f"/admin/events/{eid}/copy", follow_redirects=True)
-    assert "Копия создана и пока скрыта" in text(r)
+    assert "Копия сохранена как черновик" in text(r)
     with app.app_context():
         copies = Event.query.filter_by(title="Тестовый концерт").order_by(Event.id).all()
         assert len(copies) == 2
@@ -190,7 +190,7 @@ def test_toggle_publish_from_list(app, admin):
     html = text(admin.get("/admin/events?scope=all"))
     assert f'action="/admin/publish/event/{eid}"' in html
 
-    # Скрипт админки получает ответ без перезагрузки страницы
+    # Скрипт панели администратора получает ответ без перезагрузки страницы
     r = admin.post(f"/admin/publish/event/{eid}", headers={"X-Requested-With": "fetch"})
     assert r.is_json and r.json["published"] is False and "скрыто с сайта" in r.json["message"]
     # Сообщение не должно всплыть ещё раз при следующем открытии страницы

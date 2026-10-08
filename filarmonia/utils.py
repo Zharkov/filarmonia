@@ -4,6 +4,7 @@ import re
 import secrets
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
+from urllib.parse import parse_qs, urlsplit, urlunsplit
 
 import nh3
 from flask import current_app
@@ -31,6 +32,26 @@ MONTHS_SHORT = ["янв", "фев", "мар", "апр", "мая", "июн",
                 "июл", "авг", "сен", "окт", "ноя", "дек"]
 WEEKDAYS = ["понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье"]
 WEEKDAYS_SHORT = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
+
+
+# Смоленск живёт по московскому времени, а оно с 2014 года без перехода
+# на летнее: UTC+3. Фиксированное смещение не требует базы часовых поясов,
+# которой нет в Windows без пакета tzdata.
+MSK = timezone(timedelta(hours=3), "MSK")
+
+
+def now_msk() -> datetime:
+    """Текущее московское время без пояса — в той же шкале, что и даты концертов.
+
+    Вместо `datetime.now()`: то показывает часы сервера, а на сервере в UTC
+    прошедший концерт ещё три часа висел бы в афише как предстоящий.
+    """
+    return datetime.now(MSK).replace(tzinfo=None)
+
+
+def iso_msk(value) -> str:
+    """Дата концерта для микроразметки: «2026-10-10T18:30:00+03:00»."""
+    return value.replace(tzinfo=MSK).isoformat() if value else ""
 
 
 def utcnow() -> datetime:
@@ -141,14 +162,49 @@ def save_upload(file_storage, kinds=("image",)) -> str:
     path = os.path.join(folder, name)
     file_storage.save(path)
     if ext in cfg["ALLOWED_IMAGE_EXT"]:
+        try:
+            check_image(path)
+        except ValueError:
+            os.remove(path)
+            raise
         shrink_image(path)
         make_variants(path)
     return name
 
 
+# Форматы, которые разбирает Pillow при загрузке. Формат он определяет по
+# содержимому, а не по расширению: без списка файл PSD или PDF, названный .jpg,
+# прошёл бы проверку расширения и попал в декодер редкого формата — именно
+# в таких декодерах находят большинство уязвимостей.
+IMAGE_FORMATS = ("JPEG", "PNG", "WEBP", "GIF")
+# Защита от «бомб»: картинки, которая весит килобайты, а в памяти занимает гигабайты
+MAX_IMAGE_PIXELS = 50_000_000
+
+
+def _pil():
+    from PIL import Image
+
+    Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
+    return Image
+
+
+def check_image(path: str) -> None:
+    """Убеждается, что файл — картинка одного из разрешённых форматов."""
+    Image = _pil()
+    try:
+        with Image.open(path, formats=IMAGE_FORMATS) as img:
+            img.verify()
+    except Image.DecompressionBombError:
+        raise ValueError("Изображение слишком большое: уменьшите его до 7000 px по длинной стороне.")
+    except Exception:
+        raise ValueError("Файл не распознан как изображение JPEG, PNG, WebP или GIF.")
+
+
 # Уменьшенные копии фото. Карточка концерта на экране шириной около 400 px,
 # а оригинал ужат только до 2000: без копий браузер качал бы его целиком.
-VARIANT_WIDTHS = (400, 800)
+# 1200 — для телефонов с плотным экраном (390 px × 3): без неё они брали
+# оригинал JPEG вместо WebP.
+VARIANT_WIDTHS = (400, 800, 1200)
 
 
 def variant_name(name: str, width: int) -> str:
@@ -157,16 +213,17 @@ def variant_name(name: str, width: int) -> str:
 
 
 def make_variants(path: str) -> int:
-    """Сохраняет рядом с фото копии шириной 400 и 800 px в WebP.
+    """Сохраняет рядом с фото копии шириной 400, 800 и 1200 px в WebP.
 
     Копию шире оригинала не делаем — она была бы просто тяжелее.
     GIF не трогаем, чтобы не потерять анимацию. Возвращает число созданных копий.
     """
-    from PIL import Image, UnidentifiedImageError
+    from PIL import UnidentifiedImageError
 
+    Image = _pil()
     made = 0
     try:
-        with Image.open(path) as img:
+        with Image.open(path, formats=IMAGE_FORMATS) as img:
             if img.format == "GIF":
                 return 0
             img.load()
@@ -181,16 +238,14 @@ def make_variants(path: str) -> int:
                 copy.thumbnail((width, width * 10))
                 copy.save(target, "WEBP", quality=current_app.config["IMAGE_QUALITY"], method=4)
                 made += 1
-    except (OSError, UnidentifiedImageError, ValueError) as error:
-        print(f"Не удалось сделать копии {os.path.basename(path)}: {error}")
+    except (OSError, UnidentifiedImageError, ValueError, Image.DecompressionBombError) as error:
+        current_app.logger.warning("Не удалось сделать копии %s: %s", os.path.basename(path), error)
     return made
 
 
 @lru_cache(maxsize=2048)
 def _srcset_for(name: str, mtime: float, folder: str) -> str:
     """Строка srcset для файла; кэш по времени изменения файла."""
-    from PIL import Image
-
     parts = [
         f"{UPLOADS_PREFIX}{variant_name(name, w)} {w}w"
         for w in VARIANT_WIDTHS
@@ -199,7 +254,7 @@ def _srcset_for(name: str, mtime: float, folder: str) -> str:
     if not parts:
         return ""
     try:
-        with Image.open(os.path.join(folder, name)) as img:
+        with _pil().open(os.path.join(folder, name), formats=IMAGE_FORMATS) as img:
             parts.append(f"{UPLOADS_PREFIX}{name} {img.width}w")
     except OSError:
         pass
@@ -246,7 +301,7 @@ def delete_uploads(names) -> int:
     return removed
 
 
-# Очистка HTML из админки: оставляем разметку текста, вырезаем скрипты,
+# Очистка HTML из панели администратора: оставляем разметку текста, вырезаем скрипты,
 # обработчики событий и javascript:-ссылки. Код виджетов (схема зала, карта,
 # «Решаем вместе») сюда не попадает — его вводит только администратор.
 SAFE_TAGS = {
@@ -263,7 +318,7 @@ SAFE_ATTRS = {
 
 
 def clean_html(html: str) -> str:
-    """Безопасная разметка из текста, введённого в админке."""
+    """Безопасная разметка из текста, введённого в панели администратора."""
     if not html:
         return ""
     return nh3.clean(
@@ -297,12 +352,13 @@ def shrink_image(path: str) -> None:
     Картинку, которую Pillow не смог открыть или пересохранить, оставляем
     как есть: загрузка не должна срываться из-за неудачной оптимизации.
     """
-    from PIL import Image, UnidentifiedImageError
+    from PIL import UnidentifiedImageError
 
+    Image = _pil()
     cfg = current_app.config
     side = cfg["IMAGE_MAX_SIDE"]
     try:
-        with Image.open(path) as img:
+        with Image.open(path, formats=IMAGE_FORMATS) as img:
             img.load()
             # GIF не трогаем: пересохранение убило бы анимацию
             if img.format == "GIF" or (img.width <= side and img.height <= side):
@@ -313,8 +369,8 @@ def shrink_image(path: str) -> None:
                 img = img.convert("RGB")
             img.thumbnail((side, side))
             img.save(path, fmt, quality=cfg["IMAGE_QUALITY"], optimize=True)
-    except (OSError, UnidentifiedImageError, ValueError) as error:
-        print(f"Не удалось ужать {os.path.basename(path)}: {error}")
+    except (OSError, UnidentifiedImageError, ValueError, Image.DecompressionBombError) as error:
+        current_app.logger.warning("Не удалось ужать %s: %s", os.path.basename(path), error)
 
 
 def file_size_kb(filename: str) -> int:
@@ -344,54 +400,96 @@ def video_embed(url: str) -> str:
     Если формат не распознан, возвращается пустая строка — тогда шаблон
     покажет обычную ссылку.
 
-    Ветки с разбором адреса подставляют только группы регулярного выражения
-    (цифры и латиница), адрес целиком идёт в разметку через `_tag`.
+    Адрес разбирается целиком: схема только https, хост сверяется со списком
+    точно, а не поиском подстроки. Иначе ссылка вида
+    `javascript:…//vk.com/video_ext.php` попала бы в src фрейма и выполнилась
+    бы на сайте. Код проигрывателя собирается только из проверенных частей
+    адреса (цифры, латиница), исходная строка в разметку не идёт.
     """
     url = (url or "").strip()
     if not url:
         return ""
+    # Свой файл с сайта: /static/uploads/clip.mp4
+    if url.startswith("/") and not url.startswith("//"):
+        parts = urlsplit(url)
+        if VIDEO_FILE_RE.search(parts.path):
+            return _tag('<video controls preload="metadata" src="{}"></video>', parts.path)
+        return ""
 
-    # VK Видео: https://vk.com/video-123456_789 или vkvideo.ru/video-123_456
-    m = re.search(r"(?:vk\.com|vkvideo\.ru|vk\.ru)/video(-?\d+)_(\d+)", url)
-    if m:
-        return (
-            f'<iframe src="https://vk.com/video_ext.php?oid={m.group(1)}'
-            f'&id={m.group(2)}&hd=2" allow="autoplay; encrypted-media; fullscreen"'
-            ' allowfullscreen frameborder="0"></iframe>'
-        )
-    if "vk.com/video_ext.php" in url or "vkvideo.ru/video_ext.php" in url:
-        return _tag('<iframe src="{}" allowfullscreen frameborder="0"></iframe>', url)
+    parts = urlsplit(url)
+    host = (parts.hostname or "").lower()
+    if parts.scheme != "https" or not host:
+        return ""
+    host = host[4:] if host.startswith("www.") else host
+    path, query = parts.path, parse_qs(parts.query)
 
-    # RuTube: https://rutube.ru/video/<id>/
-    m = re.search(r"rutube\.ru/(?:video|play/embed)/([0-9a-f]{32})", url)
-    if m:
+    if host in VK_HOSTS:
+        # https://vk.com/video-123456_789 или код для вставки video_ext.php?oid=…&id=…&hash=…
+        m = re.fullmatch(r"/video(-?\d+)_(\d+)/?", path)
+        if m:
+            oid, vid, video_hash = m.group(1), m.group(2), ""
+        elif path == "/video_ext.php":
+            oid, vid = _query_value(query, "oid", r"-?\d+"), _query_value(query, "id", r"\d+")
+            video_hash = _query_value(query, "hash", r"[0-9a-f]+")
+            if not (oid and vid):
+                return ""
+        else:
+            return ""
+        extra = f"&hash={video_hash}" if video_hash else ""
         return (
-            f'<iframe src="https://rutube.ru/play/embed/{m.group(1)}"'
-            ' allow="clipboard-write; autoplay" allowfullscreen frameborder="0"></iframe>'
-        )
-
-    # Дзен / Видео Дзен
-    m = re.search(r"dzen\.ru/(?:video/)?(?:watch|embed)/([\w-]+)", url)
-    if m:
-        return (
-            f'<iframe src="https://dzen.ru/embed/{m.group(1)}"'
-            ' allow="autoplay; fullscreen" allowfullscreen frameborder="0"></iframe>'
-        )
-
-    # YouTube
-    m = re.search(r"(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/)([\w-]{11})", url)
-    if m:
-        return (
-            f'<iframe src="https://www.youtube.com/embed/{m.group(1)}"'
-            ' allow="accelerometer; clipboard-write; encrypted-media; picture-in-picture"'
-            ' allowfullscreen frameborder="0"></iframe>'
+            f'<iframe src="https://vk.com/video_ext.php?oid={oid}&id={vid}{extra}&hd=2"'
+            ' allow="autoplay; encrypted-media; fullscreen" allowfullscreen frameborder="0"></iframe>'
         )
 
-    # Прямая ссылка на файл
-    if re.search(r"\.(mp4|webm)(\?|$)", url, re.I):
-        return _tag('<video controls preload="metadata" src="{}"></video>', url)
+    if host == "rutube.ru":
+        m = re.fullmatch(r"/(?:video|play/embed)/([0-9a-f]{32})/?", path)
+        if m:
+            return (
+                f'<iframe src="https://rutube.ru/play/embed/{m.group(1)}"'
+                ' allow="clipboard-write; autoplay" allowfullscreen frameborder="0"></iframe>'
+            )
+        return ""
 
+    if host == "dzen.ru":
+        m = re.fullmatch(r"/(?:video/)?(?:watch|embed)/([\w-]+)/?", path, re.ASCII)
+        if m:
+            return (
+                f'<iframe src="https://dzen.ru/embed/{m.group(1)}"'
+                ' allow="autoplay; fullscreen" allowfullscreen frameborder="0"></iframe>'
+            )
+        return ""
+
+    if host in ("youtube.com", "m.youtube.com", "youtu.be"):
+        if host == "youtu.be":
+            m = re.fullmatch(r"/([\w-]{11})/?", path, re.ASCII)
+            video_id = m.group(1) if m else ""
+        elif path == "/watch":
+            video_id = _query_value(query, "v", r"[\w-]{11}")
+        else:
+            m = re.fullmatch(r"/(?:embed|shorts)/([\w-]{11})/?", path, re.ASCII)
+            video_id = m.group(1) if m else ""
+        if video_id:
+            return (
+                f'<iframe src="https://www.youtube.com/embed/{video_id}"'
+                ' allow="accelerometer; clipboard-write; encrypted-media; picture-in-picture"'
+                ' allowfullscreen frameborder="0"></iframe>'
+            )
+        return ""
+
+    # Прямая ссылка на файл на другом сайте — только https
+    if VIDEO_FILE_RE.search(path):
+        return _tag('<video controls preload="metadata" src="{}"></video>', urlunsplit(parts))
     return ""
+
+
+VK_HOSTS = {"vk.com", "m.vk.com", "vk.ru", "vkvideo.ru"}
+VIDEO_FILE_RE = re.compile(r"\.(mp4|webm)$", re.I)
+
+
+def _query_value(query: dict, key: str, pattern: str) -> str:
+    """Параметр адреса, если он целиком подходит под шаблон, иначе пустая строка."""
+    value = (query.get(key) or [""])[0]
+    return value if re.fullmatch(pattern, value, re.ASCII) else ""
 
 
 def parse_dt(value: str):

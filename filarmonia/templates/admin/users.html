@@ -38,7 +38,7 @@
     {% else %}
       <div class="checkline"><input id="ua" type="checkbox" name="is_active" {{ 'checked' if v.get('is_active') }}>
         <label for="ua">Доступ разрешён</label></div>
-      <p class="hint" style="margin-top:-4px">Снимите галочку, чтобы временно закрыть вход, не удаляя сотрудника. Действует сразу, даже если он сейчас в админке.</p>
+      <p class="hint" style="margin-top:-4px">Снимите отметку, чтобы временно закрыть доступ, не удаляя учётную запись. Изменение вступает в силу сразу, в том числе для текущего сеанса работы.</p>
     {% endif %}
     <button class="btn btn--primary" type="submit">{{ 'Сохранить изменения' if e else 'Сохранить' }}</button>
     {% if e %}<a class="btn btn--ghost" href="{{ url_for('admin.users') }}">Отмена</a>{% endif %}
@@ -48,12 +48,12 @@
 <form class="filters" method="get">
   {{ keep_sort() }}
   <input type="text" name="q" value="{{ search }}" placeholder="Логин или имя" aria-label="Поиск">
-  <select name="role" onchange="this.form.submit()" aria-label="Права">
+  <select name="role" data-autosubmit aria-label="Права">
     <option value="">Любые права</option>
     <option value="admin" {{ 'selected' if request.args.get('role') == 'admin' }}>Администраторы</option>
     <option value="editor" {{ 'selected' if request.args.get('role') == 'editor' }}>Редакторы</option>
   </select>
-  <select name="status" onchange="this.form.submit()" aria-label="Доступ">
+  <select name="status" data-autosubmit aria-label="Доступ">
     <option value="">Любой доступ</option>
     <option value="on" {{ 'selected' if request.args.get('status') == 'on' }}>Доступ разрешён</option>
     <option value="off" {{ 'selected' if request.args.get('status') == 'off' }}>Отключённые</option>
@@ -73,14 +73,14 @@
     </tr>
     {% for u in items %}
       <tr class="{{ 'is-editing' if edit and edit.id == u.id }}">
-        <td>{{ u.login }}{% if u.id == current_user.id %} <span class="badge">это вы</span>{% endif %}</td>
+        <td>{{ u.login }}{% if u.id == current_user.id %} <span class="badge">ваша учётная запись</span>{% endif %}</td>
         <td>{{ u.name }}</td>
         <td>{{ 'Администратор' if u.is_admin else 'Редактор' }}{% if not u.is_active %} <span class="badge badge--off">отключён</span>{% endif %}</td>
         <td>{{ u.last_login_at | ru_date if u.last_login_at else '—' }}</td>
         <td><div class="row-actions">
           <a class="btn btn--ghost btn--sm" href="{{ url_for('admin.users', edit=u.id) }}#form">Изменить</a>
           {% if u.id != current_user.id %}
-          <form method="post" action="{{ url_for('admin.user_delete', item_id=u.id) }}" onsubmit="return confirm('Удалить сотрудника?')">
+          <form method="post" action="{{ url_for('admin.user_delete', item_id=u.id) }}" data-confirm="Удалить сотрудника?">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button class="btn btn--danger btn--sm" type="submit">Удалить</button></form>
           {% endif %}

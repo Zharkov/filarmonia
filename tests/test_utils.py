@@ -40,9 +40,10 @@ def test_variants_and_srcset(app):
         path = os.path.join(folder, "big.jpg")
         from PIL import Image
         Image.open(png((1600, 1000))).convert("RGB").save(path)
-        assert utils.make_variants(path) == 2
+        assert utils.make_variants(path) == 3
         srcset = utils.srcset("/static/uploads/big.jpg")
-        assert "big-400w.webp 400w" in srcset and "big-800w.webp 800w" in srcset and "big.jpg 1600w" in srcset
+        for part in ("big-400w.webp 400w", "big-800w.webp 800w", "big-1200w.webp 1200w", "big.jpg 1600w"):
+            assert part in srcset
         # Копию шире оригинала не делаем
         Image.open(png((500, 300))).convert("RGB").save(os.path.join(folder, "small.jpg"))
         assert utils.make_variants(os.path.join(folder, "small.jpg")) == 1

@@ -20,20 +20,20 @@
   <input type="hidden" name="scope" value="{{ scope }}">
   {{ keep_sort() }}
   <input type="text" name="q" value="{{ search }}" placeholder="Поиск по названию" aria-label="Поиск по названию">
-  <select name="venue" onchange="this.form.submit()" aria-label="Площадка">
+  <select name="venue" data-autosubmit aria-label="Площадка">
     <option value="">Все площадки</option>
     {% for v in venues %}<option value="{{ v.id }}" {{ 'selected' if request.args.get('venue') == v.id | string }}>{{ v.name }}</option>{% endfor %}
   </select>
-  <select name="category" onchange="this.form.submit()" aria-label="Жанр">
+  <select name="category" data-autosubmit aria-label="Жанр">
     <option value="">Все жанры</option>
     {% for c in categories %}<option value="{{ c.id }}" {{ 'selected' if request.args.get('category') == c.id | string }}>{{ c.name }}</option>{% endfor %}
   </select>
-  <select name="status" onchange="this.form.submit()" aria-label="Статус">
+  <select name="status" data-autosubmit aria-label="Статус">
     <option value="">Любой статус</option>
     <option value="on" {{ 'selected' if request.args.get('status') == 'on' }}>Опубликованные</option>
     <option value="off" {{ 'selected' if request.args.get('status') == 'off' }}>Скрытые</option>
   </select>
-  <select name="mark" onchange="this.form.submit()" aria-label="Отметка">
+  <select name="mark" data-autosubmit aria-label="Отметка">
     <option value="">Любые отметки</option>
     <option value="pushkin" {{ 'selected' if request.args.get('mark') == 'pushkin' }}>Пушкинская карта</option>
     <option value="benefits" {{ 'selected' if request.args.get('mark') == 'benefits' }}>Есть льготы</option>
@@ -63,7 +63,7 @@
           {{ publish_toggle('event', ev) }}
           {% if ev.show_pushkin %}<span class="badge">Пушкинская</span>{% endif %}
           {% if ev.show_benefits %}<span class="badge">льготы</span>{% endif %}
-          {% if ev.media %}<span class="badge">медиа: {{ ev.media | length }}</span>{% endif %}
+          {% if ev.media %}<span class="badge">фото и видео: {{ ev.media | length }}</span>{% endif %}
         </td>
         <td><a href="{{ ev.url }}" target="_blank">на сайте</a></td>
       </tr>

@@ -1,31 +1,35 @@
 {% extends "admin/base.html" %}
 {% from "admin/_media.html" import media_manager %}
+{% from "admin/_form.html" import slug_field, form_actions %}
 {% block title %}{{ ev.title or 'Новое событие' }}{% endblock %}
 
 {% block content %}
 <div class="page-head">
   <div>
     <h1>{{ ev.title or 'Новое событие' }}</h1>
-    <p class="subtitle">{% if ev.id %}{{ ev.starts_at | ru_datetime }}{% else %}Заполните карточку и сохраните{% endif %}</p>
+    <p class="subtitle">{% if ev.id %}{{ ev.starts_at | ru_datetime }}{% else %}Заполните сведения о событии и сохраните запись{% endif %}</p>
   </div>
   <div style="display:flex;gap:10px;flex-wrap:wrap">
     {% if ev.id %}
       <a class="btn btn--ghost" href="{{ ev.url }}" target="_blank">{{ 'Посмотреть на сайте' if ev.is_published else 'Предпросмотр (скрыто с сайта)' }}</a>
       <form method="post" action="{{ url_for('admin.event_copy', event_id=ev.id) }}"
-            onsubmit="return confirm('Создать копию события? Она будет скрыта с сайта, пока вы не поменяете дату и не опубликуете её.')">
+            data-confirm="Создать копию события? Копия будет сохранена как черновик: укажите новую дату и опубликуйте её.">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button class="btn btn--ghost" type="submit" title="Для повторной программы: всё, кроме даты, переносится">Создать копию</button>
+        <button class="btn btn--ghost" type="submit" title="Для повторной программы: переносятся все сведения, кроме даты">Создать копию</button>
       </form>
     {% endif %}
     <a class="btn btn--ghost" href="{{ url_for('admin.events') }}">К списку</a>
   </div>
 </div>
 
-<form method="post" enctype="multipart/form-data">
+<form method="post" enctype="multipart/form-data" id="record-form" data-track-changes {{ 'data-unsaved' if unsaved }}>
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <section class="panel">
-    <div class="field"><label for="title">Название события *</label>
-      <input id="title" type="text" name="title" value="{{ ev.title or '' }}" required></div>
+    <div class="grid grid--2">
+      <div class="field"><label for="title">Название события *</label>
+        <input id="title" type="text" name="title" value="{{ ev.title or '' }}" required></div>
+      {{ slug_field(ev, "event", "/afisha/") }}
+    </div>
 
     <div class="grid grid--3">
       <div class="field"><label for="starts_at">Дата и время *</label>
@@ -58,11 +62,11 @@
       <div class="field"><label for="yandex_id">ID сеанса в Яндекс Афише</label>
         <input id="yandex_id" type="text" name="yandex_id" value="{{ ev.yandex_id or '' }}"
                placeholder="ticketsteam-825@496249">
-        <div class="hint">Свой у каждого концерта, выдаёт Яндекс Афиша. По нему кнопка «Купить билет» открывает окно покупки, а на странице события появляется схема зала с выбором мест.</div></div>
+        <div class="hint">Уникален для каждого концерта, предоставляется Яндекс Афишей. По нему кнопка «Купить билет» открывает окно покупки, а на странице события появляется схема зала с выбором мест.</div></div>
       <div class="field"><label for="ticket_url">Ссылка на покупку билета</label>
         <input id="ticket_url" type="url" name="ticket_url" value="{{ ev.ticket_url or '' }}"
                placeholder="Ссылка билетной системы">
-        <div class="hint">Если ID Яндекс Афиши не задан, кнопка «Купить билет» ведёт сюда. Пусто — на страницу события.</div></div>
+        <div class="hint">Если ID Яндекс Афиши не задан, кнопка «Купить билет» ведёт по этой ссылке. Если поле не заполнено — на страницу события.</div></div>
       <div class="field"><label for="tickets_left">Наличие билетов</label>
         <input id="tickets_left" type="text" name="tickets_left" value="{{ ev.tickets_left or '' }}"
                placeholder="осталось более 100 билетов"></div>
@@ -71,7 +75,7 @@
     <div class="grid grid--3">
       <div class="field"><label for="cover">Фото для карточки (горизонтальное, 16:9)</label>
         <input id="cover" type="file" name="cover" accept="image/*">
-        <div class="hint">Идёт в карточки на главной и в подборках. Без него берётся первое фото галереи или афиша.</div>
+        <div class="hint">Используется в карточках на главной странице и в подборках. Если не загружено, используется первое фото галереи или афиша.</div>
         {% if ev.cover %}<img src="/static/uploads/{{ ev.cover }}" alt="" style="max-width:220px;margin-top:8px;border-radius:4px">{% endif %}
       </div>
       <div class="field"><label for="poster">Афиша (вертикальная, 3:4)</label>
@@ -81,9 +85,6 @@
       </div>
       <div class="field"><label for="organizer">Организатор</label>
         <input id="organizer" type="text" name="organizer" value="{{ ev.organizer or '' }}">
-        <div class="field" style="margin-top:16px"><label for="slug">Адрес страницы</label>
-          <input id="slug" type="text" name="slug" value="{{ ev.slug or '' }}" placeholder="создастся автоматически">
-        </div>
       </div>
     </div>
 
@@ -97,13 +98,21 @@
     <div class="field"><label for="performers">Исполнители</label>
       <textarea id="performers" name="performers" data-rich="small">{{ ev.performers or '' }}</textarea></div>
 
-    <div class="field"><label>Коллективы филармонии в этой программе</label>
-      <select name="collectives" multiple size="5">
-        {% for c in all_collectives %}
-          <option value="{{ c.id }}" {{ 'selected' if c in ev.collectives }}>{{ c.name }}</option>
-        {% endfor %}
-      </select>
-      <div class="hint">Удерживайте Ctrl, чтобы выбрать несколько.</div></div>
+    <fieldset class="field picks" data-picks>
+      <legend>Коллективы филармонии в этой программе</legend>
+      {% if all_collectives %}
+        <div class="picks__list">
+          {% for c in all_collectives %}
+            <label class="pick"><input type="checkbox" name="collectives" value="{{ c.id }}"
+                   {{ 'checked' if c in ev.collectives }}> {{ c.name }}</label>
+          {% endfor %}
+        </div>
+        <div class="hint">Можно выбрать один или несколько коллективов. Чтобы исключить коллектив, снимите отметку.
+          <button class="link-btn" type="button" data-picks-clear>Снять все отметки</button></div>
+      {% else %}
+        <div class="hint">Коллективы не добавлены. Добавить их можно в разделе «Коллективы и артисты».</div>
+      {% endif %}
+    </fieldset>
 
     <div class="field"><label for="hall_widget">Схема зала (другой билетной системы)</label>
       <textarea id="hall_widget" name="hall_widget" class="code" style="min-height:70px"
@@ -121,8 +130,8 @@
   <section class="panel">
     <h2 style="margin-top:0">Льготы и Пушкинская карта</h2>
     <p class="hint" style="margin-bottom:16px">
-      Эти блоки показываются на странице события, только если галочка снята или поставлена
-      здесь — для каждого концерта отдельно.
+      Блоки отображаются на странице события, только если они включены ниже.
+      Настройка выполняется для каждого концерта отдельно.
     </p>
 
     <div class="checkline">
@@ -141,14 +150,11 @@
   </section>
 
   <section class="panel">
-    <h2 style="margin-top:0">Публикация</h2>
-    <div class="checkline"><input id="is_published" type="checkbox" name="is_published" {{ 'checked' if ev.is_published or not ev.id }}>
-      <label for="is_published">Опубликовано на сайте</label></div>
+    <h2 style="margin-top:0">Отметки</h2>
     <div class="checkline"><input id="is_new" type="checkbox" name="is_new" {{ 'checked' if ev.is_new }}>
       <label for="is_new">Отметка «Новинка» (фильтр в афише)</label></div>
     <div class="checkline"><input id="is_featured" type="checkbox" name="is_featured" {{ 'checked' if ev.is_featured }}>
       <label for="is_featured">Показывать в подборке на главной</label></div>
-    <button class="btn btn--primary" type="submit">Сохранить событие</button> <button class="btn btn--ghost" type="submit" name="then" value="view" title="Сохранить и открыть, как страница выглядит на сайте. Пока не отмечено «Опубликовано», её видят только сотрудники">Сохранить и посмотреть</button>
   </section>
 </form>
 
@@ -157,8 +163,8 @@
   <section id="badges" class="panel">
     <h2 style="margin-top:0">Всплывающие баннеры на афише</h2>
     <p class="hint" style="margin-bottom:16px">
-      Баннер лежит поверх афиши события. При наведении (на телефоне — при касании)
-      разворачивается подсказка с пояснением.
+      Баннер размещается поверх афиши события. При наведении курсора (на телефоне — при касании)
+      отображается подсказка с пояснением.
     </p>
 
     {#- Баннер, открытый на правку: ?edit_badge=<id> -#}
@@ -177,7 +183,7 @@
               <td><div class="row-actions">
                 <a class="btn btn--ghost btn--sm" href="{{ url_for('admin.event_form', event_id=ev.id, edit_badge=b.id) }}#badge-form">Изменить</a>
                 <form method="post" action="{{ url_for('admin.badge_delete', badge_id=b.id) }}"
-                      onsubmit="return confirm('Удалить баннер?')">
+                      data-confirm="Удалить баннер?">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button class="btn btn--danger btn--sm" type="submit">Удалить</button></form>
               </div></td>
@@ -215,7 +221,7 @@
 
   <section class="panel">
     <form method="post" action="{{ url_for('admin.event_delete', item_id=ev.id) }}"
-          onsubmit="return confirm('Удалить событие вместе с галереей и баннерами?')">
+          data-confirm="Удалить событие вместе с галереей и баннерами?">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button class="btn btn--danger" type="submit">Удалить событие</button>
     </form>
@@ -223,4 +229,5 @@
 {% else %}
   <p class="hint">Галерея и баннеры станут доступны после первого сохранения.</p>
 {% endif %}
+{{ form_actions(ev) }}
 {% endblock %}

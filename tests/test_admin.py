@@ -1,11 +1,11 @@
-"""Админка: таблицы, правка записей, защита от опасного удаления, журнал."""
+"""Панель администратора: таблицы, правка записей, защита от опасного удаления, журнал."""
 from datetime import timedelta
 
 from conftest import create_event, text
 
 from filarmonia import utils
 from filarmonia.models import (
-    db, ActionLog, Appeal, Banner, Document, MenuItem, Page, Setting, User,
+    db, ActionLog, Appeal, Banner, Document, MenuItem, News, Page, Setting, User,
 )
 
 TABLES = (
@@ -88,7 +88,7 @@ def test_appeal_print(app, admin):
         db.session.add(Appeal(name="Иванова", message="Прошу ответить", consent=True))
         db.session.commit()
     html = text(admin.get("/admin/appeals/1/print"))
-    assert "Иванова" in html and "Прошу ответить" in html and "window.print" in html
+    assert "Иванова" in html and "Прошу ответить" in html and "data-print" in html
 
 
 def test_old_processed_appeals_purged(app, admin):
@@ -173,6 +173,45 @@ def test_save_and_view(app, admin):
     assert app.test_client().get("/novosti/chernovik-novosti").status_code == 404
 
 
+def test_new_record_is_draft_until_published(app, admin):
+    admin.post("/admin/news/new", data={"title": "Анонс"}, content_type="multipart/form-data")
+    assert app.test_client().get("/novosti/anons").status_code == 404
+    with app.app_context():
+        item_id = db.session.query(News.id).filter_by(slug="anons").scalar()
+
+    # «Сохранить» без кнопки публикации статус не меняет
+    admin.post(f"/admin/news/{item_id}", data={"title": "Анонс", "lead": "Скоро"},
+               content_type="multipart/form-data")
+    assert app.test_client().get("/novosti/anons").status_code == 404
+
+    admin.post(f"/admin/news/{item_id}", data={"title": "Анонс", "publish": "1"},
+               content_type="multipart/form-data")
+    assert app.test_client().get("/novosti/anons").status_code == 200
+    admin.post(f"/admin/news/{item_id}", data={"title": "Анонс", "lead": "Перенесено"},
+               content_type="multipart/form-data")
+    assert app.test_client().get("/novosti/anons").status_code == 200
+
+    admin.post(f"/admin/news/{item_id}", data={"title": "Анонс", "publish": "0"},
+               content_type="multipart/form-data")
+    assert app.test_client().get("/novosti/anons").status_code == 404
+
+
+def test_slug_suggest(app, admin):
+    admin.post("/admin/news/new", data={"title": "Концерт"}, content_type="multipart/form-data")
+    with app.app_context():
+        item_id = db.session.query(News.id).filter_by(slug="koncert").scalar()
+
+    data = admin.get("/admin/slug?kind=news&title=Концерт").get_json()
+    assert data == {"slug": "koncert-2", "wanted": "koncert", "taken": True}
+    # Своя запись свой же адрес не занимает
+    data = admin.get(f"/admin/slug?kind=news&title=Концерт&id={item_id}").get_json()
+    assert data["slug"] == "koncert" and not data["taken"]
+    # Введённый вручную адрес приводится к латинице
+    assert admin.get("/admin/slug?kind=news&slug=Мой адрес").get_json()["slug"] == "moy-adres"
+    assert admin.get("/admin/slug?kind=user&title=x").status_code == 404
+    assert app.test_client().get("/admin/slug?kind=news&title=x").status_code == 302
+
+
 def test_social_icon_can_be_hidden(app, admin):
     with app.app_context():
         for key, value, kind in (("social_tg", "https://t.me/filarmonia", "text"),
@@ -197,7 +236,7 @@ def test_cannot_lock_yourself_out(app, admin):
         admin_id = User.query.filter_by(login="admin").first().id
     r = admin.post("/admin/users", data={"id": str(admin_id), "login": "admin", "role": "editor",
                                          "is_active": "1"}, follow_redirects=True)
-    assert "самому себе" in text(r)
+    assert "собственной учётной записи" in text(r)
     with app.app_context():
         assert db.session.get(User, admin_id).is_admin
 

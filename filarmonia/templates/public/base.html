@@ -14,20 +14,26 @@
 <title>{% if page_title %}{{ page_title }} — {% endif %}{{ site_name }}</title>
 <meta name="description" content="{{ page_description }}">
 {% if config.SITE_NOINDEX or g.draft %}<meta name="robots" content="noindex, nofollow">{% endif %}
-<link rel="canonical" href="{{ request.base_url }}">
+{#- Канонический адрес без параметров фильтров, но с номером страницы списка:
+    иначе вторая страница новостей считалась бы копией первой -#}
+{% set page_no = request.args.get('page', '1') | int %}
+{% set canonical = site_url(request.path) ~ ('?page=' ~ page_no if page_no > 1 else '') %}
+<link rel="canonical" href="{{ canonical }}">
 
 <meta property="og:type" content="{% block og_type %}website{% endblock %}">
 <meta property="og:site_name" content="{{ site_name }}">
 <meta property="og:locale" content="ru_RU">
 <meta property="og:title" content="{{ page_title or site_name }}">
 <meta property="og:description" content="{{ page_description }}">
-<meta property="og:url" content="{{ request.base_url }}">
+<meta property="og:url" content="{{ canonical }}">
 {% block og_image %}{% endblock %}
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#1e2430">
 
 <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
-<link rel="stylesheet" href="{{ asset_url('fonts/fonts.css') }}">
+{#- Кириллица основного шрифта нужна на любой странице: браузер начинает её
+    загрузку сразу, не дожидаясь разбора стилей -#}
+<link rel="preload" href="{{ url_for('static', filename='fonts/golos-text-cyrillic.woff2') }}" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="{{ asset_url('css/site.css') }}">
 {% block head %}{% endblock %}
 </head>
@@ -40,12 +46,13 @@
   <div class="wrap topbar__row">
     <div class="topbar__links">
       <a href="tel:{{ settings.get('phone_raw', '+74812383181') }}">{{ settings.get('phone', '+7 (4812) 38-31-81') }}</a>
-      <span>{{ settings.get('address_short', 'Смоленск, ул. Глинки, 3') }}</span>
+      <span class="topbar__wide">{{ settings.get('address_short', 'Смоленск, ул. Глинки, 3') }}</span>
     </div>
     <div class="topbar__links">
-      {{ social_links(settings, 'social--top') }}
-      <a href="{{ url_for('public.appeals') }}">Обращения граждан</a>
-      <a href="{{ url_for('public.documents') }}">Документы</a>
+      {#- На телефоне эти ссылки переезжают в меню, адрес и соцсети есть в подвале -#}
+      <span class="topbar__wide">{{ social_links(settings, 'social--top') }}</span>
+      <a class="topbar__wide" href="{{ url_for('public.appeals') }}">Обращения граждан</a>
+      <a class="topbar__wide" href="{{ url_for('public.documents') }}">Документы</a>
       <button class="a11y__btn a11y__btn--onDark" data-a11y-toggle aria-expanded="false">Версия для слабовидящих</button>
     </div>
   </div>
@@ -93,6 +100,9 @@
             {% endif %}
           </li>
         {% endfor %}
+        {#- Дубли ссылок служебной полосы: видны в меню только на телефоне -#}
+        <li class="nav__item nav__item--narrow"><a class="nav__link" href="{{ url_for('public.appeals') }}">Обращения граждан</a></li>
+        <li class="nav__item nav__item--narrow"><a class="nav__link" href="{{ url_for('public.documents') }}">Документы</a></li>
       </ul>
     </nav>
 
@@ -112,12 +122,12 @@
 <main id="main">
   {% if g.draft %}
     <div class="wrap"><p class="draft-note" role="status">
-      <strong>Скрыто с сайта.</strong> Посетители эту страницу не видят — вы смотрите её как сотрудник.
-      Чтобы опубликовать, отметьте «Опубликовано» в админке.
+      <strong>Скрыто с сайта.</strong> Это черновик: страница недоступна посетителям и показана вам как сотруднику.
+      Чтобы опубликовать страницу, нажмите «Опубликовать» в панели администратора.
       {% if g.edit_url %}<a href="{{ g.edit_url }}">Вернуться к редактированию</a>{% endif %}
     </p></div>
   {% elif g.edit_url %}
-    <div class="wrap"><p class="staff-note"><a href="{{ g.edit_url }}">Редактировать в админке</a></p></div>
+    <div class="wrap"><p class="staff-note"><a href="{{ g.edit_url }}">Редактировать в панели администратора</a></p></div>
   {% endif %}
   {% block breadcrumbs %}{% endblock %}
   {% with messages = get_flashed_messages(with_categories=true) %}
@@ -181,6 +191,14 @@
     </div>
   </div>
 </footer>
+
+{#- Кнопка «Наверх»: появляется, когда страницу прокрутили на полтора экрана -#}
+<button class="to-top" type="button" data-to-top aria-label="Наверх" title="Наверх" hidden>
+  <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+    <path d="M12 19V5M5.5 11.5 12 5l6.5 6.5" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+</button>
 
 <div class="modal" id="photo-viewer" role="dialog" aria-modal="true" aria-label="Просмотр фотографии">
   <div class="modal__box modal__box--wide">

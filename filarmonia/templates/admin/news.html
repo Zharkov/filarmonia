@@ -10,12 +10,12 @@
 <form class="filters" method="get">
   {{ keep_sort() }}
   <input type="text" name="q" value="{{ search }}" placeholder="Поиск по заголовку" aria-label="Поиск по заголовку">
-  <select name="status" onchange="this.form.submit()" aria-label="Статус">
+  <select name="status" data-autosubmit aria-label="Статус">
     <option value="">Любой статус</option>
     <option value="on" {{ 'selected' if request.args.get('status') == 'on' }}>Опубликованные</option>
     <option value="off" {{ 'selected' if request.args.get('status') == 'off' }}>Скрытые</option>
   </select>
-  <select name="layout" onchange="this.form.submit()" aria-label="Вид новости">
+  <select name="layout" data-autosubmit aria-label="Вид новости">
     <option value="">Любой вид</option>
     <option value="media" {{ 'selected' if request.args.get('layout') == 'media' }}>С фото и видео</option>
     <option value="text" {{ 'selected' if request.args.get('layout') == 'text' }}>Только текст</option>
@@ -29,7 +29,7 @@
     <tr>
       {{ sort_th('Дата', 'date', sorting) }}
       {{ sort_th('Заголовок', 'title', sorting) }}
-      <th>Медиа</th>
+      <th>Фото и видео</th>
       {{ sort_th('Статус', 'status', sorting) }}
     </tr>
     {% for n in items.items %}

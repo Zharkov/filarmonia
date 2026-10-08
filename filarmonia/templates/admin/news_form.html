@@ -1,5 +1,6 @@
 {% extends "admin/base.html" %}
 {% from "admin/_media.html" import media_manager %}
+{% from "admin/_form.html" import slug_field, form_actions %}
 {% block title %}{{ item.title or 'Новая новость' }}{% endblock %}
 {% block content %}
 <div class="page-head">
@@ -9,11 +10,14 @@
     <a class="btn btn--ghost" href="{{ url_for('admin.news') }}">К списку</a>
   </div>
 </div>
-<form method="post" enctype="multipart/form-data">
+<form method="post" enctype="multipart/form-data" id="record-form" data-track-changes {{ 'data-unsaved' if unsaved }}>
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <section class="panel">
-    <div class="field"><label for="title">Заголовок *</label>
-      <input id="title" type="text" name="title" value="{{ item.title or '' }}" required></div>
+    <div class="grid grid--2">
+      <div class="field"><label for="title">Заголовок *</label>
+        <input id="title" type="text" name="title" value="{{ item.title or '' }}" required></div>
+      {{ slug_field(item, "news", "/novosti/") }}
+    </div>
     {% set with_media = item.show_media or not item.id %}
     <fieldset class="field" style="border:0;padding:0;margin-left:0">
       <legend style="font-size:.88rem;margin-bottom:6px">Вид новости</legend>
@@ -33,17 +37,15 @@
       <textarea id="lead" name="lead" style="min-height:70px">{{ item.lead or '' }}</textarea></div>
     <div class="field"><label for="content">Текст</label>
       <textarea id="content" name="content" data-rich>{{ item.content or '' }}</textarea></div>
-    <div class="checkline"><input id="is_published" type="checkbox" name="is_published" {{ 'checked' if item.is_published or not item.id }}>
-      <label for="is_published">Опубликовано</label></div>
-    <button class="btn btn--primary" type="submit">Сохранить</button> <button class="btn btn--ghost" type="submit" name="then" value="view" title="Сохранить и открыть, как страница выглядит на сайте. Пока не отмечено «Опубликовано», её видят только сотрудники">Сохранить и посмотреть</button>
   </section>
 </form>
 {% if item.id %}
   {{ media_manager('news', item.id, item.media) }}
   <section class="panel">
-    <form method="post" action="{{ url_for('admin.news_delete', item_id=item.id) }}" onsubmit="return confirm('Удалить новость?')">
+    <form method="post" action="{{ url_for('admin.news_delete', item_id=item.id) }}" data-confirm="Удалить новость?">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button class="btn btn--danger" type="submit">Удалить новость</button></form>
   </section>
 {% endif %}
+{{ form_actions(item) }}
 {% endblock %}

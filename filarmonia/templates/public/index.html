@@ -1,22 +1,27 @@
 {% extends "public/base.html" %}
 {% from "public/_macros.html" import event_carousel, daystrip, news_card, icon, img_src %}
+{#- Карточка организации и строка поиска по сайту в поисковой выдаче -#}
+{% block head %}
+<script type="application/ld+json">{{ schema.organization(settings) | tojson }}</script>
+<script type="application/ld+json">{{ schema.website(settings) | tojson }}</script>
+{% endblock %}
 
 {% block hero %}
-{% set has_video = settings.get('hero_video') or settings.get('hero_video_url') %}
+{#- Первый кадр — картинка: она и есть крупнейший элемент экрана (LCP), поэтому
+    грузится сразу и с высоким приоритетом. Видео весит в десятки раз больше:
+    site.js подключает его после загрузки страницы и только там, где это
+    не мешает — на широком экране, без экономии трафика и без просьбы
+    уменьшить анимацию. Без картинки видео запускается везде. -#}
+{% set video_src = ('/static/uploads/' ~ settings.get('hero_video')) if settings.get('hero_video') else settings.get('hero_video_url') %}
+{% set poster = ('/static/uploads/' ~ settings.get('hero_poster')) if settings.get('hero_poster') else '' %}
 <section class="hero">
   <div class="hero__media">
-    {% if settings.get('hero_video') %}
-      <video data-hero-video autoplay muted loop playsinline preload="metadata"
-             {% if settings.get('hero_poster') %}poster="/static/uploads/{{ settings.get('hero_poster') }}"{% endif %}>
-        <source src="/static/uploads/{{ settings.get('hero_video') }}" type="video/mp4">
-      </video>
-    {% elif settings.get('hero_video_url') %}
-      <video data-hero-video autoplay muted loop playsinline preload="metadata"
-             {% if settings.get('hero_poster') %}poster="/static/uploads/{{ settings.get('hero_poster') }}"{% endif %}>
-        <source src="{{ settings.get('hero_video_url') }}" type="video/mp4">
-      </video>
-    {% elif settings.get('hero_poster') %}
-      <img src="/static/uploads/{{ settings.get('hero_poster') }}" alt="">
+    {% if poster %}
+      <img class="hero__poster" {{ img_src(poster, '100vw') }} alt="" fetchpriority="high">
+    {% endif %}
+    {% if video_src %}
+      <video data-hero-video data-src="{{ video_src }}" muted loop playsinline preload="none"
+             {{ 'data-always' if not poster }}></video>
     {% endif %}
   </div>
 
@@ -26,8 +31,8 @@
     <p class="hero__lead">{{ settings.get('hero_lead', 'Симфонические программы, органные вечера, джаз и концерты для детей в зале на улице Глинки.') }}</p>
   </div>
 
-  {% if has_video %}
-    <button class="hero__sound" type="button" data-hero-sound aria-pressed="false" aria-label="Включить звук">
+  {% if video_src %}
+    <button class="hero__sound" type="button" data-hero-sound aria-pressed="false" aria-label="Включить звук" hidden>
       <span data-sound-off>{{ icon('sound-off') }}</span>
       <span data-sound-on hidden>{{ icon('sound-on') }}</span>
     </button>
@@ -49,7 +54,7 @@
     {% if upcoming %}
       {{ event_carousel(upcoming, 'Ближайшие концерты', url_for('public.more_cards')) }}
     {% else %}
-      <p class="empty">Ближайшие концерты пока не опубликованы. Добавьте события в разделе «Афиша» админки.</p>
+      <p class="empty">Ближайшие концерты пока не опубликованы. Добавьте события в разделе «Афиша» панели администратора.</p>
     {% endif %}
   </div>
 </section>

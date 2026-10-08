@@ -1,8 +1,7 @@
 {% extends "public/base.html" %}
+{% from "public/_macros.html" import breadcrumbs %}
 {% block title %}Документы{% endblock %}
-{% block breadcrumbs %}
-<div class="wrap breadcrumbs"><a href="{{ url_for('public.index') }}">Главная</a> / Документы</div>
-{% endblock %}
+{% block breadcrumbs %}{{ breadcrumbs([('Главная', url_for('public.index')), ('Документы', None)]) }}{% endblock %}
 {% block content %}
 <div class="wrap">
   <h1>Документы</h1>

@@ -38,17 +38,6 @@ def make_app(tmp_path, **overrides):
     return app
 
 
-@pytest.fixture(autouse=True)
-def fresh_counters():
-    """Счётчики попыток входа и отправки обращений живут в памяти процесса —
-    без сброса блокировка из одной проверки запирала бы вход в следующих."""
-    from filarmonia import admin, public
-
-    admin._login_attempts.clear()
-    public._last_appeal.clear()
-    yield
-
-
 @pytest.fixture
 def app(tmp_path):
     return make_app(tmp_path)
