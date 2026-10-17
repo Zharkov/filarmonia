@@ -9,14 +9,19 @@ on:
   schedule:
     - cron: "0 5 * * 1"
 
+# Python — последний выпуск ветки 3.11. Точная сборка из .python-version (3.11.9)
+# есть не для каждого образа Ubuntu, и без неё проверки падают ещё до установки пакетов
+env:
+  PYTHON_VERSION: "3.11"
+
 jobs:
   tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
-          python-version-file: ".python-version"
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
           cache-dependency-path: requirements-dev.txt
       - run: pip install -r requirements-dev.txt
@@ -24,11 +29,11 @@ jobs:
 
   # Известные уязвимости в закреплённых версиях пакетов (база PyPI/OSV)
   dependencies:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
-          python-version-file: ".python-version"
+          python-version: ${{ env.PYTHON_VERSION }}
       - run: pip install pip-audit
       - run: pip-audit -r requirements.txt
