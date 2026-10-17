@@ -158,7 +158,7 @@ a { color: var(--brick); text-decoration: none; }
 a:hover { text-decoration: underline; }
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 /* На тёмных блоках синяя рамка не видна — там она золотая */
-.nav, .hero, .route, .ecard, .footer, .bigbanner { --focus: var(--gold-soft); }
+.nav, .hero, .route, .ecard, .footer { --focus: var(--gold-soft); }
 /* В контрастных режимах эти блоки залиты цветом текста — рамка цвета фона */
 html[data-theme] .nav, html[data-theme] .hero, html[data-theme] .footer { --focus: var(--paper); }
 
@@ -834,19 +834,6 @@ html[data-theme] .route__title { color: var(--ink); }
 }
 .carousel__dots button[aria-current="true"] { background: #fff; }
 
-/* Крупный баннер «Госуслуги. Решаем вместе» */
-.bigbanner {
-  display: flex; align-items: center; justify-content: space-between; gap: 28px; padding: 34px 40px;
-  border-radius: 18px; color: #fff; background: linear-gradient(110deg, #0d4cd3 0%, #3a7bf0 60%, #ee3f58 140%);
-}
-.bigbanner:hover { text-decoration: none; filter: brightness(1.05); }
-.bigbanner__text strong { display: block; font-family: var(--f-display); font-size: 1.9rem; line-height: 1.15; margin-bottom: 8px; }
-.bigbanner__text span { display: block; max-width: 60ch; opacity: .92; }
-.bigbanner__btn { flex: 0 0 auto; background: #fff; color: #0d4cd3; font-weight: 600; padding: 12px 26px; border-radius: 10px; }
-.bigbanner--image { display: block; padding: 0; background: none; overflow: hidden; }
-.bigbanner--image img { width: 100%; }
-html[data-theme] .bigbanner { background: var(--paper); color: var(--ink); border: 2px solid var(--ink); }
-html[data-theme] .bigbanner__btn { background: var(--ink); color: var(--paper); }
 /* Виджет «Решаем вместе»: скругление как у остальных блоков. Окно с формой
    скрипт Госуслуг открывает поверх страницы, обрезка его не задевает. */
 .pos-widget { min-height: 120px; border-radius: 18px; overflow: hidden; }
@@ -1131,7 +1118,6 @@ html[data-theme] .section-icon { color: var(--ink); }
   .hero__inner { padding: 60px 0 80px; }
   .section { padding: 44px 0; }
   .section--flush { padding: 36px 0; }
-  .bigbanner { flex-direction: column; align-items: flex-start; padding: 26px 24px; }
   .map--wide { height: 300px; }
 }
 

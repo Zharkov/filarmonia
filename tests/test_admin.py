@@ -132,11 +132,11 @@ def test_edit_menu_and_banner(app, admin):
     admin.post("/admin/menu", data={"id": str(menu_id), "title": "Афиша сезона", "url": "/afisha",
                                     "is_published": "1"})
     admin.post("/admin/banners", data={"id": str(banner_id), "title": "Госуслуги", "url": "https://www.gosuslugi.ru",
-                                       "place": "main"}, content_type="multipart/form-data")
+                                       "place": "footer"}, content_type="multipart/form-data")
     with app.app_context():
         assert db.session.get(MenuItem, menu_id).title == "Афиша сезона"
         banner = db.session.get(Banner, banner_id)
-        assert banner.place == "main" and not banner.is_published
+        assert banner.place == "footer" and not banner.is_published
 
 
 def test_edit_user_and_duplicate_login(app, admin):
@@ -274,13 +274,13 @@ def test_settings_html_sanitized_but_widgets_kept(app, admin):
     with app.app_context():
         db.session.add_all([
             Setting(key="history_text", value="", kind="html"),
-            Setting(key="pos_widget", value="", kind="html"),
+            Setting(key="history_map", value="", kind="html"),
         ])
         db.session.commit()
     admin.post("/admin/settings", data={
         "history_text": "<p>История<script>x()</script></p>",
-        "pos_widget": "<script src='https://pos.gosuslugi.ru/bin/script.min.js'></script>",
+        "history_map": "<script src='https://api-maps.yandex.ru/services/constructor/1.0/js/'></script>",
     }, content_type="multipart/form-data")
     with app.app_context():
         assert Setting.get("history_text") == "<p>История</p>"
-        assert "<script" in Setting.get("pos_widget")
+        assert "<script" in Setting.get("history_map")

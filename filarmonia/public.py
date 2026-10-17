@@ -109,7 +109,6 @@ def index():
         "public/index.html",
         upcoming=upcoming,
         news=news,
-        main_banners=[b for b in banners if b.place == "main"],
         banners=[b for b in banners if b.place == "partners"],
         history=history,
         day_strip=_day_strip(CALENDAR_DAYS),

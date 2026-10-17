@@ -18,7 +18,7 @@ MIN_PASSWORD_LENGTH = 8
 MOSCOW_OFFSET = timedelta(hours=3)
 
 # Настройки, куда вставляется код сторонних виджетов: их не очищаем
-WIDGET_SETTINGS = {"pos_widget", "history_map"}
+WIDGET_SETTINGS = {"history_map"}
 
 
 # Настройки

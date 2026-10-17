@@ -5,7 +5,7 @@
 {% block content %}
 <h1>Баннеры</h1>
 <p class="subtitle">Госуслуги, bus.gov.ru, партнёры и другие графические ссылки.
-  Место «Главная, крупно» — широкий баннер «Госуслуги. Решаем вместе» над лентой партнёров.</p>
+  Виджет «Госуслуги. Решаем вместе» на главной встроен в сайт и здесь не настраивается.</p>
 
 {% set e = edit %}
 <section class="panel {{ 'panel--editing' if e }}" style="margin-top:20px" id="form">
@@ -23,7 +23,7 @@
           {% for value, label in places %}<option value="{{ value }}" {{ 'selected' if e and e.place == value }}>{{ label }}</option>{% endfor %}
         </select></div>
       <div class="field"><label for="b-image">Картинка</label>
-        {{ file_input('b-image', 'image', size='Рекомендуемый размер: «Главная, крупно» — от 1920 px по ширине; лента и подвал — от 130 px по высоте, PNG с прозрачным фоном.') }}
+        {{ file_input('b-image', 'image', size='Рекомендуемый размер: от 130 px по высоте, PNG с прозрачным фоном.') }}
         {% if e and e.image %}<img src="/static/uploads/{{ e.image }}" alt="" style="max-height:44px;margin-top:6px">
           <div class="hint">Новая картинка заменит эту.</div>{% endif %}</div>
     </div>

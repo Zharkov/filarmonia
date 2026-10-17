@@ -171,31 +171,11 @@
   </div>
 </section>
 
-{% if settings.get('pos_widget') or main_banners %}
 <section class="section section--flush" data-reveal>
   <div class="wrap">
-    {% if settings.get('pos_widget') %}
-      <div class="pos-widget">{{ settings.get('pos_widget') | safe }}</div>
-    {% else %}
-      {% for b in main_banners %}
-        {% if b.image %}
-          <a class="bigbanner bigbanner--image" href="{{ b.url }}" rel="noopener" target="_blank">
-            <img src="/static/uploads/{{ b.image }}" alt="{{ b.title }}" loading="lazy">
-          </a>
-        {% else %}
-          <a class="bigbanner" href="{{ b.url }}" rel="noopener" target="_blank">
-            <span class="bigbanner__text">
-              <strong>{{ b.title }}</strong>
-              <span>Есть вопрос или предложение по работе филармонии? Напишите через Госуслуги — обращение обязательно рассмотрят.</span>
-            </span>
-            <span class="bigbanner__btn">Сообщить</span>
-          </a>
-        {% endif %}
-      {% endfor %}
-    {% endif %}
+    <div class="pos-widget">{% include "public/_pos_widget.html" %}</div>
   </div>
 </section>
-{% endif %}
 
 {#- Бегущая строка баннеров справа налево. Лента — два одинаковых набора:
     когда первый уезжает целиком, анимация незаметно начинается заново.

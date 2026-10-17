@@ -111,6 +111,12 @@ def test_static_versioned_and_cached(app):
     assert "max-age=2592000" in r.headers.get("Cache-Control", "")
 
 
+def test_pos_widget_on_home_page(app):
+    html = text(app.test_client().get("/"))
+    assert 'Widget("https://pos.gosuslugi.ru/form", 243684)' in html
+    assert "https://pos.gosuslugi.ru/bin/script.min.js" in html
+
+
 def test_hero_has_no_next_event_card(app, admin):
     create_event(admin, title="Ближний концерт", ticket_url="https://tickets.example/1")
     assert "hero__next" not in text(app.test_client().get("/"))
