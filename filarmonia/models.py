@@ -116,7 +116,7 @@ class Page(db.Model, HasMedia):
     sort = db.Column(db.Integer, default=100)
     is_published = db.Column(db.Boolean, default=True, nullable=False)
     show_in_menu = db.Column(db.Boolean, default=True, nullable=False)
-    # page | documents | contacts | pushkin | benefits
+    # page | documents | documents_years | nok | contacts | pushkin | benefits
     template = db.Column(db.String(32), default="page")
     seo_description = db.Column(db.String(400), default="")
     updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
@@ -135,6 +135,16 @@ class Page(db.Model, HasMedia):
     @property
     def url(self) -> str:
         return f"/info/{self.slug}"
+
+    @property
+    def has_documents(self) -> bool:
+        return self.template in DOCUMENT_TEMPLATES
+
+
+# Страницы, под текстом которых выводится список документов. Документ
+# попадает на страницу, если его категория совпадает с заголовком страницы.
+# nok — «Независимая оценка качества»: анкета с QR-кодом и документы по годам.
+DOCUMENT_TEMPLATES = ("documents", "documents_years", "nok")
 
 
 class MenuItem(db.Model):
@@ -171,6 +181,74 @@ event_collectives = db.Table(
     db.Column("event_id", db.Integer, db.ForeignKey("events.id"), primary_key=True),
     db.Column("collective_id", db.Integer, db.ForeignKey("collectives.id"), primary_key=True),
 )
+
+event_festivals = db.Table(
+    "event_festivals",
+    db.Column("event_id", db.Integer, db.ForeignKey("events.id"), primary_key=True),
+    db.Column("festival_id", db.Integer, db.ForeignKey("festivals.id"), primary_key=True),
+)
+
+
+class Festival(db.Model):
+    """Фестиваль: метка на карточке концерта ведёт на его страницу с описанием и концертами."""
+
+    __tablename__ = "festivals"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    slug = db.Column(db.String(200), unique=True, nullable=False)
+    sort = db.Column(db.Integer, default=100)
+    description = db.Column(db.Text, default="")
+
+    @property
+    def url(self) -> str:
+        return f"/festivali/{self.slug}"
+
+
+# Виды изменений в афише: ключ хранится в базе, подпись видит посетитель
+NOTICE_KINDS = [
+    ("cancel", "Отмена"),
+    ("move", "Перенос"),
+    ("venue", "Смена площадки"),
+    ("other", "Изменение"),
+]
+
+
+class AfishaNotice(db.Model):
+    """Изменение в афише: отмена, перенос концерта, смена площадки.
+
+    Пока есть хотя бы одно действующее изменение, на главной и в афише
+    показывается плашка «Изменения в афише». После даты «показывать до»
+    запись пропадает с сайта сама, редактору не нужно её снимать.
+    """
+
+    __tablename__ = "afisha_notices"
+
+    id = db.Column(db.Integer, primary_key=True)
+    kind = db.Column(db.String(16), default="other", nullable=False)
+    text = db.Column(db.String(500), nullable=False)
+    url = db.Column(db.String(500), default="")
+    show_until = db.Column(db.DateTime)
+    sort = db.Column(db.Integer, default=100)
+    is_published = db.Column(db.Boolean, default=True, nullable=False)
+    updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
+
+    @property
+    def kind_label(self) -> str:
+        return dict(NOTICE_KINDS).get(self.kind, "Изменение")
+
+    @staticmethod
+    def active():
+        """Опубликованные изменения, срок показа которых не истёк."""
+        now = now_msk()
+        return (
+            AfishaNotice.query.filter(
+                AfishaNotice.is_published.is_(True),
+                (AfishaNotice.show_until.is_(None)) | (AfishaNotice.show_until >= now),
+            )
+            .order_by(AfishaNotice.sort, AfishaNotice.id.desc())
+            .all()
+        )
 
 
 class Venue(db.Model):
@@ -260,6 +338,9 @@ class Event(db.Model, HasMedia):
     category = db.relationship("Category", backref="events")
     collectives = db.relationship(
         "Collective", secondary=event_collectives, backref="events"
+    )
+    festivals = db.relationship(
+        "Festival", secondary=event_festivals, backref="events", order_by="Festival.sort"
     )
     media = db.relationship(
         "MediaItem",
@@ -405,6 +486,10 @@ class News(db.Model, HasMedia):
         "MediaItem", backref="news", order_by="MediaItem.sort",
         cascade="all, delete-orphan",
     )
+    documents = db.relationship(
+        "Document", backref="news", order_by="Document.sort, Document.id",
+        cascade="all, delete-orphan",
+    )
 
     @property
     def url(self) -> str:
@@ -413,7 +498,12 @@ class News(db.Model, HasMedia):
 
 # Документы
 class Document(db.Model):
-    """Документ для скачивания: устав, НПА, отчёт, план ФХД."""
+    """Документ: устав, НПА, отчёт, план ФХД — или приложение к новости.
+
+    Документ раздела находит свою страницу по категории (= заголовку страницы).
+    У приложения к новости заполнен news_id, а категория пустая: в разделы
+    «Документов» такой документ не попадает.
+    """
 
     __tablename__ = "documents"
 
@@ -427,10 +517,28 @@ class Document(db.Model):
     size_kb = db.Column(db.Integer)
     sort = db.Column(db.Integer, default=100)
     is_published = db.Column(db.Boolean, default=True, nullable=False)
+    news_id = db.Column(db.Integer, db.ForeignKey("news.id"), index=True)
 
     @property
     def href(self) -> str:
         return (UPLOADS_URL + self.file) if self.file else self.url
+
+    @property
+    def ext(self) -> str:
+        """Тип файла по расширению: «pdf», «docx». Пусто — расширения нет."""
+        path = (self.file or self.url or "").split("?")[0].split("#")[0]
+        name = path.rsplit("/", 1)[-1]
+        return name.rsplit(".", 1)[-1].lower() if "." in name else ""
+
+    @property
+    def viewable(self) -> bool:
+        """PDF браузер показывает сам — его можно открыть без скачивания."""
+        return self.ext == "pdf"
+
+    @property
+    def is_image(self) -> bool:
+        """Скан или фото документа: открывается в окне просмотра фотографий."""
+        return self.ext in ("jpg", "jpeg", "png", "webp", "gif")
 
 
 class Banner(db.Model):
@@ -529,6 +637,7 @@ def referenced_uploads() -> set:
     texts = (
         Event.description, Event.performers, Event.benefits_text, Event.pushkin_text,
         News.content, Page.content, Collective.description, Collective.contacts, Setting.value,
+        Festival.description,
     )
     pattern = re.compile(re.escape(UPLOADS_URL) + r"([\w.\-]+)")
     for column in texts:

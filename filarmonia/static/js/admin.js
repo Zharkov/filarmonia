@@ -42,6 +42,43 @@
     }
   });
 
+  /* Поле загрузки с data-max-mb: слишком большой файл или чужой тип отклоняем
+     сразу при выборе, чтобы не ждать отправки десятков мегабайт ради отказа.
+     Сервер проверяет то же самое — это только ускоряет ответ. */
+  document.addEventListener("change", function (e) {
+    var input = e.target;
+    if (input.type !== "file" || !input.hasAttribute("data-max-mb")) return;
+    var box = input.nextElementSibling;
+    while (box && !box.hasAttribute("data-file-error")) box = box.nextElementSibling;
+    var limits = JSON.parse(input.getAttribute("data-limits") || "{}");
+    var totalMb = Number(input.getAttribute("data-total-mb"));
+    var mb = 1024 * 1024;
+    var problem = "";
+    var total = 0;
+    Array.prototype.forEach.call(input.files || [], function (file) {
+      total += file.size;
+      if (problem) return;
+      var ext = (file.name.split(".").pop() || "").toLowerCase();
+      if (!limits[ext]) {
+        problem = "Недопустимый тип файла: «" + file.name + "».";
+      } else if (file.size > limits[ext] * mb) {
+        problem = "Размер файла «" + file.name + "» — " + (file.size / mb).toFixed(1) +
+          " МБ, допустимо не более " + limits[ext] + " МБ.";
+      }
+    });
+    if (!problem && total > totalMb * mb) {
+      problem = "Общий размер файлов — " + (total / mb).toFixed(1) + " МБ, за одну загрузку допустимо не более " +
+        totalMb + " МБ.";
+    }
+    if (problem) input.value = "";
+    if (box) {
+      box.textContent = problem;
+      box.hidden = !problem;
+    } else if (problem) {
+      notify(problem, true);
+    }
+  });
+
   // data-print — кнопка печати
   document.querySelectorAll("[data-print]").forEach(function (button) {
     button.addEventListener("click", function () { window.print(); });

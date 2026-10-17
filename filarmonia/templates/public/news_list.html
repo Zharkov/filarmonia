@@ -6,6 +6,8 @@
 <div class="wrap">
   <h1>Новости</h1>
   {% if items.items %}
+    {#- Карточки — h3; заголовок для экранного диктора, чтобы не пропускать уровень h2 -#}
+    <h2 class="visually-hidden">Список новостей</h2>
     <div class="newsgrid">
       {% for item in items.items %}{{ news_card(item) }}{% endfor %}
     </div>

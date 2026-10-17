@@ -2,7 +2,7 @@
 import io
 import os
 
-from conftest import create_event, png, text
+from conftest import create_event, login, make_app, png, text
 
 from filarmonia.models import db, Event, MediaItem, EventBadge, Setting
 
@@ -26,7 +26,7 @@ def test_create_event_with_poster(app, admin):
     assert "Пенсионерам 250 руб." in html
     assert "Пушкинской картой" in html
     # Кнопки «Купить билет» и «Заказать по телефону» со страницы события убраны
-    assert "Заказать по телефону" not in html and 'class="btn btn--primary"' not in html
+    assert "Заказать по телефону" not in html and 'class="btn btn--gold"' not in html
 
 
 def test_blocks_switch_off(app, admin):
@@ -77,6 +77,29 @@ def test_executable_rejected(app, admin):
                                              "kind": "photo", "file": (io.BytesIO(b"MZ"), "virus.exe")},
                    content_type="multipart/form-data", follow_redirects=True)
     assert "Недопустимый тип файла" in text(r)
+
+
+def test_upload_size_and_resolution_limits(tmp_path):
+    app = make_app(tmp_path, UPLOAD_LIMITS_MB={"image": 1, "video": 1, "doc": 1}, IMAGE_UPLOAD_MAX_SIDE=100)
+    client = app.test_client()
+    login(client)
+    create_event(client)
+    eid = event_id(app)
+
+    form = text(client.get(f"/admin/events/{eid}"))
+    assert "JPG, PNG, WebP, GIF · до 1 МБ · до 100 px по длинной стороне" in form
+    assert 'data-max-mb="1"' in form and "MP4, WebM · до 1 МБ" in form
+
+    def add(kind, file):
+        return text(client.post("/admin/media/add", data={"owner": "event", "owner_id": str(eid),
+                                                          "kind": kind, "file": file},
+                                content_type="multipart/form-data", follow_redirects=True))
+
+    assert "превышает 1 МБ" in add("video", (io.BytesIO(b"0" * (1024 * 1024 + 1)), "clip.mp4"))
+    assert "превышает 100 px" in add("photo", (png((200, 50)), "wide.png"))
+    assert "Загружено фотографий: 1" in add("photo", (png((100, 50)), "ok.png"))
+    with app.app_context():
+        assert MediaItem.query.count() == 1
 
 
 def test_media_reorder(app, admin):
@@ -218,7 +241,18 @@ def test_yandex_session_id(app, admin):
     assert "Симфонический оркестр" in afisha
 
     r = create_event(admin, title="Другой концерт", yandex_id="не тот код")
-    assert "ID сеанса Яндекс Афиши выглядит так" in text(r)
+    assert "Введите номер сеанса Яндекс Афиши" in text(r)
+
+
+def test_yandex_session_number_only(app, admin):
+    """Редактор вводит только номер после «@», приставка — из настроек."""
+    create_event(admin, yandex_id="496249")
+    with app.app_context():
+        ev = Event.query.first()
+        assert ev.yandex_id == "ticketsteam-825@496249"
+        ev_id = ev.id
+    form = text(admin.get(f"/admin/events/{ev_id}"))
+    assert 'value="496249"' in form and "ticketsteam-825@</span>" in form
 
 
 def test_carousel_loads_more(app, admin):
@@ -241,3 +275,22 @@ def test_draft_visible_only_to_staff(app, admin):
     assert app.test_client().get("/afisha/testovyy-koncert").status_code == 404
     html = text(admin.get("/afisha/testovyy-koncert"))
     assert "Скрыто с сайта." in html and "noindex" in html
+
+
+def test_afisha_periods_and_filter_panel(app, admin):
+    create_event(admin)
+    html = text(admin.get("/afisha"))
+    # Быстрые периоды вместо ручного ввода двух дат, поля — в панели «Фильтры»
+    for title in ("Сегодня", "Выходные", "Эта неделя", "Этот месяц"):
+        assert f">{title}</a>" in html
+    assert "data-filters-toggle" in html and 'id="filters-more"' in html
+    html = text(admin.get("/afisha?from=2030-12-01&to=2030-12-31&venue="))
+    assert 'class="filters__count">1<' in html and "Тестовый концерт" in html
+
+
+def test_event_sticky_buy_bar(app, admin):
+    create_event(admin, ticket_url="https://tickets.example/1")
+    html = text(admin.get("/afisha/testovyy-koncert"))
+    # Цена и кнопка над фактами, на телефоне — ещё и панель внизу экрана
+    assert html.index("event__deal") < html.index("event__facts")
+    assert "data-buybar" in html and html.count("Купить билет") >= 2

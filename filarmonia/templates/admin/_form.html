@@ -23,6 +23,19 @@
 </div>
 {% endmacro %}
 
+{#- Поле загрузки файла с ограничениями: типы, размер, разрешение. kinds — виды
+    файлов (image, video, doc), size — рекомендуемый размер именно для этого места.
+    Слишком большой файл admin.js отклоняет сразу, до отправки формы. -#}
+{% macro file_input(id, name, kinds=('image',), size='', multiple=False, required=False) %}
+{%- set rules = upload_rules(kinds) %}
+<input id="{{ id }}" type="file" name="{{ name }}" accept="{{ rules.accept }}"
+       data-max-mb="{{ rules.max_mb }}" data-limits='{{ rules.limits | tojson }}'
+       data-total-mb="{{ rules.total_mb }}"{{ ' multiple' if multiple }}{{ ' required' if required }}>
+<div class="hint">{{ rules.text }}{% if size %} {{ size }}{% endif %}
+  {%- if multiple %} Общий размер файлов за одну загрузку — до {{ rules.total_mb }} МБ.{% endif %}</div>
+<div class="hint hint--error" data-file-error hidden></div>
+{%- endmacro %}
+
 {#- Панель кнопок в конце страницы: прилипает к нижнему краю экрана, поэтому видна всегда.
     Стоит вне формы (ниже идут отдельные формы галереи и баннеров) и связана
     с ней атрибутом form: form_id — id формы записи.

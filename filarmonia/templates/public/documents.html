@@ -1,21 +1,19 @@
 {% extends "public/base.html" %}
-{% from "public/_macros.html" import breadcrumbs %}
+{% from "public/_macros.html" import breadcrumbs, section_icon %}
 {% block title %}Документы{% endblock %}
 {% block breadcrumbs %}{{ breadcrumbs([('Главная', url_for('public.index')), ('Документы', None)]) }}{% endblock %}
 {% block content %}
 <div class="wrap">
   <h1>Документы</h1>
-  <p class="lead">Учредительные документы, нормативные акты, планы и отчёты учреждения.</p>
-  {% for category, items in grouped.items() %}
-    <h2>{{ category }}</h2>
-    <ul>
-      {% for d in items %}
-        <li><a href="{{ d.href }}">{{ d.title }}</a>
-          <span class="hint">{% if d.year %}{{ d.year }}{% endif %}{% if d.size_kb %} · {{ d.size_kb }} КБ{% endif %}</span></li>
+  {#- Только названия подразделов: сами документы — на странице подраздела -#}
+  {% if sections %}
+    <ul class="sections">
+      {% for s in sections %}
+        <li><a class="sections__item" href="{{ s.href }}">{{ section_icon(s.slug) }}<span>{{ s.title }}</span></a></li>
       {% endfor %}
     </ul>
   {% else %}
     <p class="empty">Документы пока не загружены.</p>
-  {% endfor %}
+  {% endif %}
 </div>
 {% endblock %}

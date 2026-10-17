@@ -1,4 +1,5 @@
 {% extends "admin/base.html" %}
+{% from "admin/_form.html" import file_input %}
 {% block title %}Настройки{% endblock %}
 {% block content %}
 <h1>Настройки сайта</h1>
@@ -19,8 +20,12 @@
             <textarea id="{{ row.key }}" name="{{ row.key }}" class="code">{{ row.value }}</textarea>
             {% if row.key in widget_keys %}<div class="hint">Код вставляется на страницу без изменений — скопируйте его полностью с сайта сервиса.</div>{% endif %}
           {% elif row.kind == 'file' %}
-            <input id="{{ row.key }}" type="file" name="f_{{ row.key }}"
-                   accept="{{ 'video/mp4,video/webm' if 'video' in row.key else 'image/*' }}">
+            {% if 'video' in row.key %}
+              {{ file_input(row.key, 'f_' ~ row.key, ('video',),
+                            size='Рекомендуемое разрешение — 1920×1080, длительность — 10–30 секунд, размер файла — до 15 МБ. Видео воспроизводится без звука, звук включается кнопкой на странице.') }}
+            {% else %}
+              {{ file_input(row.key, 'f_' ~ row.key, size='Рекомендуемый размер — 1920×1080 (16:9).') }}
+            {% endif %}
             {% if row.value %}<div class="hint">Загружено: {{ row.value }}</div>{% endif %}
           {% elif row.kind == 'bool' %}
             <div class="checkline"><input type="checkbox" id="{{ row.key }}" name="{{ row.key }}" {{ 'checked' if row.value }}>

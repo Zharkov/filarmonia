@@ -1,6 +1,6 @@
 {% extends "admin/base.html" %}
 {% from "admin/_media.html" import media_manager %}
-{% from "admin/_form.html" import slug_field, form_actions %}
+{% from "admin/_form.html" import slug_field, form_actions, file_input %}
 {% block title %}{{ item.name or 'Новый коллектив' }}{% endblock %}
 {% block content %}
 <div class="page-head">
@@ -31,7 +31,8 @@
       <textarea id="description" name="description" data-rich>{{ item.description or '' }}</textarea></div>
     <div class="field"><label for="contacts">Контакты (открываются в баннере по кнопке «Контакты»)</label>
       <textarea id="contacts" name="contacts" data-rich="small">{{ item.contacts or '' }}</textarea></div>
-    <div class="field"><label for="logo">Логотип или фото</label><input id="logo" type="file" name="logo" accept="image/*">
+    <div class="field"><label for="logo">Логотип или фото</label>
+      {{ file_input('logo', 'logo', size='Рекомендуемый размер — от 800×800 (1:1).') }}
       {% if item.logo %}<img src="/static/uploads/{{ item.logo }}" alt="" style="max-width:120px;margin-top:8px">{% endif %}</div>
   </section>
 </form>

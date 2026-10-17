@@ -133,24 +133,77 @@ def _ext(filename: str) -> str:
     return filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
 
 
+UPLOAD_KINDS = ("image", "video", "doc")
+UPLOAD_EXT_ORDER = ("jpg", "jpeg", "png", "webp", "gif", "mp4", "webm",
+                    "pdf", "doc", "docx", "xls", "xlsx", "odt", "rtf", "zip")
+
+
+def _kind_ext(kind: str) -> set:
+    return current_app.config[f"ALLOWED_{kind.upper()}_EXT"]
+
+
+def _kind_of(ext: str, kinds) -> str:
+    """Вид файла по расширению: image, video или doc; пусто — не разрешён."""
+    return next((k for k in UPLOAD_KINDS if k in kinds and ext in _kind_ext(k)), "")
+
+
+def _ext_list(exts) -> str:
+    """«JPG, PNG, WebP, GIF» — расширения для подсказки, jpeg не повторяем."""
+    names = {"webp": "WebP", "webm": "WebM"}
+    return ", ".join(names.get(e, e.upper()) for e in UPLOAD_EXT_ORDER if e in exts and e != "jpeg")
+
+
+def upload_rules(kinds=("image",)) -> dict:
+    """Ограничения поля загрузки для формы: accept, предел в МБ и текст подсказки.
+
+    «Картинки: JPG, PNG, WebP, GIF · до 20 МБ · до 8000 px по длинной стороне».
+    """
+    cfg = current_app.config
+    limits = cfg["UPLOAD_LIMITS_MB"]
+    labels = {"image": "Фото", "video": "Видео", "doc": "Документы"}
+    exts, parts = set(), []
+    for kind in UPLOAD_KINDS:
+        if kind not in kinds:
+            continue
+        exts |= _kind_ext(kind)
+        text = f"{_ext_list(_kind_ext(kind))} · до {limits[kind]} МБ"
+        if kind == "image":
+            text += f" · до {cfg['IMAGE_UPLOAD_MAX_SIDE']} px по длинной стороне"
+        parts.append(f"{labels[kind]}: {text}" if len(kinds) > 1 else text)
+    return {
+        "accept": ",".join(f".{e}" for e in UPLOAD_EXT_ORDER if e in exts),
+        "max_mb": max(limits[k] for k in kinds),
+        "limits": {e: limits[_kind_of(e, kinds)] for e in exts},
+        "total_mb": cfg["MAX_CONTENT_LENGTH"] // (1024 * 1024),
+        "text": "; ".join(parts) + ".",
+    }
+
+
+def _file_size(file_storage) -> int:
+    stream = file_storage.stream
+    stream.seek(0, os.SEEK_END)
+    size = stream.tell()
+    stream.seek(0)
+    return size
+
+
 def save_upload(file_storage, kinds=("image",)) -> str:
     """Сохраняет файл в каталог загрузок, возвращает имя файла.
 
-    Имя файла делается уникальным, расширение проверяется по белому списку.
+    Имя файла делается уникальным, расширение проверяется по белому списку,
+    размер — по пределу для своего вида (UPLOAD_LIMITS_MB).
     """
     if not file_storage or not file_storage.filename:
         return ""
     ext = _ext(file_storage.filename)
-    allowed = set()
     cfg = current_app.config
-    if "image" in kinds:
-        allowed |= cfg["ALLOWED_IMAGE_EXT"]
-    if "video" in kinds:
-        allowed |= cfg["ALLOWED_VIDEO_EXT"]
-    if "doc" in kinds:
-        allowed |= cfg["ALLOWED_DOC_EXT"]
-    if ext not in allowed:
-        raise ValueError(f"Недопустимый тип файла: .{ext}")
+    kind = _kind_of(ext, kinds)
+    if not kind:
+        raise ValueError(f"Недопустимый тип файла: .{ext}. Допустимые типы: "
+                         f"{_ext_list(set().union(*(_kind_ext(k) for k in kinds)))}.")
+    limit_mb = cfg["UPLOAD_LIMITS_MB"][kind]
+    if _file_size(file_storage) > limit_mb * 1024 * 1024:
+        raise ValueError(f"Размер файла «{file_storage.filename}» превышает {limit_mb} МБ.")
 
     # slugify до secure_filename: тот вырезает кириллицу целиком, и от имени
     # «Снимок с концерта.jpg» оставалось бы только расширение
@@ -177,8 +230,9 @@ def save_upload(file_storage, kinds=("image",)) -> str:
 # прошёл бы проверку расширения и попал в декодер редкого формата — именно
 # в таких декодерах находят большинство уязвимостей.
 IMAGE_FORMATS = ("JPEG", "PNG", "WEBP", "GIF")
-# Защита от «бомб»: картинки, которая весит килобайты, а в памяти занимает гигабайты
-MAX_IMAGE_PIXELS = 50_000_000
+# Защита от «бомб»: картинки, которая весит килобайты, а в памяти занимает гигабайты.
+# 8000 × 8000 — самое крупное фото, которое пропускает IMAGE_UPLOAD_MAX_SIDE
+MAX_IMAGE_PIXELS = 64_000_000
 
 
 def _pil():
@@ -189,15 +243,20 @@ def _pil():
 
 
 def check_image(path: str) -> None:
-    """Убеждается, что файл — картинка одного из разрешённых форматов."""
+    """Убеждается, что файл — картинка одного из разрешённых форматов и не крупнее предела."""
     Image = _pil()
+    max_side = current_app.config["IMAGE_UPLOAD_MAX_SIDE"]
+    too_big = f"Размер изображения превышает {max_side} px по длинной стороне."
     try:
         with Image.open(path, formats=IMAGE_FORMATS) as img:
+            size = img.size
             img.verify()
     except Image.DecompressionBombError:
-        raise ValueError("Изображение слишком большое: уменьшите его до 7000 px по длинной стороне.")
+        raise ValueError(too_big)
     except Exception:
         raise ValueError("Файл не распознан как изображение JPEG, PNG, WebP или GIF.")
+    if max(size) > max_side:
+        raise ValueError(too_big)
 
 
 # Уменьшенные копии фото. Карточка концерта на экране шириной около 400 px,
@@ -536,20 +595,27 @@ def map_point(value: str) -> str:
 
 
 YANDEX_ID = re.compile(r"[\w.\-]+@\d+")
+YANDEX_NUMBER = re.compile(r"@?(\d+)")
+# Часть ID сеанса до «@» — одна на все концерты филармонии (настройка yandex_session_prefix)
+YANDEX_PREFIX = "ticketsteam-825"
 
 
-def yandex_session_id(value: str) -> str:
+def yandex_session_id(value: str, prefix: str = YANDEX_PREFIX) -> str:
     """ID сеанса Яндекс Афиши из формы: «ticketsteam-825@496249».
 
-    Редактор может вставить и весь код кнопки из письма Яндекса — ID
-    вытаскивается из него. Пусто — пусто; что-то иное — ValueError.
+    Обычно редактор вводит только номер после «@» — приставка берётся из
+    настроек. Можно вставить и полный ID, и весь код кнопки из письма
+    Яндекса — ID вытаскивается из него. Пусто — пусто; что-то иное — ValueError.
     """
     value = (value or "").strip()
     if not value:
         return ""
+    number = YANDEX_NUMBER.fullmatch(value)
+    if number:
+        return f"{prefix or YANDEX_PREFIX}@{number.group(1)}"
     found = YANDEX_ID.search(value)
     if not found:
-        raise ValueError("ID сеанса Яндекс Афиши выглядит так: ticketsteam-825@496249.")
+        raise ValueError("Введите номер сеанса Яндекс Афиши — цифры после «@», например 496249.")
     return found.group(0)
 
 
@@ -589,9 +655,29 @@ def compact(value):
     return value
 
 
-def group_by_category(rows) -> dict:
-    """Раскладывает документы по категориям, сохраняя порядок запроса."""
-    grouped = {}
-    for row in rows:
-        grouped.setdefault(row.category or "Прочее", []).append(row)
-    return grouped
+
+@lru_cache(maxsize=32)
+def qr_svg(url: str) -> Markup:
+    """QR-код ссылки картинкой SVG прямо в разметке, без файла и внешних сервисов.
+
+    Модули всегда чёрные на белом поле с отступом: камеры телефонов плохо
+    читают светлый код на тёмном, поэтому цвета темы сюда не попадают.
+    Ссылку меняют в «Настройках» — код перерисовывается сам.
+    """
+    url = (url or "").strip()
+    if not url:
+        return Markup("")
+    import segno
+
+    matrix = segno.make(url, error="m").matrix
+    size, border = len(matrix), 4
+    path = "".join(
+        f"M{x + border} {y + border}h1v1h-1z"
+        for y, row in enumerate(matrix) for x, dark in enumerate(row) if dark
+    )
+    full = size + border * 2
+    return Markup(
+        f'<svg class="qr" viewBox="0 0 {full} {full}" shape-rendering="crispEdges" '
+        f'role="img" aria-label="QR-код ссылки на анкету" focusable="false">'
+        f'<rect width="{full}" height="{full}" fill="#fff"/><path d="{path}" fill="#000"/></svg>'
+    )

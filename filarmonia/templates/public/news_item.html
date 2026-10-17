@@ -1,5 +1,5 @@
 {% extends "public/base.html" %}
-{% from "public/_macros.html" import news_card, img_src, breadcrumbs %}
+{% from "public/_macros.html" import news_card, img_src, breadcrumbs, document_list %}
 {% block title %}{{ item.title }}{% endblock %}
 {% block description %}{{ item.lead or item.content | strip_tags(180) }}{% endblock %}
 {% block og_type %}article{% endblock %}
@@ -16,6 +16,7 @@
     {% if item.image and item.show_media %}<img class="article__hero" {{ img_src('/static/uploads/' ~ item.image) }} alt="{{ item.title }}">{% endif %}
     {% if item.lead %}<p class="lead">{{ item.lead }}</p>{% endif %}
     <div class="prose">{{ item.content | safe }}</div>
+    {% if documents %}{{ document_list(documents) }}{% endif %}
 
     {% set photos, videos = (item.photos, item.videos) if item.show_media else ([], []) %}
     {% if videos %}

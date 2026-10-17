@@ -1,11 +1,12 @@
 """Оформление: меню, документы, баннеры, перенаправления, площадки и жанры."""
 from urllib.parse import urlsplit
 
-from flask import render_template, request, redirect, url_for, flash, g
+from flask import render_template, request, redirect, url_for, flash, g, abort
 from sqlalchemy.orm import aliased
 
 from ..models import (
-    db, Event, Page, MenuItem, Document, Banner, Venue, Category, Redirect, ROUTE_TAGS,
+    db, Event, Page, MenuItem, Document, Banner, Venue, Category, Festival, Redirect, ROUTE_TAGS,
+    DOCUMENT_TEMPLATES, event_festivals,
 )
 from .. import utils
 from . import bp
@@ -79,6 +80,8 @@ def documents():
         f = request.form
         item_id = utils.parse_int(f.get("id"))
         item = get_or_404(Document, item_id) if item_id else Document()
+        if item.news_id:
+            abort(404)
         item.title = f.get("title", "").strip()
         item.category = f.get("category", "").strip() or "Прочее"
         item.year = utils.parse_int(f.get("year"))
@@ -103,7 +106,8 @@ def documents():
         release_files(old_files)
         return redirect(url_for("admin.documents"))
 
-    q = Document.query
+    # Приложения к новостям правятся в форме новости
+    q = Document.query.filter(Document.news_id.is_(None))
     a = request.args
     search = search_text()
     if search:
@@ -119,10 +123,18 @@ def documents():
             "size": Document.size_kb, "sort": Document.sort, "status": Document.is_published},
         default="category", tiebreak=Document.sort,
     )
-    categories = [c for (c,) in db.session.query(Document.category).distinct().order_by(Document.category) if c]
-    years = [y for (y,) in db.session.query(Document.year).distinct().order_by(Document.year.desc()) if y]
+    # Разделы для выбора — страницы со списком документов. Категории без такой
+    # страницы тоже остаются в списке, чтобы при правке документ не терял свою
+    sections = [p.title for p in Page.query.filter(Page.template.in_(DOCUMENT_TEMPLATES))
+                .order_by(Page.sort, Page.title)]
+    used = [c for (c,) in db.session.query(Document.category).filter(Document.news_id.is_(None))
+            .distinct().order_by(Document.category) if c]
+    categories = sections + [c for c in used if c not in sections]
+    years = [y for (y,) in db.session.query(Document.year).filter(Document.news_id.is_(None))
+             .distinct().order_by(Document.year.desc()) if y]
     return render_template("admin/documents.html", items=q.all(), search=search, sorting=sorting,
-                           categories=categories, years=years, edit=edited(Document))
+                           categories=categories, sections=sections, years=years,
+                           edit=edited(Document))
 
 
 # Баннеры
@@ -224,8 +236,9 @@ def refs():
     if request.method == "POST":
         f = request.form
         item_id = utils.parse_int(f.get("id"))
-        is_venue = f.get("kind") == "venue"
-        model = Venue if is_venue else Category
+        kind = f.get("kind")
+        is_venue = kind == "venue"
+        model = {"venue": Venue, "festival": Festival}.get(kind, Category)
 
         item = get_or_404(model, item_id) if item_id else model()
         item.name = f.get("name", "").strip()
@@ -235,6 +248,9 @@ def refs():
             # Код карты вставляется на страницу как есть — его правит только администратор
             if g.user.is_admin:
                 item.map_embed = f.get("map_embed", "").strip()
+        elif model is Festival:
+            item.sort = utils.parse_int(f.get("sort"), 100)
+            item.description = rich("description")
         else:
             item.sort = utils.parse_int(f.get("sort"), 100)
             known = dict(ROUTE_TAGS)
@@ -244,7 +260,8 @@ def refs():
             # Адрес при правке не меняем: на него ведут ссылки фильтров афиши
             if not item.slug:
                 item.slug = unique_slug(model, item.name, item, f.get("slug"))
-            save(item, "Площадка сохранена." if is_venue else "Категория сохранена.")
+            save(item, {Venue: "Площадка сохранена.", Festival: "Фестиваль сохранён."}.get(
+                model, "Категория сохранена."))
         else:
             db.session.rollback()
             flash("Укажите название.", "error")
@@ -253,15 +270,26 @@ def refs():
         "admin/refs.html",
         venues=Venue.query.order_by(Venue.name).all(),
         categories=Category.query.order_by(Category.sort).all(),
+        festivals=Festival.query.order_by(Festival.sort, Festival.name).all(),
         route_tags=ROUTE_TAGS, edit=edited(Venue),
+        edit_festival=db.session.get(Festival, utils.parse_int(request.args.get("festival")) or 0),
     )
 
 
 @bp.route("/refs/<kind>/<int:item_id>/delete", methods=["POST"])
 @login_required
 def ref_delete(kind, item_id):
-    model = Venue if kind == "venue" else Category
+    model = {"venue": Venue, "festival": Festival}.get(kind, Category)
     item = get_or_404(model, item_id)
+    if model is Festival:
+        used = db.session.query(event_festivals).filter(event_festivals.c.festival_id == item.id).count()
+        if used:
+            flash(f"«{item.name}» отмечен у событий: {used}. Сначала снимите отметку в этих событиях.", "error")
+        else:
+            log("delete", item)
+            db.session.delete(item)
+            db.session.commit()
+        return redirect(url_for("admin.refs"))
     column = Event.venue_id if model is Venue else Event.category_id
     used = Event.query.filter(column == item.id).count()
     if used:

@@ -1,0 +1,28 @@
+{% extends "public/base.html" %}
+{% from "public/_macros.html" import event_card, event_row, breadcrumbs %}
+{% block title %}{{ fest.name }}{% endblock %}
+{% block description %}{{ fest.description | strip_tags(160) if fest.description else fest.name ~ ': концерты фестиваля в Смоленской областной филармонии.' }}{% endblock %}
+{% block breadcrumbs %}{{ breadcrumbs([('Главная', url_for('public.index')), ('Афиша', url_for('public.afisha')), (fest.name, None)]) }}{% endblock %}
+
+{% block content %}
+<div class="wrap">
+  <h1>{{ fest.name }}</h1>
+  {% if fest.description %}<div class="prose">{{ fest.description | safe }}</div>{% endif %}
+
+  <section class="section">
+    <div class="section__head"><h2>Концерты фестиваля</h2></div>
+    {% if upcoming %}
+      <div class="cards">{% for ev in upcoming %}{{ event_card(ev) }}{% endfor %}</div>
+    {% else %}
+      <p>Афиша фестиваля пока не опубликована. Следите за новостями и <a href="{{ url_for('public.afisha') }}">афишей филармонии</a>.</p>
+    {% endif %}
+  </section>
+
+  {% if past %}
+    <section class="section">
+      <div class="section__head"><h2>Прошедшие концерты</h2></div>
+      {% for ev in past %}{{ event_row(ev) }}{% endfor %}
+    </section>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,11 +1,16 @@
-"""Афиша: события, их копии и всплывающие баннеры на афише."""
+"""Афиша: события, их копии, всплывающие баннеры на афише и изменения в афише."""
+from datetime import datetime
+
 from flask import render_template, request, redirect, url_for, flash, g, abort
 
-from ..models import db, Event, EventBadge, MediaItem, Collective, Venue, Category
+from ..models import (
+    db, Event, EventBadge, MediaItem, Collective, Venue, Category, Festival, AfishaNotice, NOTICE_KINDS,
+    Setting,
+)
 from .. import utils
 from . import bp
 from .common import (
-    after_save, delete_record, get_or_404, log, login_required, paginated, publish_choice,
+    after_save, delete_record, edited, get_or_404, log, login_required, paginated, publish_choice,
     release_files, replace_file, rich, save, search_text, sorted_by, status_note, unique_slug,
     uploaded_name,
 )
@@ -82,7 +87,8 @@ def event_form(event_id=None):
             ev.performers = rich("performers")
             ev.organizer = f.get("organizer", "").strip()
             ev.ticket_url = f.get("ticket_url", "").strip()
-            ev.yandex_id = utils.yandex_session_id(f.get("yandex_id", ""))
+            ev.yandex_id = utils.yandex_session_id(f.get("yandex_id", ""),
+                                                   Setting.get("yandex_session_prefix", utils.YANDEX_PREFIX))
             ev.tickets_left = f.get("tickets_left", "").strip()
             # Код виджета вставляется на страницу как есть — его правит только администратор
             if g.user.is_admin:
@@ -98,6 +104,8 @@ def event_form(event_id=None):
 
             chosen = [utils.parse_int(i) for i in f.getlist("collectives")]
             ev.collectives = Collective.query.filter(Collective.id.in_(chosen)).all() if chosen else []
+            chosen = [utils.parse_int(i) for i in f.getlist("festivals")]
+            ev.festivals = Festival.query.filter(Festival.id.in_(chosen)).all() if chosen else []
 
             for field in ("poster", "cover"):
                 old_files += replace_file(ev, field, uploaded_name(field))
@@ -117,6 +125,7 @@ def _event_refs():
         "venues": Venue.query.order_by(Venue.name).all(),
         "categories": Category.query.order_by(Category.sort).all(),
         "all_collectives": Collective.query.order_by(Collective.name).all(),
+        "all_festivals": Festival.query.order_by(Festival.sort, Festival.name).all(),
         "positions": [
             ("top-left", "Сверху слева"), ("top-right", "Сверху справа"),
             ("bottom-left", "Снизу слева"), ("bottom-right", "Снизу справа"),
@@ -156,6 +165,9 @@ def event_copy(event_id):
         for m in ev.media
     ]
     db.session.add(copy)
+    # Фестивали — после add: иначе автосохранение при чтении связей ругается
+    # на копию, которой ещё нет в сессии
+    copy.festivals = list(ev.festivals)
     db.session.flush()
     log("copy", copy, details=f"копия события № {ev.id}")
     db.session.commit()
@@ -209,3 +221,54 @@ def badge_delete(badge_id):
 @login_required
 def event_delete(item_id):
     return delete_record(Event, item_id, "admin.events", "Событие удалено.")
+
+
+# Изменения в афише
+def notice_link(value: str) -> str:
+    """Ссылка из объявления: адрес на сайте «/afisha/…» или полный «https://…».
+
+    Остальное (в том числе «javascript:») отбрасывается: ссылка выводится
+    посетителям на главной.
+    """
+    value = (value or "").strip()
+    if value.startswith("/") and not value.startswith(("//", "/\\")):
+        return value
+    if value.startswith(("https://", "http://")):
+        return value
+    return ""
+
+
+@bp.route("/notices", methods=["GET", "POST"])
+@login_required
+def notices():
+    if request.method == "POST":
+        f = request.form
+        item_id = utils.parse_int(f.get("id"))
+        item = get_or_404(AfishaNotice, item_id) if item_id else AfishaNotice()
+        item.kind = f.get("kind") if f.get("kind") in dict(NOTICE_KINDS) else "other"
+        item.text = f.get("text", "").strip()[:500]
+        item.url = notice_link(f.get("url"))
+        until = utils.parse_date(f.get("show_until"))
+        # «Показывать до» включительно: запись видна весь этот день
+        item.show_until = datetime.combine(until, datetime.max.time().replace(microsecond=0)) if until else None
+        item.sort = utils.parse_int(f.get("sort"), 100)
+        item.is_published = bool(f.get("is_published"))
+        if not item.text:
+            db.session.rollback()
+            flash("Напишите текст изменения.", "error")
+            return redirect(url_for("admin.notices", edit=item_id) if item_id else url_for("admin.notices"))
+        if f.get("url", "").strip() and not item.url:
+            flash("Ссылка не сохранена: она должна начинаться с «/» или с «https://».", "error")
+        save(item, "Изменение в афише сохранено.")
+        return redirect(url_for("admin.notices"))
+
+    items = AfishaNotice.query.order_by(AfishaNotice.sort, AfishaNotice.id.desc()).all()
+    return render_template("admin/notices.html", items=items, kinds=NOTICE_KINDS,
+                           active_ids={n.id for n in AfishaNotice.active()},
+                           edit=edited(AfishaNotice))
+
+
+@bp.route("/notices/<int:item_id>/delete", methods=["POST"])
+@login_required
+def notice_delete(item_id):
+    return delete_record(AfishaNotice, item_id, "admin.notices", "Изменение удалено.")

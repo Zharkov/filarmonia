@@ -1,12 +1,12 @@
 """Коллективы, новости и страницы — записи с адресом на сайте."""
-from flask import render_template, request, url_for, flash, abort, jsonify
+from flask import render_template, request, redirect, url_for, flash, abort, jsonify
 from sqlalchemy.orm import aliased
 
-from ..models import db, Event, Collective, News, Page, MenuItem
+from ..models import db, Event, Collective, News, Page, MenuItem, Document
 from .. import utils
 from . import bp
 from .common import (
-    after_save, delete_record, get_or_404, login_required, paginated, publish_choice,
+    after_save, delete_record, get_or_404, log, login_required, paginated, publish_choice,
     release_files, replace_file, rich, save, search_text, sorted_by, status_note, unique_slug,
     uploaded_name,
 )
@@ -15,6 +15,8 @@ from .common import (
 PAGE_TEMPLATES = [
     ("page", "Обычная"),
     ("documents", "Со списком документов"),
+    ("documents_years", "Со списком документов по годам"),
+    ("nok", "Независимая оценка качества: анкета с QR-кодом и документы по годам"),
     ("contacts", "Контакты: с площадками и картами"),
     ("pushkin", "Пушкинская карта: с концертами по карте"),
     ("benefits", "Льготное посещение: с концертами со льготами"),
@@ -187,6 +189,7 @@ def page_form(item_id=None):
     if request.method == "POST":
         f = request.form
         was_published = bool(item.id and item.is_published)
+        old_title = item.title
         item.title = f.get("title", "").strip()
         if not item.title:
             flash("Укажите заголовок страницы.", "error")
@@ -201,6 +204,9 @@ def page_form(item_id=None):
         item.seo_description = f.get("seo_description", "").strip()
         item.is_published = publish_choice(item)
         item.show_in_menu = bool(f.get("show_in_menu"))
+        if old_title and old_title != item.title:
+            # Документы находят страницу по её заголовку — переносим их вслед за ним
+            Document.query.filter_by(category=old_title, news_id=None).update({"category": item.title})
         save(item, "Страница сохранена." + status_note(item, was_published))
         return after_save(item, url_for("admin.page_form", item_id=item.id))
     return render_template("admin/page_form.html", item=item, parents=parents,
@@ -223,6 +229,53 @@ def page_in_use(page) -> str:
 @login_required
 def collective_delete(item_id):
     return delete_record(Collective, item_id, "admin.collectives", "Коллектив удалён.")
+
+
+# Документы, прикреплённые к новости
+@bp.route("/news/<int:item_id>/documents", methods=["POST"])
+@login_required
+def news_document_add(item_id):
+    item = get_or_404(News, item_id)
+    back = url_for("admin.news_form", item_id=item.id) + "#documents"
+    f = request.form
+    doc = Document(news_id=item.id, category="", is_published=True,
+                   title=f.get("title", "").strip(), url=f.get("url", "").strip(),
+                   sort=utils.parse_int(f.get("sort"), (len(item.documents) + 1) * 10))
+    try:
+        doc.file = uploaded_name("file", ("doc", "image"))
+    except ValueError as exc:
+        flash(str(exc), "error")
+        return redirect(back)
+    if not doc.title and doc.file:
+        doc.title = request.files["file"].filename.rsplit(".", 1)[0]
+    if not doc.title or not (doc.file or doc.url):
+        release_files([doc.file])
+        flash("Укажите название и выберите файл или впишите ссылку.", "error")
+        return redirect(back)
+    if doc.file:
+        doc.size_kb = utils.file_size_kb(doc.file)
+    db.session.add(doc)
+    db.session.flush()
+    log("create", doc, details=f"новость «{item.title}»")
+    db.session.commit()
+    flash("Документ прикреплён к новости.", "ok")
+    return redirect(back)
+
+
+@bp.route("/news/documents/<int:doc_id>/delete", methods=["POST"])
+@login_required
+def news_document_delete(doc_id):
+    doc = get_or_404(Document, doc_id)
+    if not doc.news_id:
+        abort(404)
+    back = url_for("admin.news_form", item_id=doc.news_id) + "#documents"
+    names = [doc.file]
+    log("delete", doc)
+    db.session.delete(doc)
+    db.session.commit()
+    release_files(names)
+    flash("Документ откреплён от новости.", "ok")
+    return redirect(back)
 
 
 @bp.route("/news/<int:item_id>/delete", methods=["POST"])

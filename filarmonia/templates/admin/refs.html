@@ -2,7 +2,7 @@
 {% block title %}Площадки и жанры{% endblock %}
 {% block content %}
 <h1>Площадки и жанры</h1>
-<p class="subtitle">Используются в фильтрах афиши и на странице события.</p>
+<p class="subtitle">Используются в фильтрах афиши, на карточках и странице события.</p>
 
 <div class="grid grid--2" style="margin-top:20px">
   {% set e = edit %}
@@ -84,6 +84,42 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button class="btn btn--danger btn--sm" type="submit">Удалить</button></form></td></tr>
         {% else %}<tr><td>Категорий нет.</td></tr>{% endfor %}
+      </table>
+    </div>
+  </section>
+
+  {% set fe = edit_festival %}
+  <section class="panel {{ 'panel--editing' if fe }}" id="festival-form">
+    <h2 style="margin-top:0">Фестивали</h2>
+    <p class="hint">Метка фестиваля выводится на карточке и странице концерта и ведёт на страницу фестиваля:
+      описание и все его концерты. Отмечается в форме события.</p>
+    <h3>{{ 'Изменить «' ~ fe.name ~ '»' if fe else 'Добавить фестиваль' }}</h3>
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="kind" value="festival">
+      {% if fe %}<input type="hidden" name="id" value="{{ fe.id }}">{% endif %}
+      <div class="field"><label for="f-name">Название *</label>
+        <input id="f-name" type="text" name="name" value="{{ fe.name if fe }}" required></div>
+      <div class="field"><label for="f-desc">Описание (на странице фестиваля)</label>
+        <textarea id="f-desc" name="description" data-rich="small">{{ fe.description if fe }}</textarea></div>
+      <div class="field"><label for="f-sort">Порядок</label>
+        <input id="f-sort" type="number" name="sort" value="{{ fe.sort if fe else 100 }}"></div>
+      <button class="btn btn--primary" type="submit">{{ 'Сохранить изменения' if fe else 'Добавить фестиваль' }}</button>
+      {% if fe %}<a class="btn btn--ghost" href="{{ url_for('admin.refs') }}#festival-form">Отмена</a>{% endif %}
+    </form>
+    <div class="table-wrap" style="margin-top:18px">
+      <table>
+        {% for fest in festivals %}
+          <tr class="{{ 'is-editing' if fe and fe.id == fest.id }}">
+            <td>{{ fest.name }}<div class="hint"><a href="{{ fest.url }}" target="_blank">{{ fest.url }}</a></div></td>
+            <td style="width:1%"><div class="row-actions">
+              <a class="btn btn--ghost btn--sm" href="{{ url_for('admin.refs', festival=fest.id) }}#festival-form">Изменить</a>
+              <form method="post" action="{{ url_for('admin.ref_delete', kind='festival', item_id=fest.id) }}"
+                    data-confirm="Удалить фестиваль?">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn--danger btn--sm" type="submit">Удалить</button></form>
+            </div></td></tr>
+        {% else %}<tr><td>Фестивалей нет.</td></tr>{% endfor %}
       </table>
     </div>
   </section>

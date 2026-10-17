@@ -29,8 +29,8 @@ src="{{ url }}"{% set variants = url | srcset %}{% if variants %} srcset="{{ var
     </div>
     {% if ev.show_pushkin or ev.show_benefits %}
       <div class="ecard__flags">
-        {% if ev.show_pushkin %}<span class="ecard__flag">Пушкинская карта</span>{% endif %}
-        {% if ev.show_benefits %}<span class="ecard__flag ecard__flag--alt">Есть льготы</span>{% endif %}
+        {% if ev.show_pushkin %}<a class="ecard__flag" href="{{ url_for('public.page', slug='pushkinskaya-karta') }}">Пушкинская карта</a>{% endif %}
+        {% if ev.show_benefits %}<a class="ecard__flag ecard__flag--alt" href="{{ url_for('public.page', slug='lgotnoe-poseschenie') }}">Есть льготы</a>{% endif %}
       </div>
     {% endif %}
     <div class="ecard__when">
@@ -44,6 +44,9 @@ src="{{ url }}"{% set variants = url | srcset %}{% if variants %} srcset="{{ var
   </div>
 
   <div class="ecard__body">
+    {% if ev.festivals %}
+      <div class="ecard__fests">{% for f in ev.festivals %}<a class="ecard__fest" href="{{ f.url }}">{{ f.name }}</a>{% endfor %}</div>
+    {% endif %}
     <h3 class="ecard__title"><a href="{{ ev.url }}">{{ ev.title }}</a></h3>
     {% if ev.annotation %}<p class="ecard__text">{{ ev.annotation }}</p>{% endif %}
     {% if ev.venue %}<div class="ecard__venue">{{ icon('pin') }} {{ ev.venue.name }}</div>{% endif %}
@@ -53,13 +56,13 @@ src="{{ url }}"{% set variants = url | srcset %}{% if variants %} srcset="{{ var
         <div class="ecard__pricelabel">Стоимость билета</div>
         <div class="ecard__price">{{ ev.price_label }}</div>
       </div>
-      {{ buy_button(ev, 'ecard__buy') }}
+      {{ buy_button(ev, 'btn btn--gold ecard__buy') }}
     </div>
   </div>
 </article>
 {% endmacro %}
 
-{#- Карусель карточек со стрелками ‹ ›. С адресом more_url, когда посетитель
+{#- Карусель карточек со стрелками ‹ › под лентой. С адресом more_url, когда посетитель
     докручивает до конца, подгружаются следующие концерты из афиши.
     Без скрипта ленту можно прокрутить пальцем или колёсиком. -#}
 {% macro event_carousel(events, label, more_url=None) %}
@@ -67,18 +70,26 @@ src="{{ url }}"{% set variants = url | srcset %}{% if variants %} srcset="{{ var
   <div class="ecarousel__track" data-ecarousel-track tabindex="0" role="region" aria-label="{{ label }}">
     {% for ev in events %}{{ event_card(ev) }}{% endfor %}
   </div>
-  <button class="ecarousel__arrow ecarousel__arrow--prev" type="button" data-ecarousel-prev aria-label="Назад">‹</button>
-  <button class="ecarousel__arrow ecarousel__arrow--next" type="button" data-ecarousel-next aria-label="Вперёд">›</button>
+  <div class="ecarousel__nav">
+    <button class="ecarousel__arrow" type="button" data-ecarousel-prev aria-label="Назад">‹</button>
+    <button class="ecarousel__arrow" type="button" data-ecarousel-next aria-label="Вперёд">›</button>
+  </div>
 </div>
 {% endmacro %}
 
-{#- Карточка новости. У новости «только текст» картинки нет совсем. -#}
+{#- Карточка новости. У новости «только текст» вместо фото — плашка того же
+    размера с датой: без неё карточка была короче соседних и ломала сетку. -#}
 {% macro news_card(item, lead=true) %}
 {% set picture = item.image if item.show_media else '' %}
 <article class="newscard {{ 'newscard--text' if not picture }}">
   {% if picture %}
     <a class="newscard__img" href="{{ item.url }}" tabindex="-1" aria-hidden="true">
       <img {{ img_src('/static/uploads/' ~ picture, '(max-width: 860px) 100vw, 400px') }} alt="" loading="lazy">
+    </a>
+  {% elif item.published_at %}
+    <a class="newscard__img newscard__plate" href="{{ item.url }}" tabindex="-1" aria-hidden="true">
+      <span class="newscard__plate-day">{{ item.published_at.day }}</span>
+      <span class="newscard__plate-mon">{{ item.published_at | ru_month_short }}</span>
     </a>
   {% endif %}
   <div class="newscard__date">{{ item.published_at | ru_date }}</div>
@@ -107,13 +118,14 @@ src="{{ url }}"{% set variants = url | srcset %}{% if variants %} srcset="{{ var
     <div class="eventrow__meta">
       {{ ev.category.name if ev.category }}{% if ev.tickets_left %} · {{ ev.tickets_left }}{% endif %}
     </div>
-    {% if ev.show_pushkin %}<span class="card__pushkin">Пушкинская карта</span>{% endif %}
-    {% if ev.show_benefits %}<span class="card__pushkin">Есть льготы</span>{% endif %}
+    {% for f in ev.festivals %}<a class="card__pushkin card__fest" href="{{ f.url }}">{{ f.name }}</a>{% endfor %}
+    {% if ev.show_pushkin %}<a class="card__pushkin" href="{{ url_for('public.page', slug='pushkinskaya-karta') }}">Пушкинская карта</a>{% endif %}
+    {% if ev.show_benefits %}<a class="card__pushkin" href="{{ url_for('public.page', slug='lgotnoe-poseschenie') }}">Есть льготы</a>{% endif %}
   </div>
   <div class="eventrow__side">
     <div class="eventrow__price">{{ ev.price_label }}</div>
     <div class="eventrow__btns">
-      {{ buy_button(ev, 'btn btn--primary') }}
+      {{ buy_button(ev, 'btn btn--gold') }}
       <a class="btn btn--ghost" href="{{ ev.url }}">Подробнее</a>
     </div>
   </div>
@@ -121,8 +133,8 @@ src="{{ url }}"{% set variants = url | srcset %}{% if variants %} srcset="{{ var
 {% endmacro %}
 
 {#- Календарь: лента дней со стрелками, как на билетных сайтах.
-    Выходные красным, дни без концертов приглушены и не нажимаются,
-    название месяца в шапке меняется при прокрутке. -#}
+    Под днём с концертами точка, дни без концертов серые и не нажимаются,
+    выходные красным, «сегодня» в рамке. Название месяца в шапке меняется при прокрутке. -#}
 {% macro daystrip(days, active=None, base='/afisha') %}
 <div class="cal" data-cal role="group" aria-label="Календарь концертов">
   <div class="cal__head">
@@ -139,6 +151,7 @@ src="{{ url }}"{% set variants = url | srcset %}{% if variants %} srcset="{{ var
            'cal__day--weekend' if d.date.weekday() >= 5,
            'cal__day--off' if not d.has_events,
            'cal__day--active' if active and active == d.date,
+           'cal__day--today' if loop.first and not active,
            'cal__day--first' if d.date.day == 1 and not loop.first,
          ] | select | join(' ') %}
       {% set month = (d.date | ru_month) ~ ' ' ~ d.date.year %}
@@ -155,6 +168,7 @@ src="{{ url }}"{% set variants = url | srcset %}{% if variants %} srcset="{{ var
       {% if d.has_events %}</a>{% else %}</span>{% endif %}
     {% endfor %}
   </div>
+  <p class="cal__legend" aria-hidden="true">— дни с концертами, нажмите на дату</p>
 </div>
 {% endmacro %}
 
@@ -206,6 +220,133 @@ src="{{ url }}"{% set variants = url | srcset %}{% if variants %} srcset="{{ var
 {% endif %}
 {% endmacro %}
 
+{#- Список документов, как на сайтах учреждений культуры: значок типа файла,
+    название и под ним «Открыть», «Скачать», размер и тип. PDF открывается
+    в окне просмотра прямо на странице, без скачивания; на телефоне и без
+    скрипта — во вкладке браузера. by_year — с подзаголовками по годам. -#}
+{% macro document_list(docs, by_year=false) %}
+{% if by_year %}
+  {% for year, group in docs | groupby('year', default=0) | reverse %}
+    <h2 class="doclist__year">{{ year or 'Другие документы' }}</h2>
+    <ul class="doclist">{% for d in group %}{{ document_row(d) }}{% endfor %}</ul>
+  {% endfor %}
+{% else %}
+  <ul class="doclist">{% for d in docs %}{{ document_row(d) }}{% endfor %}</ul>
+{% endif %}
+{% endmacro %}
+
+{% macro document_row(d) %}
+{% set kind = {'pdf': 'pdf', 'doc': 'doc', 'docx': 'doc', 'odt': 'doc', 'rtf': 'doc',
+               'xls': 'xls', 'xlsx': 'xls', 'zip': 'zip'}.get(d.ext, 'img' if d.is_image else 'other') %}
+{#- PDF — в окне просмотра документа, скан или фото — в окне просмотра фотографий -#}
+{% set view -%}
+  {%- if d.viewable %} data-doc-view data-doc-title="{{ d.title }}"
+  {%- elif d.is_image %} data-photo="{{ d.href }}" data-photo-alt="{{ d.title }}"{% endif -%}
+{%- endset %}
+<li class="doc">
+  <a class="doc__icon doc__icon--{{ kind }}" href="{{ d.href }}" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true"{{ view }}>
+    <svg viewBox="0 0 32 40" width="32" height="40" focusable="false">
+      <path d="M3 1.5h18l8 8v29H3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M21 1.5v8h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+      {%- if kind == 'img' %}
+      <circle cx="11" cy="12.5" r="2.4" fill="currentColor"/>
+      <path d="M6 22.5l6-6 4 4 3-3 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      {%- endif %}
+    </svg>
+    <span class="doc__ext">{{ ('JPG' if d.ext == 'jpeg' else d.ext | upper) if d.ext and d.ext | length <= 4 else '' }}</span>
+  </a>
+  <div class="doc__body">
+    <a class="doc__title" href="{{ d.href }}" target="_blank" rel="noopener"{{ view }}>{{ d.title }}</a>
+    <div class="doc__meta">
+      {% if d.viewable or d.is_image %}<a href="{{ d.href }}" target="_blank" rel="noopener"{{ view }}>Открыть</a>{% endif %}
+      {% if d.file %}<span><a href="{{ d.href }}" download>Скачать</a>
+        {%- if d.size_kb %} ({{ ('%.1f' | format(d.size_kb / 1024)) | replace('.', ',') ~ ' МБ' if d.size_kb >= 1024 else d.size_kb ~ ' КБ' }}){% endif %}</span>{% endif %}
+      {% if d.ext %}<span>Тип файла: {{ d.ext }}</span>{% endif %}
+    </div>
+  </div>
+</li>
+{% endmacro %}
+
+{#- Значки подразделов «Документов», «Посетителям» и «Об учреждении»:
+    по адресу страницы, иначе папка -#}
+{% macro section_icon(slug) -%}
+{% set glyphs = {
+     'uchreditelnye-dokumenty': 'seal',
+     'plan-finansovo-hozyaystvennoy-deyatelnosti': 'chart',
+     'svedeniya-ob-operaciyah-s-celevymi-subsidiyami': 'coins',
+     'gosudarstvennoe-zadanie': 'task',
+     'otchet-o-deyatelnosti-za-predyduschie-gody': 'report',
+     'kompleksnaya-ocenka-usloviy-truda': 'helmet',
+     'antiterror': 'shield',
+     'dostupnaya-sreda': 'access',
+     'lokalnye-normativnye-akty': 'scales',
+     'uslugi': 'service',
+     'nezavisimaya-ocenka-kachestva': 'star',
+     'pravila-posescheniya': 'rules',
+     'pravila-prodazhi-i-vozvrata-biletov': 'service',
+     'cifrovoy-id': 'idcard',
+     'pushkinskaya-karta': 'card',
+     'lgotnoe-poseschenie': 'percent',
+     'informaciya-o-rabote-kassy': 'clock',
+     'obschie-svedeniya': 'info',
+     'istoriya': 'columns',
+     'struktura-i-organy-upravleniya': 'tree',
+     'protivodeystvie-korrupcii': 'shield',
+     'materialno-tehnicheskaya-baza': 'building',
+     'kontakty-i-shema-proezda': 'pin',
+   } %}
+{% set name = glyphs.get(slug, 'folder') %}
+<svg class="section-icon" viewBox="0 0 24 24" width="40" height="40" aria-hidden="true" focusable="false"
+     fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+{%- if name == 'seal' -%}
+  <path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/><circle cx="12.5" cy="13" r="3"/><path d="M11 15.6 10 20l2.5-1.3L15 20l-1-4.4"/>
+{%- elif name == 'chart' -%}
+  <path d="M4 20h16"/><path d="M7 16v-5M11 16V7M15 16v-7M19 16V5"/>
+{%- elif name == 'coins' -%}
+  <ellipse cx="9" cy="6.5" rx="5.5" ry="2.5"/><path d="M3.5 6.5v4c0 1.4 2.5 2.5 5.5 2.5s5.5-1.1 5.5-2.5v-4"/>
+  <path d="M3.5 10.5v4c0 1.4 2.5 2.5 5.5 2.5 1 0 1.9-.1 2.7-.4"/><circle cx="16.5" cy="16" r="4.5"/><path d="M16.5 14v4"/>
+{%- elif name == 'task' -%}
+  <rect x="5" y="4" width="14" height="17" rx="1.5"/><path d="M9 4V2.8h6V4"/><path d="m8.5 12 2.2 2.2 4.8-4.7M8.5 17.5h7"/>
+{%- elif name == 'report' -%}
+  <path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/><path d="M9 17v-3M12 17v-6M15 17v-4"/>
+{%- elif name == 'helmet' -%}
+  <path d="M3.5 17.5h17"/><path d="M5 17.5a7 7 0 0 1 14 0"/><path d="M10 10.8V7.5h4v3.3"/><path d="M12 7.5V5.5"/>
+{%- elif name == 'shield' -%}
+  <path d="M12 3 5 6v5.5c0 4.4 3 7.8 7 9.5 4-1.7 7-5.1 7-9.5V6z"/><path d="m9 12 2.2 2.2L15.5 10"/>
+{%- elif name == 'access' -%}
+  <circle cx="12" cy="4.5" r="1.6"/><path d="M5.5 8.5 12 9.5l6.5-1M12 9.5v5M12 14.5l-3 6.5M12 14.5l3 6.5"/>
+{%- elif name == 'scales' -%}
+  <path d="M12 3.5v17M7.5 20.5h9M5 7h14"/><path d="m5 7-2.5 6a2.5 2.5 0 0 0 5 0zM19 7l-2.5 6a2.5 2.5 0 0 0 5 0z"/>
+{%- elif name == 'service' -%}
+  <path d="M3.5 8.5V6.8c0-.7.6-1.3 1.3-1.3h14.4c.7 0 1.3.6 1.3 1.3v1.7a2.5 2.5 0 0 0 0 5v1.7c0 .7-.6 1.3-1.3 1.3H4.8c-.7 0-1.3-.6-1.3-1.3v-1.7a2.5 2.5 0 0 0 0-5z"/><path d="M14.5 6v12" stroke-dasharray="1.6 1.8"/>
+{%- elif name == 'star' -%}
+  <path d="m12 3.5 2.6 5.3 5.9.8-4.3 4.2 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.2 5.9-.8z"/>
+{%- elif name == 'rules' -%}
+  <rect x="5" y="4" width="14" height="17" rx="1.5"/><path d="M9 4V2.8h6V4"/><path d="M8.5 9.5h7M8.5 13h7M8.5 16.5h4.5"/>
+{%- elif name == 'idcard' -%}
+  <rect x="3" y="5.5" width="18" height="13" rx="2"/><circle cx="8.5" cy="11" r="2"/><path d="M5.5 15.5c.6-1.4 1.7-2 3-2s2.4.6 3 2M14 10h4M14 13.5h3"/>
+{%- elif name == 'card' -%}
+  <rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="M3 9.5h18M6.5 15h4"/>
+{%- elif name == 'percent' -%}
+  <path d="M18 6 6 18"/><circle cx="7.5" cy="7.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/>
+{%- elif name == 'clock' -%}
+  <circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>
+{%- elif name == 'info' -%}
+  <circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5"/><circle cx="12" cy="7.8" r=".6" fill="currentColor"/>
+{%- elif name == 'columns' -%}
+  <path d="M3.5 9 12 4l8.5 5zM4.5 20.5h15M5.5 18h13"/><path d="M7 10.5V18M10.3 10.5V18M13.7 10.5V18M17 10.5V18"/>
+{%- elif name == 'tree' -%}
+  <rect x="9" y="3.5" width="6" height="4.5" rx="1"/><rect x="3.5" y="16" width="6" height="4.5" rx="1"/><rect x="14.5" y="16" width="6" height="4.5" rx="1"/><path d="M12 8v4M6.5 16v-4h11v4"/>
+{%- elif name == 'building' -%}
+  <path d="M4.5 20.5V5.5l8-2v17M12.5 9.5l7 2v9M3 20.5h18"/><path d="M7.5 8.5h2M7.5 12h2M7.5 15.5h2M15 14h2M15 17h2"/>
+{%- elif name == 'pin' -%}
+  <path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>
+{%- else -%}
+  <path d="M3.5 6.5c0-.8.7-1.5 1.5-1.5h4.5l2 2.5H19c.8 0 1.5.7 1.5 1.5v9c0 .8-.7 1.5-1.5 1.5H5c-.8 0-1.5-.7-1.5-1.5z"/>
+{%- endif -%}
+</svg>
+{%- endmacro %}
+
 {#- Значки рисуются цветом текста (currentColor) и подстраиваются под тему. -#}
 {% macro icon(name) -%}
 <svg class="icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
@@ -224,6 +365,14 @@ src="{{ url }}"{% set variants = url | srcset %}{% if variants %} srcset="{{ var
 {%- elif name == 'sound-on' -%}
   <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/>
   <path d="M15.5 9a4.5 4.5 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+{%- elif name == 'search' -%}
+  <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="1.9"/>
+  <path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+{%- elif name == 'phone' -%}
+  <path d="M6.6 3.5h2.6l1.4 4.2-2 1.4a12 12 0 0 0 6.3 6.3l1.4-2 4.2 1.4v2.6c0 1-.8 1.8-1.8 1.8A15.5 15.5 0 0 1 4.8 5.3c0-1 .8-1.8 1.8-1.8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+{%- elif name == 'eye' -%}
+  <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+  <circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/>
 {%- elif name == 'vk' -%}
   <path d="M3 7h3.2c.2 4.2 2 6 3.4 6.4V7h3v3.6c1.4-.2 2.8-1.8 3.3-3.6h3c-.5 2.4-2.2 4.2-3.5 4.9 1.3.6 3.3 2.2 4.1 5.1h-3.3c-.7-2-2.3-3.5-3.6-3.7V17h-.4C6.8 17 3.3 13.4 3 7z" fill="currentColor"/>
 {%- elif name == 'tg' -%}

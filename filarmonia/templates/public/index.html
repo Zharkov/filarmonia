@@ -1,5 +1,5 @@
 {% extends "public/base.html" %}
-{% from "public/_macros.html" import event_carousel, daystrip, news_card, icon, img_src %}
+{% from "public/_macros.html" import event_carousel, daystrip, news_card, icon, img_src, buy_button %}
 {#- Карточка организации и строка поиска по сайту в поисковой выдаче -#}
 {% block head %}
 <script type="application/ld+json">{{ schema.organization(settings) | tojson }}</script>
@@ -29,6 +29,11 @@
     <div class="hero__kicker">{{ settings.get('hero_kicker', 'Сезон 2026 / 2027') }}</div>
     <h1>{{ settings.get('hero_title', 'Музыка на все времена') }}</h1>
     <p class="hero__lead">{{ settings.get('hero_lead', 'Симфонические программы, органные вечера, джаз и концерты для детей в зале на улице Глинки.') }}</p>
+    {#- Первый шаг посетителя — сразу на первом экране -#}
+    <div class="hero__actions">
+      <a class="btn btn--gold" href="{{ url_for('public.afisha') }}">{{ icon('ticket') }} Афиша концертов</a>
+      <a class="btn btn--onDark" href="{{ url_for('public.page', slug='pushkinskaya-karta') }}">Пушкинская карта</a>
+    </div>
   </div>
 
   {% if video_src %}
@@ -77,6 +82,7 @@
       <div class="kicker">Подбор концерта</div>
       <h2>Музыкальный маршрут</h2>
       <p>Ответьте на три вопроса — и мы соберём персональную подборку концертов.</p>
+      <p class="route__meta">3 вопроса · меньше минуты · подборка из текущей афиши</p>
     </div>
 
     <form class="route__form" method="get" action="{{ url_for('public.index') }}#marshrut"
@@ -212,6 +218,7 @@
         {% endfor %}
       </div>
     </div>
+    <button class="partners__pause" type="button" data-marquee-pause>Остановить ленту</button>
   </div>
 </section>
 {% endif %}

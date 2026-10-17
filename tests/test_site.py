@@ -1,7 +1,7 @@
 """Публичная часть: главная, музыкальный маршрут, страницы, новости, поиск."""
 from conftest import create_event, png, text
 
-from filarmonia.models import db, Category, Event, News, Page
+from filarmonia.models import db, Category, Event, News, Page, Setting
 
 
 def test_home_blocks(admin):
@@ -109,3 +109,21 @@ def test_static_versioned_and_cached(app):
     assert "site.css?v=" in html
     r = app.test_client().get("/static/css/site.css")
     assert "max-age=2592000" in r.headers.get("Cache-Control", "")
+
+
+def test_hero_has_no_next_event_card(app, admin):
+    create_event(admin, title="Ближний концерт", ticket_url="https://tickets.example/1")
+    assert "hero__next" not in text(app.test_client().get("/"))
+
+
+def test_metrika_counter_only_for_visitors(app, admin):
+    with app.app_context():
+        Setting.set("yandex_metrika_id", "12345678")
+        db.session.commit()
+    assert 'data-metrika="12345678"' in text(app.test_client().get("/"))
+    # Сотрудники статистику не портят
+    assert "data-metrika" not in text(admin.get("/"))
+    with app.app_context():
+        Setting.set("yandex_metrika_id", "12345678<script>")
+        db.session.commit()
+    assert "data-metrika" not in text(app.test_client().get("/"))

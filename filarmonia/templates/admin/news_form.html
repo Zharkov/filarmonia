@@ -1,6 +1,6 @@
 {% extends "admin/base.html" %}
 {% from "admin/_media.html" import media_manager %}
-{% from "admin/_form.html" import slug_field, form_actions %}
+{% from "admin/_form.html" import slug_field, form_actions, file_input %}
 {% block title %}{{ item.title or 'Новая новость' }}{% endblock %}
 {% block content %}
 <div class="page-head">
@@ -30,7 +30,8 @@
       <div class="field"><label for="published_at">Дата публикации</label>
         <input id="published_at" type="datetime-local" name="published_at"
                value="{{ item.published_at.strftime('%Y-%m-%dT%H:%M') if item.published_at }}"></div>
-      <div class="field"><label for="image">Фотография</label><input id="image" type="file" name="image" accept="image/*">
+      <div class="field"><label for="image">Фотография</label>
+        {{ file_input('image', 'image', size='Рекомендуемый размер — 1920×1080 (16:9).') }}
         {% if item.image %}<img src="/static/uploads/{{ item.image }}" alt="" style="max-width:150px;margin-top:8px">{% endif %}</div>
     </div>
     <div class="field"><label for="lead">Короткий анонс</label>
@@ -41,6 +42,36 @@
 </form>
 {% if item.id %}
   {{ media_manager('news', item.id, item.media) }}
+  <section id="documents" class="panel">
+    <h2 style="margin-top:0">Документы к новости</h2>
+    <p class="hint" style="margin-bottom:16px">Выводятся под текстом новости списком со значками.
+      PDF и сканы (jpg, png) посетитель открывает прямо на сайте, Word и Excel — скачивает.</p>
+    {% if item.documents %}
+      <div class="table-wrap" style="margin-bottom:18px">
+        <table>
+          {% for d in item.documents %}
+            <tr><td><a href="{{ d.href }}" target="_blank">{{ d.title }}</a>
+                <div class="hint">{{ d.ext or 'ссылка' }}{% if d.size_kb %} · {{ d.size_kb }} КБ{% endif %}</div></td>
+              <td style="width:1%">
+                <form method="post" action="{{ url_for('admin.news_document_delete', doc_id=d.id) }}" data-confirm="Открепить документ от новости?">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn--danger btn--sm" type="submit">Удалить</button></form></td></tr>
+          {% endfor %}
+        </table>
+      </div>
+    {% endif %}
+    <form method="post" action="{{ url_for('admin.news_document_add', item_id=item.id) }}" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="grid grid--3">
+        <div class="field"><label for="nd-title">Название</label>
+          <input id="nd-title" type="text" name="title" placeholder="По умолчанию — имя файла"></div>
+        <div class="field"><label for="nd-file">Файл</label>
+          {{ file_input('nd-file', 'file', ('doc', 'image')) }}</div>
+        <div class="field"><label for="nd-url">Или внешняя ссылка</label><input id="nd-url" type="url" name="url"></div>
+      </div>
+      <button class="btn btn--primary" type="submit">Прикрепить документ</button>
+    </form>
+  </section>
   <section class="panel">
     <form method="post" action="{{ url_for('admin.news_delete', item_id=item.id) }}" data-confirm="Удалить новость?">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

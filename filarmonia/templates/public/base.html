@@ -1,5 +1,5 @@
 <!doctype html>
-{% from "public/_macros.html" import social_links %}
+{% from "public/_macros.html" import social_links, icon %}
 <html lang="ru">
 <head>
 <meta charset="utf-8">
@@ -28,7 +28,7 @@
 <meta property="og:url" content="{{ canonical }}">
 {% block og_image %}{% endblock %}
 <meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#1e2430">
+<meta name="theme-color" content="#002f55">
 
 <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
 {#- Кириллица основного шрифта нужна на любой странице: браузер начинает её
@@ -38,25 +38,12 @@
 {% block head %}{% endblock %}
 </head>
 {#- Ключ и регион Яндекс Афиши: по ним site.js подключает окно покупки билетов -#}
-<body{% if settings.get('yandex_client_key') %} data-ya-key="{{ settings.get('yandex_client_key') }}" data-ya-region="{{ settings.get('yandex_region_id', '12') }}"{% endif %}>
+{#- Счётчик Яндекс Метрики подключает site.js по номеру из «Настроек» (только цифры) -#}
+{% set metrika = (settings.get('yandex_metrika_id') or '') | trim %}
+<body{% if settings.get('yandex_client_key') %} data-ya-key="{{ settings.get('yandex_client_key') }}" data-ya-region="{{ settings.get('yandex_region_id', '12') }}"{% endif %}
+      {%- if metrika.isdigit() and not g.get('user') %} data-metrika="{{ metrika }}"{% endif %}>
 
 <a class="skip-link" href="#main">Перейти к содержимому</a>
-
-<div class="topbar">
-  <div class="wrap topbar__row">
-    <div class="topbar__links">
-      <a href="tel:{{ settings.get('phone_raw', '+74812383181') }}">{{ settings.get('phone', '+7 (4812) 38-31-81') }}</a>
-      <span class="topbar__wide">{{ settings.get('address_short', 'Смоленск, ул. Глинки, 3') }}</span>
-    </div>
-    <div class="topbar__links">
-      {#- На телефоне эти ссылки переезжают в меню, адрес и соцсети есть в подвале -#}
-      <span class="topbar__wide">{{ social_links(settings, 'social--top') }}</span>
-      <a class="topbar__wide" href="{{ url_for('public.appeals') }}">Обращения граждан</a>
-      <a class="topbar__wide" href="{{ url_for('public.documents') }}">Документы</a>
-      <button class="a11y__btn a11y__btn--onDark" data-a11y-toggle aria-expanded="false">Версия для слабовидящих</button>
-    </div>
-  </div>
-</div>
 
 <div class="a11y" data-a11y>
   <div class="wrap a11y__row">
@@ -78,6 +65,9 @@
   </div>
 </div>
 
+{#- Шапка в две полосы: белая с логотипом, поиском и контактами, под ней
+    меню на синем фоне. Меню прилипает к верху экрана при прокрутке, поэтому
+    стоит после шапки, а не внутри неё: липкий элемент не выходит за пределы родителя. -#}
 <header class="header">
   <div class="wrap header__row">
     <a class="logo" href="{{ url_for('public.index') }}">
@@ -86,36 +76,70 @@
       <span class="logo__text" aria-hidden="true">{{ site_name }}</span>
     </a>
 
-    <nav class="nav" data-nav aria-label="Главное меню">
-      <ul class="nav__list">
-        {% for item in main_menu %}
-          <li class="nav__item">
-            <a class="nav__link" href="{{ item.href }}">{{ item.title }}</a>
-            {% if item.children %}
-              <ul class="nav__sub">
-                {% for child in item.children if child.is_published %}
-                  <li><a href="{{ child.href }}">{{ child.title }}</a></li>
-                {% endfor %}
-              </ul>
-            {% endif %}
-          </li>
-        {% endfor %}
-        {#- Дубли ссылок служебной полосы: видны в меню только на телефоне -#}
-        <li class="nav__item nav__item--narrow"><a class="nav__link" href="{{ url_for('public.appeals') }}">Обращения граждан</a></li>
-        <li class="nav__item nav__item--narrow"><a class="nav__link" href="{{ url_for('public.documents') }}">Документы</a></li>
-      </ul>
-    </nav>
+    <form class="search" action="{{ url_for('public.search') }}" method="get" role="search">
+      <label class="visually-hidden" for="site-search">Поиск по сайту</label>
+      <input class="search__input" id="site-search" type="search" name="q" placeholder="Поиск по сайту"
+             value="{{ request.args.get('q','') }}">
+      <button class="search__btn" type="submit" aria-label="Найти">{{ icon('search') }}</button>
+    </form>
 
-    <div class="header__tools">
-      <form class="search" action="{{ url_for('public.search') }}" method="get" role="search">
-        <label class="visually-hidden" for="site-search">Поиск по сайту</label>
-        <input class="search__input" id="site-search" type="text" name="q" placeholder="Поиск"
-               value="{{ request.args.get('q','') }}">
-      </form>
-      <button class="icon-btn burger" data-burger aria-expanded="false" aria-label="Меню">≡</button>
+    {#- Версия для слабовидящих — значок сразу за поиском, отдельно от соцсетей -#}
+    <button class="a11y-toggle" type="button" data-a11y-toggle aria-expanded="false"
+            aria-label="Версия для слабовидящих" title="Версия для слабовидящих">{{ icon('eye') }}</button>
+
+    <div class="header__contacts">
+      <a class="header__phone" href="tel:{{ settings.get('phone_raw', '+74812383181') }}">{{ settings.get('phone', '+7 (4812) 38-31-81') }}</a>
+      <span class="header__addr">{{ settings.get('address_short', 'Смоленск, ул. Глинки, 3') }}</span>
+      {#- На средних экранах ссылка не помещается в полосу меню и встаёт сюда вместо адреса -#}
+      <a class="header__nok" href="{{ url_for('public.page', slug='nezavisimaya-ocenka-kachestva') }}">Независимая оценка качества</a>
+    </div>
+
+    <div class="header__icons">
+      {{ social_links(settings, 'social--header') }}
+      {#- На телефоне номер кассы из шапки убран — вместо него звонок одним касанием -#}
+      <a class="icon-btn header__call" href="tel:{{ settings.get('phone_raw', '+74812383181') }}"
+         aria-label="Позвонить в кассу: {{ settings.get('phone', '+7 (4812) 38-31-81') }}">{{ icon('phone') }}</a>
+      <button class="icon-btn burger" data-burger aria-expanded="false" aria-controls="main-nav" aria-label="Меню">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+          <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
     </div>
   </div>
 </header>
+
+<nav class="nav" id="main-nav" data-nav aria-label="Главное меню">
+  <ul class="wrap nav__list">
+    {#- В раскрытом меню телефона первой строкой — касса -#}
+    <li class="nav__item nav__item--phone">
+      <a class="nav__link" href="tel:{{ settings.get('phone_raw', '+74812383181') }}">{{ icon('phone') }} Касса: {{ settings.get('phone', '+7 (4812) 38-31-81') }}</a>
+    </li>
+    {% for item in main_menu %}
+      {#- На телефоне подменю свёрнуты; раздел, в котором находится посетитель, раскрыт -#}
+      {% set here = item.children and request.path in item.children | map(attribute='href') | list %}
+      <li class="nav__item {{ 'nav__item--has-sub' if item.children }} {{ 'is-open' if here }}">
+        <a class="nav__link" href="{{ item.href }}">{{ item.title }}
+          {%- if item.children %}<svg class="nav__caret" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" focusable="false"><path d="m2.5 4.5 3.5 3.5 3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>{% endif -%}
+        </a>
+        {% if item.children %}
+          <button class="nav__toggle" type="button" data-nav-toggle aria-expanded="{{ 'true' if here else 'false' }}"
+                  aria-label="Подразделы: {{ item.title }}">
+            <svg viewBox="0 0 12 12" width="14" height="14" aria-hidden="true" focusable="false"><path d="m2.5 4.5 3.5 3.5 3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <ul class="nav__sub">
+            {% for child in item.children if child.is_published %}
+              <li><a href="{{ child.href }}">{{ child.title }}</a></li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </li>
+    {% endfor %}
+    {#- Обязательная ссылка — у правого края полосы меню, на телефоне последним пунктом -#}
+    <li class="nav__item nav__item--aside"><a class="nav__link" href="{{ url_for('public.page', slug='nezavisimaya-ocenka-kachestva') }}">Независимая оценка качества</a></li>
+  </ul>
+</nav>
+
+{% if notices %}{% include "public/_notices.html" %}{% endif %}
 
 {% block hero %}{% endblock %}
 
@@ -146,16 +170,18 @@
   <div class="wrap">
     <div class="footer__cols">
       <div>
-        <h4>{{ site_name }}</h4>
+        <h2>{{ site_name }}</h2>
         <p class="footer__text">{{ settings.get('address', '214000, г. Смоленск, ул. Глинки, д. 3') }}</p>
         <p class="footer__text">
           Касса: <a href="tel:{{ settings.get('phone_raw', '+74812383181') }}">{{ settings.get('phone', '+7 (4812) 38-31-81') }}</a><br>
           <a href="mailto:{{ settings.get('email', 'info@smolensk-filarmonia.ru') }}">{{ settings.get('email', 'info@smolensk-filarmonia.ru') }}</a>
         </p>
+        {#- Когда звонить — рядом с телефоном -#}
+        {% if settings.get('work_hours') %}<p class="footer__text footer__hours">{{ settings.get('work_hours') }}</p>{% endif %}
         {{ social_links(settings, 'social--footer') }}
       </div>
       <div>
-        <h4>Зрителю</h4>
+        <h2>Зрителю</h2>
         <ul>
           <li><a href="{{ url_for('public.afisha') }}">Афиша</a></li>
           <li><a href="{{ url_for('public.collectives') }}">Коллективы и артисты</a></li>
@@ -166,7 +192,7 @@
         </ul>
       </div>
       <div>
-        <h4>Учреждение</h4>
+        <h2>Учреждение</h2>
         <ul>
           <li><a href="{{ url_for('public.documents') }}">Документы</a></li>
           <li><a href="{{ url_for('public.page', slug='protivodeystvie-korrupcii') }}">Противодействие коррупции</a></li>
@@ -176,7 +202,7 @@
         </ul>
       </div>
       <div>
-        <h4>Обязательные ссылки</h4>
+        <h2>Обязательные ссылки</h2>
         <ul>
           <li><a href="https://www.gosuslugi.ru" rel="noopener" target="_blank">Госуслуги</a></li>
           <li><a href="https://bus.gov.ru" rel="noopener" target="_blank">bus.gov.ru</a></li>
@@ -187,6 +213,7 @@
     </div>
     <div class="footer__bottom">
       <span>© {{ now.year }} {{ site_name }}</span>
+      <span><a href="{{ url_for('public.site_map') }}">Карта сайта</a></span>
       <span><a href="{{ url_for('admin.login') }}">Вход для сотрудников</a></span>
     </div>
   </div>
@@ -204,6 +231,18 @@
   <div class="modal__box modal__box--wide">
     <button class="modal__close" type="button" aria-label="Закрыть">×</button>
     <img src="" alt="">
+  </div>
+</div>
+
+{#- Просмотр PDF без скачивания: файл открывается встроенным просмотрщиком браузера -#}
+<div class="modal" id="doc-viewer" role="dialog" aria-modal="true" aria-labelledby="doc-viewer-title">
+  <div class="modal__box docview">
+    <div class="docview__head">
+      <span class="docview__title" id="doc-viewer-title"></span>
+      <a class="docview__tab" href="" target="_blank" rel="noopener" data-doc-tab>Открыть в новой вкладке</a>
+      <button class="modal__close docview__close" type="button" aria-label="Закрыть">×</button>
+    </div>
+    <iframe class="docview__frame" title="Просмотр документа" src="about:blank"></iframe>
   </div>
 </div>
 

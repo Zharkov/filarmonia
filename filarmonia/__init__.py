@@ -27,6 +27,7 @@ JINJA_FILTERS = {
     "video_embed": lambda url: Markup(utils.video_embed(url)),
     "srcset": utils.srcset,
     "msk": utils.to_moscow,
+    "qr_svg": utils.qr_svg,
 }
 
 # Статика кэшируется браузером надолго: имена загруженных файлов уникальны,
@@ -98,6 +99,8 @@ def create_app(**config_overrides) -> Flask:
     app.jinja_env.filters.update(JINJA_FILTERS)
     # Микроразметка Schema.org: {{ schema.event(ev, settings) | tojson }}
     app.jinja_env.globals["schema"] = schema
+    # Ограничения полей загрузки в панели: {{ upload_rules(('image',)).text }}
+    app.jinja_env.globals["upload_rules"] = utils.upload_rules
 
     from .public import bp as public_bp
     from .admin import bp as admin_bp

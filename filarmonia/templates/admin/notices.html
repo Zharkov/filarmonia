@@ -1,0 +1,60 @@
+{% extends "admin/base.html" %}
+{% from "admin/_table.html" import publish_toggle %}
+{% block title %}Изменения в афише{% endblock %}
+{% block content %}
+<h1>Изменения в афише</h1>
+<p class="subtitle">Отмены, переносы концертов, смена площадки. Пока есть хотя бы одно действующее изменение,
+  на главной и в афише под меню показывается плашка «Изменения в афише»; посетитель может её свернуть или закрыть.
+  После даты «Показывать до» запись пропадает с сайта сама.</p>
+
+{% set e = edit %}
+<section class="panel {{ 'panel--editing' if e }}" style="margin-top:20px" id="form">
+  <h2 style="margin-top:0">{{ 'Изменить запись' if e else 'Добавить изменение' }}</h2>
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% if e %}<input type="hidden" name="id" value="{{ e.id }}">{% endif %}
+    <div class="grid grid--4">
+      <div class="field"><label for="n-kind">Вид</label>
+        <select id="n-kind" name="kind">
+          {% for value, label in kinds %}<option value="{{ value }}" {{ 'selected' if e and e.kind == value }}>{{ label }}</option>{% endfor %}
+        </select></div>
+      <div class="field"><label for="n-until">Показывать до (включительно)</label>
+        <input id="n-until" type="date" name="show_until" value="{{ e.show_until.date().isoformat() if e and e.show_until }}">
+        <div class="hint">Обычно — дата концерта. Пусто — пока не снимете.</div></div>
+      <div class="field"><label for="n-url">Ссылка «Подробнее»</label>
+        <input id="n-url" type="text" name="url" value="{{ e.url if e }}" placeholder="/afisha/…">
+        <div class="hint">Адрес страницы концерта на сайте или полный адрес с https://</div></div>
+      <div class="field"><label for="n-sort">Порядок</label>
+        <input id="n-sort" type="number" name="sort" value="{{ e.sort if e else 100 }}"></div>
+    </div>
+    <div class="field"><label for="n-text">Текст *</label>
+      <textarea id="n-text" name="text" maxlength="500" style="min-height:70px" required
+                placeholder="Концерт «Органный вечер» 20 октября переносится на 3 ноября. Билеты действительны.">{{ e.text if e }}</textarea></div>
+    <div class="checkline"><input id="np" type="checkbox" name="is_published" {{ 'checked' if not e or e.is_published }}><label for="np">Показывать на сайте</label></div>
+    <button class="btn btn--primary" type="submit">{{ 'Сохранить изменения' if e else 'Добавить' }}</button>
+    {% if e %}<a class="btn btn--ghost" href="{{ url_for('admin.notices') }}">Отмена</a>{% endif %}
+  </form>
+</section>
+
+<div class="table-wrap" style="margin-top:20px">
+  <table>
+    <tr><th>Вид</th><th>Текст</th><th>Показывать до</th><th>Порядок</th><th>Статус</th><th></th></tr>
+    {% for n in items %}
+      <tr id="row-{{ n.id }}" class="{{ 'is-editing' if e and e.id == n.id }}">
+        <td>{{ n.kind_label }}</td>
+        <td>{{ n.text }}{% if n.url %}<div class="hint"><a href="{{ n.url }}" target="_blank">{{ n.url | truncate(60) }}</a></div>{% endif %}</td>
+        <td>{{ n.show_until | ru_date if n.show_until else 'без срока' }}
+          {% if n.is_published and n.id not in active_ids %}<div class="hint">срок истёк — на сайте не видно</div>{% endif %}</td>
+        <td>{{ n.sort }}</td>
+        <td>{{ publish_toggle('notice', n, 'показывается', 'скрыто') }}</td>
+        <td><div class="row-actions">
+          <a class="btn btn--ghost btn--sm" href="{{ url_for('admin.notices', edit=n.id) }}#form">Изменить</a>
+          <form method="post" action="{{ url_for('admin.notice_delete', item_id=n.id) }}" data-confirm="Удалить запись?">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn--danger btn--sm" type="submit">Удалить</button></form>
+        </div></td>
+      </tr>
+    {% else %}<tr><td colspan="6">Изменений нет — плашка на сайте не показывается.</td></tr>{% endfor %}
+  </table>
+</div>
+{% endblock %}

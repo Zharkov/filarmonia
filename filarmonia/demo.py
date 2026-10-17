@@ -255,6 +255,37 @@ def photo(name, caption, seed, size=(1600, 1000)):
     return name
 
 
+def document_pdf(name, title, section, year):
+    """Одностраничный PDF формата A4 — заглушка документа для раздела «Документы».
+
+    Нужен настоящий файл: по расширению сайт показывает значок PDF
+    и открывает документ в окне просмотра.
+    """
+    w, h = 1240, 1754                     # A4 при 150 точках на дюйм
+    img = Image.new("RGB", (w, h), (255, 255, 255))
+    d = ImageDraw.Draw(img)
+    margin = 130
+    f_small = font(SANS, 30)
+    d.text((margin, margin), "ОГБУК «Смоленская областная филармония»", font=f_small, fill=(90, 96, 110))
+    d.line([margin, margin + 60, w - margin, margin + 60], fill=(0, 47, 85), width=3)
+    f_title, lines, size = fitted(d, title, SERIF_BOLD, 64, w - margin * 2, 4, min_size=36)
+    y = margin + 140
+    for line in lines:
+        d.text((margin, y), line, font=f_title, fill=(30, 36, 48))
+        y += size + 18
+    d.text((margin, y + 20), f"{section} · {year or ''}".rstrip(" ·"), font=f_small, fill=(90, 96, 110))
+    # Строки «текста» — серые полосы разной длины
+    rnd = random.Random(title)
+    y += 120
+    while y < h - margin - 40:
+        d.rectangle([margin, y, margin + rnd.randint(int((w - margin * 2) * .55), w - margin * 2), y + 14],
+                    fill=(222, 224, 228))
+        y += rnd.choice((40, 40, 40, 80))
+    d.text((margin, h - margin), "Демонстрационный документ", font=f_small, fill=(160, 164, 172))
+    img.save(os.path.join(OUT, name), "PDF", resolution=150)
+    return name
+
+
 def hero_video(image_name, video_name):
     """Короткий цикл с медленным наездом — заглушка для видео на главной.
 

@@ -51,7 +51,8 @@ PUBLIC_CSP_REPORT = "; ".join((
     "img-src 'self' data: https:",
     "media-src 'self' https:",
     "font-src 'self' data:",
-    "frame-src https:",
+    # 'self' — окно просмотра PDF из загрузок сайта
+    "frame-src 'self' https:",
     "connect-src 'self' https:",
     "report-uri /csp-report",
 ))

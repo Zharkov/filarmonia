@@ -6,39 +6,57 @@
 {% block content %}
 <div class="wrap">
   <h1>{{ item.name }}</h1>
-  {% if item.lead %}<p class="lead">{{ item.lead }}</p>{% endif %}
 
-  {% set photos, videos = item.photos, item.videos %}
+  {#- Две колонки: слева рассказ, галерея и видео, справа липкая карточка
+      «Пригласить коллектив» — за ней на страницу приходят организаторы.
+      Без контактов карточки нет, и рассказ занимает всю ширину. -#}
+  <div class="collective-page {{ 'collective-page--solo' if not item.contacts }}">
+    <div class="collective-page__main">
+      {% if item.lead %}<p class="lead">{{ item.lead }}</p>{% endif %}
 
-  {% if photos %}
-    <div class="gallery-grid gallery-grid--spaced">
-      {% for p in photos %}
-        <a href="{{ p.src }}" data-photo="{{ p.src }}" data-photo-alt="{{ item.name }}">
-          <img {{ img_src(p.src, '(max-width: 620px) 50vw, 25vw') }} alt="{{ p.title or item.name }}" loading="lazy">
-        </a>
-      {% endfor %}
-    </div>
-  {% endif %}
+      {% set photos, videos = item.photos, item.videos %}
 
-  <div class="prose">{{ item.description | safe }}</div>
-
-  {% if videos %}
-    <h2 id="video">Видео</h2>
-    <div class="video-grid">
-      {% for v in videos %}
-        <div class="video-frame">
-          {% if v.embed %}{{ v.embed | safe }}
-          {% elif v.url %}{{ v.url | video_embed }}
-          {% elif v.file %}<video controls preload="metadata" src="/static/uploads/{{ v.file }}"></video>{% endif %}
+      {% if photos %}
+        <div class="gallery-grid gallery-grid--spaced">
+          {% for p in photos %}
+            <a href="{{ p.src }}" data-photo="{{ p.src }}" data-photo-alt="{{ item.name }}">
+              <img {{ img_src(p.src, '(max-width: 620px) 50vw, 25vw') }} alt="{{ p.title or item.name }}" loading="lazy">
+            </a>
+          {% endfor %}
         </div>
-      {% endfor %}
-    </div>
-  {% endif %}
+      {% endif %}
 
-  {% if item.contacts %}
-    <h2>Контакты</h2>
-    <div class="prose">{{ item.contacts | safe }}</div>
-  {% endif %}
+      <div class="prose">{{ item.description | safe }}</div>
+
+      {% if videos %}
+        <h2 id="video">Видео</h2>
+        <div class="video-grid">
+          {% for v in videos %}
+            <div class="video-frame">
+              {% if v.embed %}{{ v.embed | safe }}
+              {% elif v.url %}{{ v.url | video_embed }}
+              {% elif v.file %}<video controls preload="metadata" src="/static/uploads/{{ v.file }}"></video>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+
+    {% if item.contacts %}
+      <aside class="invite" aria-labelledby="invite-title">
+        <h2 id="invite-title">Пригласить коллектив</h2>
+        <div class="prose">{{ item.contacts | safe }}</div>
+        {% if events %}
+          {% set next_ev = events[0] %}
+          <div class="invite__next">
+            <span class="invite__label">Ближайшее выступление</span>
+            <a href="{{ next_ev.url }}">{{ next_ev.title }}</a>
+            <span class="invite__when">{{ next_ev.starts_at | ru_date }}, {{ next_ev.starts_at.strftime('%H:%M') }}</span>
+          </div>
+        {% endif %}
+      </aside>
+    {% endif %}
+  </div>
 
   {% if events %}
     <section class="section">

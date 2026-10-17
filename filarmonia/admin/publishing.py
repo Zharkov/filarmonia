@@ -1,7 +1,7 @@
 """Публикация и снятие с сайта прямо из таблиц разделов."""
 from flask import request, redirect, url_for, flash, abort, jsonify
 
-from ..models import db, Event, Collective, News, Page, MenuItem, Document, Banner
+from ..models import db, Event, Collective, News, Page, MenuItem, Document, Banner, AfishaNotice
 from . import bp
 from .common import get_or_404, log, login_required, safe_next, title_of
 
@@ -16,6 +16,7 @@ PUBLISH_TOGGLES = {
     "document": (Document, "admin.documents"),
     "banner": (Banner, "admin.banners"),
     "menu": (MenuItem, "admin.menu"),
+    "notice": (AfishaNotice, "admin.notices"),
 }
 
 

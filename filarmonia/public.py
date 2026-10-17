@@ -9,8 +9,8 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import joinedload, selectinload
 
 from .models import (
-    db, Event, Venue, Category, Collective, News, Page, Document,
-    Banner, Appeal, Setting,
+    db, Event, Venue, Category, Collective, News, Page, Document, MenuItem,
+    Banner, Appeal, Setting, Festival, AfishaNotice, DOCUMENT_TEMPLATES,
 )
 from . import throttle, utils
 from .web import site_url
@@ -56,6 +56,7 @@ def cards():
     """
     return Event.query.options(
         joinedload(Event.venue), joinedload(Event.category), selectinload(Event.media),
+        selectinload(Event.festivals),
     )
 
 
@@ -115,6 +116,7 @@ def index():
         route_questions=ROUTE_QUESTIONS,
         answers=answers,
         route=route,
+        notices=AfishaNotice.active(),
     )
 
 
@@ -204,6 +206,25 @@ def _day_strip(days: int = 21):
     ]
 
 
+def _periods(today: date) -> list:
+    """Быстрые периоды афиши: (название, с, по). Заменяют ручной ввод двух дат."""
+    sunday = today + timedelta(days=6 - today.weekday())
+    saturday = max(today, sunday - timedelta(days=1))
+    next_month = (today.replace(day=28) + timedelta(days=4)).replace(day=1)
+    return [
+        ("Сегодня", today, today),
+        ("Выходные", saturday, sunday),
+        ("Эта неделя", today, sunday),
+        ("Этот месяц", today, next_month - timedelta(days=1)),
+    ]
+
+
+# Поля фильтра, которые на телефоне свёрнуты в панель «Фильтры»: их число
+# показывается на кнопке, чтобы было видно, что фильтр включён.
+# Пара дат «с» и «по» считается одним фильтром
+PANEL_FILTERS = ("venue", "category", "price", "q")
+
+
 def _day_start(day: date) -> datetime:
     return datetime.combine(day, datetime.min.time())
 
@@ -276,7 +297,11 @@ def afisha():
         categories=Category.query.order_by(Category.sort).all(),
         day_strip=_day_strip(CALENDAR_DAYS),
         selected_day=day,
+        periods=_periods(utils.now_msk().date()),
+        panel_count=sum(1 for key in PANEL_FILTERS if request.args.get(key))
+                    + (1 if date_from or date_to else 0) + (1 if sort not in ("", "date") else 0),
         args=request.args,
+        notices=AfishaNotice.active(),
     )
 
 
@@ -286,6 +311,19 @@ def event(slug):
     check_published(ev, url_for("admin.event_form", event_id=ev.id))
     similar = upcoming_cards().filter(Event.id != ev.id).limit(SIMILAR_EVENTS).all()
     return render_template("public/event.html", ev=ev, similar=similar)
+
+
+@bp.route("/festivali/<slug>")
+def festival(slug):
+    """Страница фестиваля: описание и его концерты — сначала предстоящие, ниже прошедшие."""
+    fest = Festival.query.filter_by(slug=slug).first_or_404()
+    concerts = cards().filter(Event.is_published.is_(True), Event.festivals.any(id=fest.id))
+    now = utils.now_msk()
+    upcoming = concerts.filter(Event.starts_at >= now).order_by(Event.starts_at).all()
+    past = concerts.filter(Event.starts_at < now).order_by(Event.starts_at.desc()).limit(SIMILAR_EVENTS).all()
+    if g.get("user"):
+        g.edit_url = url_for("admin.refs", festival=fest.id, _anchor="festival-form")
+    return render_template("public/festival.html", fest=fest, upcoming=upcoming, past=past)
 
 
 @bp.route("/kartochki-afishi")
@@ -342,7 +380,8 @@ def news_item(slug):
         .limit(3)
         .all()
     )
-    return render_template("public/news_item.html", item=item, other=other)
+    documents = [d for d in item.documents if d.is_published]
+    return render_template("public/news_item.html", item=item, other=other, documents=documents)
 
 
 # Страницы и документы
@@ -359,10 +398,10 @@ def page(slug):
     pg = Page.query.filter_by(slug=slug).first_or_404()
     check_published(pg, url_for("admin.page_form", item_id=pg.id))
     documents, venues, events, afisha_filter = [], [], [], None
-    if pg.template == "documents":
+    if pg.has_documents:
         documents = (
-            Document.query.filter_by(is_published=True, category=pg.title)
-            .order_by(Document.sort, Document.year.desc())
+            Document.query.filter_by(is_published=True, category=pg.title, news_id=None)
+            .order_by(Document.sort, Document.year.desc(), Document.id)
             .all()
         )
     elif pg.template == "contacts":
@@ -373,17 +412,68 @@ def page(slug):
         afisha_filter = FLAGGED_PAGES[pg.template][1]
         events = upcoming_cards(pg.template).limit(CAROUSEL_BATCH).all()
     return render_template("public/page.html", pg=pg, documents=documents, venues=venues,
-                           events=events, afisha_filter=afisha_filter)
+                           events=events, afisha_filter=afisha_filter,
+                           in_documents=_in_documents(pg))
+
+
+def _documents_menu():
+    """Пункт «Документы» главного меню: его подпункты — подразделы документов."""
+    return MenuItem.query.filter_by(url="/dokumenty", parent_id=None).first()
+
+
+def _in_documents(pg) -> bool:
+    """Стоит ли страница в разделе «Документы» — для хлебных крошек.
+
+    Решает подменю «Документы»: «Независимая оценка качества» тоже страница
+    со списком документов, но по требованию заказчика вынесена из раздела
+    в меню отдельной ссылкой. Без такого пункта меню — любая страница документов.
+    """
+    if pg.parent or not pg.has_documents:
+        return False
+    parent = _documents_menu()
+    if parent is None:
+        return True
+    return any(c.page_id == pg.id for c in parent.children)
 
 
 @bp.route("/dokumenty")
 def documents():
-    rows = (
-        Document.query.filter_by(is_published=True)
-        .order_by(Document.category, Document.sort, Document.title)
-        .all()
-    )
-    return render_template("public/documents.html", grouped=utils.group_by_category(rows))
+    """Оглавление документов: только названия подразделов, сами списки — внутри.
+
+    Состав и порядок берутся из подпунктов «Документы» главного меню: редактор
+    правит их в разделе «Меню», и плитки здесь совпадают с выпадающим списком.
+    Если такого пункта меню нет — все опубликованные страницы со списком документов.
+    """
+    parent = _documents_menu()
+    sections = []
+    if parent is not None:
+        sections = [
+            {"title": c.title, "href": c.href, "slug": c.page.slug if c.page else ""}
+            for c in sorted(parent.children, key=lambda c: (c.sort or 0, c.id))
+            if c.is_published and (c.page is None or c.page.is_published)
+        ]
+    if not sections:
+        sections = [
+            {"title": p.title, "href": p.url, "slug": p.slug}
+            for p in Page.query.filter(Page.template.in_(DOCUMENT_TEMPLATES), Page.is_published.is_(True))
+            .order_by(Page.sort, Page.title)
+        ]
+    return render_template("public/documents.html", sections=sections)
+
+
+# Карта сайта для посетителей
+@bp.route("/karta-sajta")
+def site_map():
+    """Все разделы сайта списком: главное меню, затем страницы, которых в меню нет."""
+    linked = {
+        page_id for (page_id,) in db.session.query(MenuItem.page_id).filter(MenuItem.page_id.isnot(None))
+    }
+    q = Page.query.filter(Page.is_published.is_(True))
+    if linked:
+        q = q.filter(Page.id.notin_(linked))
+    other = q.order_by(Page.title).all()
+    festivals = Festival.query.order_by(Festival.sort, Festival.name).all()
+    return render_template("public/site_map.html", other=other, festivals=festivals)
 
 
 # Интернет-приёмная
@@ -391,6 +481,18 @@ def documents():
 # не забивали роботы. Счётчик общий для всех процессов сайта.
 def _appeal_key() -> str:
     return f"appeal:{request.remote_addr or ''}"
+
+
+def _appeal_back() -> str:
+    """Куда вернуть после отправки: форма стоит и на странице «Контакты».
+
+    Принимается только адрес страницы сайта вида /info/…, иначе поле
+    превратилось бы в перенаправление на чужой сайт.
+    """
+    back = request.form.get("back", "")
+    if back.startswith("/info/") and "//" not in back and "\\" not in back:
+        return back + "#feedback"
+    return url_for("public.appeals")
 
 
 def appeal_too_soon() -> bool:
@@ -405,13 +507,16 @@ def appeals():
             # Поле-приманка скрыто стилями: его заполняют только роботы.
             # Отвечаем как при успехе, чтобы не подсказывать, что письмо не ушло.
             flash("Обращение принято. Ответ придёт в течение 30 дней.", "ok")
-            return redirect(url_for("public.appeals"))
+            return redirect(_appeal_back())
         if appeal_too_soon():
             flash("Обращение уже отправлено. Следующее можно отправить через минуту.", "error")
         elif not request.form.get("consent"):
             flash("Без согласия на обработку персональных данных обращение отправить нельзя.", "error")
         elif not request.form.get("name") or not request.form.get("message"):
             flash("Заполните имя и текст обращения.", "error")
+        elif "@" not in request.form.get("email", "").strip()[1:-1]:
+            # Ответ на обращение уходит на почту — без адреса ответить некуда
+            flash("Укажите адрес электронной почты: на него будет направлен ответ.", "error")
         else:
             db.session.add(
                 Appeal(
@@ -426,7 +531,10 @@ def appeals():
             db.session.commit()
             throttle.hit(_appeal_key(), current_app.config["APPEAL_INTERVAL_SECONDS"])
             flash("Обращение принято. Ответ придёт в течение 30 дней.", "ok")
-            return redirect(url_for("public.appeals"))
+            return redirect(_appeal_back())
+        if request.form.get("back"):
+            # Ошибка в форме на «Контактах»: сообщение показываем там же
+            return redirect(_appeal_back())
     pg = Page.query.filter_by(slug="internet-priemnaya").first()
     return render_template("public/appeals.html", pg=pg)
 
@@ -480,7 +588,7 @@ def search():
 @bp.route("/sitemap.xml")
 def sitemap():
     urls = [(u, None) for u in ("/", "/afisha", "/kollektivy", "/novosti",
-                                "/dokumenty", "/obrashcheniya")]
+                                "/dokumenty", "/obrashcheniya", "/karta-sajta")]
     # Адрес строится из slug, дата изменения подсказывает поисковику,
     # что переобходить. У записей, созданных до появления поля updated_at,
     # берётся дата создания или публикации. Концерты старше года не включаем.
@@ -498,6 +606,7 @@ def sitemap():
             q = q.filter(condition)
         for slug, when in q:
             urls.append((prefix + slug, when))
+    urls += [(f.url, None) for f in Festival.query.order_by(Festival.sort)]
     body = render_template("public/sitemap.xml", urls=urls, host=site_url())
     resp = make_response(body)
     resp.headers["Content-Type"] = "application/xml; charset=utf-8"

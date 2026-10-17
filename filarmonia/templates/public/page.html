@@ -1,11 +1,33 @@
 {% extends "public/base.html" %}
-{% from "public/_macros.html" import event_carousel, img_src, breadcrumbs %}
+{% from "public/_macros.html" import event_carousel, img_src, breadcrumbs, document_list, icon, section_icon %}
 {% block title %}{{ pg.title }}{% endblock %}
 {% block description %}{{ pg.seo_description or pg.content | strip_tags(180) }}{% endblock %}
-{% block breadcrumbs %}{{ breadcrumbs([('Главная', url_for('public.index'))] + ([(pg.parent.title, pg.parent.url)] if pg.parent else []) + [(pg.title, None)]) }}{% endblock %}
+{% block breadcrumbs %}
+  {#- Подраздел из подменю «Документы» стоит в разделе «Документы» -#}
+  {% set section = (pg.parent.title, pg.parent.url) if pg.parent
+                   else (('Документы', url_for('public.documents')) if in_documents else None) %}
+  {{ breadcrumbs([('Главная', url_for('public.index'))] + ([section] if section else []) + [(pg.title, None)]) }}
+{% endblock %}
 {% block content %}
 <div class="wrap">
   <h1>{{ pg.title }}</h1>
+  {% if pg.template == 'nok' %}{% include "public/_nok.html" %}{% endif %}
+
+  {#- Адрес, телефон, почта и режим работы — из «Настроек», сразу под заголовком.
+      Текст страницы ниже — для того, чего в настройках нет: как добраться и т. п. -#}
+  {% if pg.template == 'contacts' %}
+    <section class="contacts">
+      <dl class="contacts__list">
+        {% if settings.get('address') %}<div><dt>Адрес</dt><dd>{{ settings.get('address') }}</dd></div>{% endif %}
+        {% if settings.get('phone') %}<div><dt>Телефон кассы</dt>
+          <dd><a href="tel:{{ settings.get('phone_raw', '') }}">{{ settings.get('phone') }}</a></dd></div>{% endif %}
+        {% if settings.get('email') %}<div><dt>Электронная почта</dt>
+          <dd><a class="contacts__email" href="mailto:{{ settings.get('email') }}">{{ settings.get('email') }}</a></dd></div>{% endif %}
+        {% if settings.get('work_hours') %}<div><dt>Режим работы</dt><dd>{{ settings.get('work_hours') }}</dd></div>{% endif %}
+      </dl>
+    </section>
+  {% endif %}
+
   <div class="prose">{{ pg.content | safe }}</div>
 
   {% set photos, videos = pg.photos, pg.videos %}
@@ -51,32 +73,49 @@
   {% endif %}
 
   {% if documents %}
-    <h2>Документы</h2>
-    <ul>
-      {% for d in documents %}
-        <li><a href="{{ d.href }}">{{ d.title }}</a>
-          <span class="hint">{% if d.year %}{{ d.year }}{% endif %}{% if d.size_kb %} · {{ d.size_kb }} КБ{% endif %}</span></li>
-      {% endfor %}
-    </ul>
+    {% if pg.template == 'nok' %}<h2 class="nok__docs">Результаты оценки и план по улучшению</h2>{% endif %}
+    {{ document_list(documents, by_year=pg.template in ('documents_years', 'nok')) }}
+  {% elif pg.has_documents %}
+    <p class="empty">Документы пока не загружены.</p>
   {% endif %}
 
-  {% for v in venues %}
-    <section class="section">
-      <h2>{{ v.name }}</h2>
-      {% if v.address %}<p>{{ v.address }}</p>{% endif %}
-      {% if v.description %}<div class="prose">{{ v.description | safe }}</div>{% endif %}
-      {% if v.map_embed %}<div class="map">{{ v.map_embed | safe }}</div>{% endif %}
+  {#- Площадки карточками: без карты — без пустого места под ней, с кнопкой маршрута -#}
+  {% if venues %}
+    <section class="venues">
+      <h2>Площадки</h2>
+      <div class="venues__grid">
+        {% for v in venues %}
+          <article class="venue {{ 'venue--map' if v.map_embed }}">
+            <h3>{{ v.name }}</h3>
+            {% if v.address %}<p class="venue__addr">{{ v.address }}</p>{% endif %}
+            {% if v.description %}<div class="prose">{{ v.description | safe }}</div>{% endif %}
+            {% if v.map_embed %}<div class="map">{{ v.map_embed | safe }}</div>
+            {% elif v.address %}
+              <a class="btn btn--ghost btn--sm" href="https://yandex.ru/maps/?text={{ v.address | urlencode }}"
+                 rel="noopener" target="_blank">{{ icon('pin') }} Маршрут</a>
+            {% endif %}
+          </article>
+        {% endfor %}
+      </div>
     </section>
-  {% endfor %}
+  {% endif %}
 
+  {% if pg.template == 'contacts' %}
+    <section class="section" id="feedback">
+      <h2>Обратная связь</h2>
+      <p class="hint">Обращение рассматривается в течение 30 дней со дня регистрации.</p>
+      {% include "public/_appeal_form.html" %}
+    </section>
+  {% endif %}
+
+  {#- Подразделы — карточками со значками, как на странице «Документы» -#}
   {% if pg.children %}
     <h2>Разделы</h2>
-    <ul>
+    <ul class="sections">
       {% for child in pg.children if child.is_published %}
-        <li><a href="{{ child.url }}">{{ child.title }}</a></li>
+        <li><a class="sections__item" href="{{ child.url }}">{{ section_icon(child.slug) }}<span>{{ child.title }}</span></a></li>
       {% endfor %}
     </ul>
   {% endif %}
-  <p class="hint">Обновлено: {{ pg.updated_at | ru_date }}</p>
 </div>
 {% endblock %}

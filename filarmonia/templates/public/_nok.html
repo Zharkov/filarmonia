@@ -1,0 +1,35 @@
+{#- Независимая оценка качества: приглашение пройти анкету Минкультуры.
+    Ссылки на анкету и на результаты — в «Настройках»; QR-код строится из ссылки сам. -#}
+{% set survey = settings.get('nok_survey_url', 'https://forms.mkrf.ru/e/2579/xTPLeBU7/') %}
+{% set results = settings.get('nok_results_url', 'https://bus.gov.ru/') %}
+<section class="nok" aria-labelledby="nok-title">
+  <div class="nok__main">
+    <p class="nok__kicker">Анкета Министерства культуры России</p>
+    <h2 class="nok__title" id="nok-title">Оцените работу филармонии</h2>
+    <p class="nok__lead">Дорогие зрители! Ответьте, пожалуйста, на вопросы короткой анонимной анкеты.
+      Ваши ответы помогут филармонии стать лучше, а Министерству культуры — получить честную
+      оценку работы учреждений культуры.</p>
+    <ol class="nok__steps">
+      <li><strong>Откройте анкету</strong> кнопкой ниже или наведите камеру телефона на QR-код.</li>
+      <li><strong>Во втором вопросе</strong> «Укажите вид организации, деятельность которой Вы оцениваете»
+        выберите <span class="nok__pick">«Концертная организация, концертный коллектив»</span>.</li>
+      <li><strong>Ответьте на вопросы</strong>, выбирая самый подходящий для вас вариант.</li>
+    </ol>
+    <div class="nok__actions">
+      <a class="btn btn--gold nok__go" href="{{ survey }}" target="_blank" rel="noopener">Пройти анкету</a>
+      {% if results %}<a class="btn btn--onDark" href="{{ results }}" target="_blank" rel="noopener">Результаты оценки на bus.gov.ru</a>{% endif %}
+    </div>
+  </div>
+  <figure class="nok__qr">
+    <a href="{{ survey }}" target="_blank" rel="noopener" tabindex="-1">{{ survey | qr_svg }}</a>
+    <figcaption>Наведите камеру телефона на код, чтобы открыть анкету</figcaption>
+  </figure>
+</section>
+
+<ul class="nok__facts">
+  <li><strong>Анонимно</strong><span>Анкета не спрашивает имя и контакты</span></li>
+  <li><strong>Несколько минут</strong><span>Вопросы с готовыми вариантами ответа</span></li>
+  <li><strong>Открыто</strong><span>Итоги независимой оценки публикуются на bus.gov.ru</span></li>
+</ul>
+
+<p class="nok__thanks">Спасибо за внимание и время, которое вы уделите анкете!</p>

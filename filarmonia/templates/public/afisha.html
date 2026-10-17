@@ -9,7 +9,18 @@
   <h1>Афиша</h1>
   {{ daystrip(day_strip, selected_day) }}
 
+  {#- На телефоне списки, даты и поиск свёрнуты в панель «Фильтры»: без неё форма
+      занимала экран до первого концерта. Быстрые периоды и метки — всегда на виду.
+      Без скрипта панель раскрыта. -#}
   <form class="filters" method="get" action="{{ url_for('public.afisha') }}">
+    <button class="btn btn--ghost filters__toggle" type="button" data-filters-toggle
+            aria-expanded="false" aria-controls="filters-more">
+      Фильтры{% if panel_count %} <span class="filters__count">{{ panel_count }}</span>{% endif %}
+    </button>
+    {#- Без скрипта кнопке нечего делать — панель раскрыта сразу -#}
+    <noscript><style>.filters__more { display: grid !important; } .filters__toggle { display: none !important; }
+      @media (min-width: 621px) { .filters__more { display: contents !important; } }</style></noscript>
+    <div class="filters__more" id="filters-more" data-filters-more>
     <select name="sort" data-autosubmit aria-label="Сортировка">
       <option value="date" {{ 'selected' if args.get('sort') in (None, '', 'date') }}>Сначала ближайшие</option>
       <option value="date_desc" {{ 'selected' if args.get('sort') == 'date_desc' }}>Сначала поздние</option>
@@ -31,8 +42,9 @@
       {% endfor %}
     </select>
 
-    <label class="hint">с <input type="date" name="from" value="{{ args.get('from','') }}" data-autosubmit></label>
-    <label class="hint">по <input type="date" name="to" value="{{ args.get('to','') }}" data-autosubmit></label>
+    {#- Даты отправляются, когда заполнены обе: иначе выбор первой перезагружал страницу -#}
+    <label class="hint">с <input type="date" name="from" value="{{ args.get('from','') }}" aria-label="Дата с" data-autosubmit></label>
+    <label class="hint">по <input type="date" name="to" value="{{ args.get('to','') }}" aria-label="Дата по" data-autosubmit></label>
 
     <select name="price" data-autosubmit aria-label="Цена">
       <option value="">Любая цена</option>
@@ -41,9 +53,18 @@
       <option value="1000" {{ 'selected' if args.get('price') == '1000' }}>до 1000 ₽</option>
     </select>
 
-    <input type="text" name="q" placeholder="Название или исполнитель" value="{{ args.get('q','') }}">
-    <button class="btn btn--primary btn--sm" type="submit">Найти</button>
+    <label class="visually-hidden" for="afisha-q">Поиск по названию или исполнителю</label>
+    <input id="afisha-q" type="search" name="q" placeholder="Название, исполнитель" value="{{ args.get('q','') }}">
+    <button class="btn btn--primary btn--sm" type="submit">Показать</button>
+    </div>
 
+    <div class="filters__chips">
+    {#- Период — ссылка с датами «с» и «по»; повторное нажатие снимает его -#}
+    {% for title, start, end in periods %}
+      {% set on = args.get('from') == start.isoformat() and args.get('to') == end.isoformat() %}
+      {% set period_args = dict(args.to_dict(), **{'from': '' if on else start.isoformat(), 'to': '' if on else end.isoformat(), 'day': '', 'page': ''}) %}
+      <a class="chip {{ 'chip--on' if on }}" href="{{ url_for('public.afisha', **period_args) }}">{{ title }}</a>
+    {% endfor %}
     {% set on_push = args.get('pushkin') == '1' %}
     {% set on_new = args.get('new') == '1' %}
     {% set on_ben = args.get('benefits') == '1' %}
@@ -56,12 +77,15 @@
     {% if args %}
       <a class="chip" href="{{ url_for('public.afisha') }}">Сбросить фильтры</a>
     {% endif %}
+    </div>
   </form>
 
   {% if selected_day %}
     <p class="hint">Показаны события на {{ selected_day | ru_date }}. <a href="{{ url_for('public.afisha') }}">Показать все</a></p>
   {% endif %}
 
+  {#- Заголовок для экранного диктора: строки афиши — h3, без него уровень h2 пропущен -#}
+  <h2 class="visually-hidden">Концерты</h2>
   {% if events.items %}
     {% for ev in events.items %}{{ event_row(ev) }}{% endfor %}
     {{ pagination(events, 'public.afisha', args.to_dict()) }}

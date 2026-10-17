@@ -1,6 +1,6 @@
 {% extends "admin/base.html" %}
 {% from "admin/_media.html" import media_manager %}
-{% from "admin/_form.html" import slug_field, form_actions %}
+{% from "admin/_form.html" import slug_field, form_actions, file_input %}
 {% block title %}{{ ev.title or 'Новое событие' }}{% endblock %}
 
 {% block content %}
@@ -59,10 +59,18 @@
     </div>
 
     <div class="grid grid--3">
-      <div class="field"><label for="yandex_id">ID сеанса в Яндекс Афише</label>
-        <input id="yandex_id" type="text" name="yandex_id" value="{{ ev.yandex_id or '' }}"
-               placeholder="ticketsteam-825@496249">
-        <div class="hint">Уникален для каждого концерта, предоставляется Яндекс Афишей. По нему кнопка «Купить билет» открывает окно покупки, а на странице события появляется схема зала с выбором мест.</div></div>
+      {#- Приставка до «@» общая для всех концертов — вводится только номер сеанса.
+          ID с другой приставкой показываем целиком, чтобы не потерять её. -#}
+      {%- set ya_prefix = (settings.get('yandex_session_prefix') or 'ticketsteam-825') ~ '@' %}
+      {%- set ya_value = ev.yandex_id or '' %}
+      {%- if ya_value.startswith(ya_prefix) %}{% set ya_value = ya_value[ya_prefix | length:] %}{% endif %}
+      <div class="field"><label for="yandex_id">Номер сеанса в Яндекс Афише</label>
+        <div class="slug-input">
+          <span class="slug-input__prefix">{{ ya_prefix }}</span>
+          <input id="yandex_id" type="text" name="yandex_id" value="{{ ya_value }}"
+                 inputmode="numeric" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="hint">Указываются цифры после «@». Номер уникален для каждого концерта и предоставляется Яндекс Афишей. По ним кнопка «Купить билет» открывает окно покупки, а на странице события появляется схема зала с выбором мест.</div></div>
       <div class="field"><label for="ticket_url">Ссылка на покупку билета</label>
         <input id="ticket_url" type="url" name="ticket_url" value="{{ ev.ticket_url or '' }}"
                placeholder="Ссылка билетной системы">
@@ -74,12 +82,12 @@
 
     <div class="grid grid--3">
       <div class="field"><label for="cover">Фото для карточки (горизонтальное, 16:9)</label>
-        <input id="cover" type="file" name="cover" accept="image/*">
+        {{ file_input('cover', 'cover', size='Рекомендуемый размер — 1920×1080.') }}
         <div class="hint">Используется в карточках на главной странице и в подборках. Если не загружено, используется первое фото галереи или афиша.</div>
         {% if ev.cover %}<img src="/static/uploads/{{ ev.cover }}" alt="" style="max-width:220px;margin-top:8px;border-radius:4px">{% endif %}
       </div>
       <div class="field"><label for="poster">Афиша (вертикальная, 3:4)</label>
-        <input id="poster" type="file" name="poster" accept="image/*">
+        {{ file_input('poster', 'poster', size='Рекомендуемый размер — 1200×1600.') }}
         <div class="hint">Показывается на странице события.</div>
         {% if ev.poster %}<img src="/static/uploads/{{ ev.poster }}" alt="" style="max-width:120px;margin-top:8px;border-radius:4px">{% endif %}
       </div>
@@ -111,6 +119,21 @@
           <button class="link-btn" type="button" data-picks-clear>Снять все отметки</button></div>
       {% else %}
         <div class="hint">Коллективы не добавлены. Добавить их можно в разделе «Коллективы и артисты».</div>
+      {% endif %}
+    </fieldset>
+
+    <fieldset class="field picks">
+      <legend>Фестиваль</legend>
+      {% if all_festivals %}
+        <div class="picks__list">
+          {% for fest in all_festivals %}
+            <label class="pick"><input type="checkbox" name="festivals" value="{{ fest.id }}"
+                   {{ 'checked' if fest in ev.festivals }}> {{ fest.name }}</label>
+          {% endfor %}
+        </div>
+        <div class="hint">Метка фестиваля выводится на карточке и странице концерта. Список фестивалей — в разделе «Площадки и жанры».</div>
+      {% else %}
+        <div class="hint">Фестивали не добавлены. Добавить их можно в разделе «Площадки и жанры».</div>
       {% endif %}
     </fieldset>
 

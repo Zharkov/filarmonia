@@ -132,7 +132,7 @@ def test_session_is_permanent_with_limit(app):
 
 
 def test_appeal_interval_shared_between_clients(app):
-    form = {"name": "Иван", "message": "Вопрос", "consent": "1"}
+    form = {"name": "Иван", "email": "ivan@example.ru", "message": "Вопрос", "consent": "1"}
     app.test_client().post("/obrashcheniya", data=form)
     r = app.test_client().post("/obrashcheniya", data=form, follow_redirects=True)
     assert "Следующее можно отправить через минуту" in text(r)

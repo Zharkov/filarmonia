@@ -39,10 +39,15 @@ def build_config(**overrides) -> dict:
         "UPLOAD_FOLDER": os.environ.get(
             "UPLOAD_FOLDER", os.path.join(BASE_DIR, "filarmonia", "static", "uploads")
         ),
-        "MAX_CONTENT_LENGTH": 64 * 1024 * 1024,  # 64 МБ на загрузку
+        "MAX_CONTENT_LENGTH": 64 * 1024 * 1024,  # 64 МБ на одну отправку формы
         "ALLOWED_IMAGE_EXT": ALLOWED_IMAGE_EXT,
         "ALLOWED_VIDEO_EXT": ALLOWED_VIDEO_EXT,
         "ALLOWED_DOC_EXT": ALLOWED_DOC_EXT,
+        # Предел одного файла по видам, МБ. Подсказки в формах берутся отсюда
+        "UPLOAD_LIMITS_MB": {"image": 20, "video": 60, "doc": 30},
+        # Фото крупнее по длинной стороне не принимаются: такие бывают только у
+        # склеенных панорам, а на сайте всё равно ужимаются до IMAGE_MAX_SIDE
+        "IMAGE_UPLOAD_MAX_SIDE": 8000,
 
         # Загруженные фотографии ужимаются до этой стороны и пересохраняются:
         # снимок с телефона весит 8-12 МБ, а в вёрстке нигде не крупнее 2000 px.

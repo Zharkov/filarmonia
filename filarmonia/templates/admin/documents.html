@@ -1,9 +1,11 @@
 {% extends "admin/base.html" %}
 {% from "admin/_table.html" import sort_th, keep_sort, reset_link, publish_toggle %}
+{% from "admin/_form.html" import file_input %}
 {% block title %}Документы{% endblock %}
 {% block content %}
 <h1>Документы</h1>
-<p class="subtitle">Устав, НПА, планы и отчёты. Категория определяет раздел, в котором документ показывается.</p>
+<p class="subtitle">Устав, локальные акты, планы и отчёты. Раздел определяет страницу, на которой документ показывается.
+  PDF и сканы (jpg, png) посетитель открывает прямо на сайте, Word и Excel — скачивает. Документы к новостям прикрепляются в форме новости.</p>
 
 {% set d = edit %}
 <section class="panel {{ 'panel--editing' if d }}" style="margin-top:20px" id="form">
@@ -14,19 +16,19 @@
     <div class="grid grid--3">
       <div class="field"><label for="doc-title">Название *</label>
         <input id="doc-title" type="text" name="title" value="{{ d.title if d }}" required></div>
-      <div class="field"><label for="doc-cat">Категория</label>
-        <input id="doc-cat" type="text" name="category" list="cats" value="{{ d.category if d else 'Учредительные документы' }}">
-        <datalist id="cats">
-          {% for category in categories %}<option value="{{ category }}">{% endfor %}
-          <option value="Учредительные документы"><option value="Приказы"><option value="План финансово-хозяйственной деятельности">
-          <option value="Годовые отчёты о деятельности"><option value="Независимая оценка качества"><option value="Материально-техническая база">
-          <option value="Противодействие коррупции"><option value="Политика конфиденциальности">
-        </datalist></div>
+      <div class="field"><label for="doc-cat">Раздел</label>
+        <select id="doc-cat" name="category">
+          {% for category in categories %}
+            <option value="{{ category }}" {{ 'selected' if d and d.category == category }}>{{ category }}{{ ' (нет страницы)' if category not in sections }}</option>
+          {% endfor %}
+        </select>
+        <div class="hint">Разделы — страницы с типом «Со списком документов». Новый раздел создаётся в «Страницах».</div></div>
       <div class="field"><label for="doc-year">Год</label>
         <input id="doc-year" type="number" name="year" value="{{ (d.year or '') if d else now.year }}"></div>
     </div>
     <div class="grid grid--3">
-      <div class="field"><label for="doc-file">Файл (pdf, doc, xls)</label><input id="doc-file" type="file" name="file">
+      <div class="field"><label for="doc-file">Файл</label>
+        {{ file_input('doc-file', 'file', ('doc', 'image')) }}
         {% if d and d.file %}<div class="hint">Сейчас: <a href="{{ d.href }}" target="_blank">{{ d.file }}</a>. Новый файл заменит его.</div>{% endif %}</div>
       <div class="field"><label for="doc-url">Или внешняя ссылка</label>
         <input id="doc-url" type="url" name="url" value="{{ d.url if d and d.url != '#' }}"></div>
@@ -43,7 +45,7 @@
   {{ keep_sort() }}
   <input type="text" name="q" value="{{ search }}" placeholder="Поиск по названию" aria-label="Поиск по названию">
   <select name="category" data-autosubmit aria-label="Категория">
-    <option value="">Все категории</option>
+    <option value="">Все разделы</option>
     {% for c in categories %}<option value="{{ c }}" {{ 'selected' if request.args.get('category') == c }}>{{ c }}</option>{% endfor %}
   </select>
   <select name="year" data-autosubmit aria-label="Год">
@@ -63,7 +65,7 @@
   <table>
     <tr>
       {{ sort_th('Название', 'title', sorting) }}
-      {{ sort_th('Категория', 'category', sorting) }}
+      {{ sort_th('Раздел', 'category', sorting) }}
       {{ sort_th('Год', 'year', sorting) }}
       {{ sort_th('Размер', 'size', sorting) }}
       {{ sort_th('Порядок', 'sort', sorting) }}

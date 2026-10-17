@@ -51,6 +51,15 @@
     </div>
 
     <div>
+      {#- Цена и покупка — первым делом, над фактами: так кнопка видна без прокрутки -#}
+      <div class="event__deal">
+        <div class="event__price">{{ ev.price_label }}</div>
+        {% if not ev.is_past and (ev.yandex_id or ev.ticket_url) %}
+          <div class="event__buy">{{ buy_button(ev, 'btn btn--gold') }}</div>
+        {% endif %}
+        {% if ev.tickets_left %}<p class="event__note">{{ ev.tickets_left }}</p>{% endif %}
+      </div>
+
       <div class="event__facts">
         <div class="fact">
           <div class="fact__label">Дата и время</div>
@@ -74,6 +83,12 @@
           <div class="fact__value"><a href="{{ url_for('public.afisha', category=ev.category.slug) }}">{{ ev.category.name }}</a></div>
         </div>
         {% endif %}
+        {% if ev.festivals %}
+        <div class="fact">
+          <div class="fact__label">{{ 'Фестивали' if ev.festivals | length > 1 else 'Фестиваль' }}</div>
+          <div class="fact__value">{% for f in ev.festivals %}<a href="{{ f.url }}">{{ f.name }}</a>{{ ', ' if not loop.last }}{% endfor %}</div>
+        </div>
+        {% endif %}
         {% if ev.duration_min %}
         <div class="fact">
           <div class="fact__label">Продолжительность</div>
@@ -92,11 +107,18 @@
         {% endif %}
       </div>
 
-      <div class="event__price">{{ ev.price_label }}</div>
-      {% if not ev.is_past and (ev.yandex_id or ev.ticket_url) %}
-        <div class="event__buy">{{ buy_button(ev, 'btn btn--primary') }}</div>
+      {#- Сначала о самом концерте и его участниках, затем условия: льготы и Пушкинская карта -#}
+      {% if ev.description %}
+        <div class="prose">{{ ev.description | safe }}</div>
       {% endif %}
-      {% if ev.tickets_left %}<p class="event__note">{{ ev.tickets_left }}</p>{% endif %}
+
+      {% if ev.collectives %}
+        <p class="event__collectives"><span>Участвуют:</span>
+          {% for c in ev.collectives %}
+            <a href="{{ c.url }}">{{ c.name }}</a>{{ ", " if not loop.last }}
+          {% endfor %}
+        </p>
+      {% endif %}
 
       {% if ev.show_benefits and ev.benefits_text %}
         <div class="block">
@@ -111,20 +133,20 @@
           {{ (ev.pushkin_text or settings.get('pushkin_default', '<p>Билет можно оплатить Пушкинской картой через приложение «Госуслуги Культура» или на сайте билетного оператора.</p>')) | safe }}
         </div>
       {% endif %}
-
-      {% if ev.description %}
-        <div class="prose">{{ ev.description | safe }}</div>
-      {% endif %}
-
-      {% if ev.collectives %}
-        <p>
-          {% for c in ev.collectives %}
-            <a href="{{ c.url }}">{{ c.name }}</a>{{ ", " if not loop.last }}
-          {% endfor %}
-        </p>
-      {% endif %}
     </div>
   </div>
+
+  {#- Телефон: когда кнопка покупки уходит с экрана, внизу появляется панель
+      «цена + Купить билет». Показывает и прячет её site.js; на компьютере её нет -#}
+  {% if not ev.is_past and (ev.yandex_id or ev.ticket_url) %}
+    <div class="buybar" data-buybar hidden>
+      <div class="buybar__info">
+        <span class="buybar__price">{{ ev.price_label }}</span>
+        <span class="buybar__when">{{ ev.starts_at | ru_date }}, {{ ev.starts_at.strftime('%H:%M') }}</span>
+      </div>
+      {{ buy_button(ev, 'btn btn--gold') }}
+    </div>
+  {% endif %}
 
   {#- Встроенный виджет покупки. Скрыт, пока скрипт его не покажет:
       без ключа Яндекс Афиши в «Настройках» на странице не будет пустого блока -#}

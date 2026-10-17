@@ -1,5 +1,6 @@
 {% extends "admin/base.html" %}
 {% from "admin/_table.html" import sort_th, keep_sort, reset_link, publish_toggle %}
+{% from "admin/_form.html" import file_input %}
 {% block title %}Баннеры{% endblock %}
 {% block content %}
 <h1>Баннеры</h1>
@@ -21,7 +22,8 @@
         <select id="b-place" name="place">
           {% for value, label in places %}<option value="{{ value }}" {{ 'selected' if e and e.place == value }}>{{ label }}</option>{% endfor %}
         </select></div>
-      <div class="field"><label for="b-image">Картинка</label><input id="b-image" type="file" name="image" accept="image/*">
+      <div class="field"><label for="b-image">Картинка</label>
+        {{ file_input('b-image', 'image', size='Рекомендуемый размер: «Главная, крупно» — от 1920 px по ширине; лента и подвал — от 130 px по высоте, PNG с прозрачным фоном.') }}
         {% if e and e.image %}<img src="/static/uploads/{{ e.image }}" alt="" style="max-height:44px;margin-top:6px">
           <div class="hint">Новая картинка заменит эту.</div>{% endif %}</div>
     </div>

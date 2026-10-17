@@ -1,3 +1,4 @@
+{% from "admin/_form.html" import file_input %}
 {% macro media_manager(owner, owner_id, media) %}
 <section id="media" class="panel">
   <h2 style="margin-top:0">Галерея: фото и видео</h2>
@@ -13,8 +14,9 @@
       <input type="hidden" name="owner_id" value="{{ owner_id }}">
       <input type="hidden" name="kind" value="photo">
       <h3>Добавить фотографии</h3>
-      <div class="field"><label for="m-file-{{ owner }}">Файлы (jpg, png, webp)</label>
-        <input id="m-file-{{ owner }}" type="file" name="file" accept="image/*" multiple required></div>
+      <div class="field"><label for="m-file-{{ owner }}">Файлы</label>
+        {{ file_input('m-file-' ~ owner, 'file', multiple=True, required=True,
+                      size='Рекомендуемый размер — от 1600 px по длинной стороне.') }}</div>
       <div class="field"><label>Подпись (необязательно)</label><input type="text" name="title"></div>
       <button class="btn btn--primary" type="submit">Загрузить</button>
     </form>
@@ -28,8 +30,11 @@
       <div class="field"><label>Ссылка на видео</label>
         <input type="url" name="url" placeholder="https://rutube.ru/video/... или https://vk.com/video-123_456">
         <div class="hint">Укажите ссылку либо загрузите файл ниже.</div></div>
-      <div class="field"><label>Файл .mp4 / .webm</label><input type="file" name="file" accept="video/mp4,video/webm"></div>
-      <div class="field"><label>Обложка видео</label><input type="file" name="preview" accept="image/*"></div>
+      <div class="field"><label for="m-video-{{ owner }}">Файл видео</label>
+        {{ file_input('m-video-' ~ owner, 'file', ('video',),
+                      size='Рекомендуемое разрешение — 1920×1080.') }}</div>
+      <div class="field"><label for="m-preview-{{ owner }}">Обложка видео</label>
+        {{ file_input('m-preview-' ~ owner, 'preview', size='Рекомендуемый размер — 1280×720 (16:9).') }}</div>
       <div class="field"><label>Подпись</label><input type="text" name="title"></div>
       <button class="btn btn--primary" type="submit">Добавить видео</button>
     </form>

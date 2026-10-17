@@ -5,7 +5,7 @@ from flask import request, redirect, url_for, flash, g, abort
 
 from ..models import (
     db, User, Event, EventBadge, MediaItem, Collective, News, Page, MenuItem, Document, Banner,
-    Venue, Category, Appeal, Setting, ActionLog, Redirect, referenced_uploads,
+    Venue, Category, Festival, AfishaNotice, Appeal, Setting, ActionLog, Redirect, referenced_uploads,
 )
 from .. import reset_site_data, utils
 from . import bp
@@ -18,6 +18,7 @@ OBJECT_TYPES = {
     Event: ("event", "Событие"), News: ("news", "Новость"), Collective: ("collective", "Коллектив"),
     Page: ("page", "Страница"), MenuItem: ("menu", "Пункт меню"), Document: ("document", "Документ"),
     Banner: ("banner", "Баннер"), Venue: ("venue", "Площадка"), Category: ("category", "Жанр"),
+    Festival: ("festival", "Фестиваль"), AfishaNotice: ("notice", "Изменение в афише"),
     User: ("user", "Сотрудник"), Appeal: ("appeal", "Обращение"), MediaItem: ("media", "Фото или видео"),
     EventBadge: ("badge", "Баннер на афише"), Setting: ("settings", "Настройки"),
     Redirect: ("redirect", "Перенаправление"),
@@ -231,6 +232,8 @@ def files_of(item) -> list:
             names.append(value)
     for media in getattr(item, "media", None) or []:
         names += [media.file, media.preview]
+    for doc in getattr(item, "documents", None) or []:
+        names.append(doc.file)
     return [n for n in names if n]
 
 

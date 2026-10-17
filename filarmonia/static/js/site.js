@@ -10,6 +10,13 @@
       var open = nav.classList.toggle("is-open");
       burger.setAttribute("aria-expanded", open ? "true" : "false");
     });
+    // Подменю на телефоне раскрываются стрелкой справа от пункта
+    nav.querySelectorAll("[data-nav-toggle]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var open = btn.parentNode.classList.toggle("is-open");
+        btn.setAttribute("aria-expanded", open ? "true" : "false");
+      });
+    });
   }
 
   /* Настройки для слабовидящих */
@@ -69,6 +76,39 @@
   }
   applyStored();
 
+  /* Изменения в афише. Свёрнутая или закрытая плашка остаётся такой на всех
+     страницах, пока набор изменений тот же: новая или исправленная запись
+     меняет ключ, и плашка снова открыта. */
+  var notices = document.querySelector("[data-notices]");
+  if (notices) {
+    var noticesKey = notices.getAttribute("data-notices");
+    var noticesBox = notices.querySelector("[data-notices-box]");
+    var noticesClose = notices.querySelector("[data-notices-close]");
+    var noticesState = "";
+    try {
+      var savedNotices = JSON.parse(localStorage.getItem("notices") || "{}");
+      if (savedNotices.key === noticesKey) noticesState = savedNotices.state;
+    } catch (e) { /* localStorage может быть отключён */ }
+    var rememberNotices = function (state) {
+      try { localStorage.setItem("notices", JSON.stringify({ key: noticesKey, state: state })); } catch (e) {}
+    };
+    if (noticesState === "closed") {
+      notices.hidden = true;
+    } else {
+      if (noticesState === "folded") noticesBox.open = false;
+      noticesClose.hidden = false;
+      noticesBox.addEventListener("toggle", function () {
+        rememberNotices(noticesBox.open ? "open" : "folded");
+      });
+      noticesClose.addEventListener("click", function () {
+        notices.hidden = true;
+        rememberNotices("closed");
+        var main = document.getElementById("main");
+        if (main) { main.setAttribute("tabindex", "-1"); main.focus({ preventScroll: true }); }
+      });
+    }
+  }
+
   /* Всплывающие баннеры на афише (тач-устройства) */
   var canHover = window.matchMedia("(hover: hover)").matches;
   document.querySelectorAll(".pin").forEach(function (pin) {
@@ -107,6 +147,9 @@
   function closeModals() {
     var wasOpen = document.querySelector(".modal.is-open");
     document.querySelectorAll(".modal.is-open").forEach(function (m) { m.classList.remove("is-open"); });
+    // Документ выгружаем, иначе он продолжает висеть в памяти вкладки
+    var docFrame = document.querySelector("#doc-viewer iframe");
+    if (docFrame && wasOpen && wasOpen.id === "doc-viewer") docFrame.src = "about:blank";
     document.body.style.overflow = "";
     if (wasOpen && openerBeforeModal) openerBeforeModal.focus();
     openerBeforeModal = null;
@@ -163,6 +206,26 @@
     });
   }
 
+  /* Просмотр PDF прямо на странице, без скачивания. На узком экране
+     встроенный просмотр мобильные браузеры не умеют — там ссылка
+     открывает документ в новой вкладке, как и без скрипта. */
+  var docViewer = document.getElementById("doc-viewer");
+  if (docViewer) {
+    var docFrame = docViewer.querySelector("iframe");
+    var docTitle = docViewer.querySelector(".docview__title");
+    var docTab = docViewer.querySelector("[data-doc-tab]");
+    var wideScreen = window.matchMedia("(min-width: 861px)");
+    document.addEventListener("click", function (e) {
+      var link = e.target.closest("[data-doc-view]");
+      if (!link || !wideScreen.matches || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      e.preventDefault();
+      docFrame.src = link.getAttribute("href");
+      docTab.href = link.getAttribute("href");
+      docTitle.textContent = link.getAttribute("data-doc-title") || "";
+      openModal("doc-viewer");
+    });
+  }
+
   /* Видео в шапке. Загружается после всей страницы, чтобы не отнимать канал
      у первого экрана, и только на широком экране без режима экономии трафика
      и без просьбы уменьшить анимацию. На телефоне остаётся картинка.
@@ -193,6 +256,9 @@
     soundBtn.addEventListener("click", function () {
       heroVideo.muted = !heroVideo.muted;
       var on = !heroVideo.muted;
+      // Нажатие и есть разрешение на звук; play() — на случай, если браузер
+      // приостановил ролик, когда в нём включили звук
+      if (on && heroVideo.paused) heroVideo.play().catch(function () {});
       soundBtn.setAttribute("aria-pressed", on ? "true" : "false");
       soundBtn.setAttribute("aria-label", on ? "Выключить звук" : "Включить звук");
       soundBtn.querySelector("[data-sound-on]").hidden = !on;
@@ -236,6 +302,36 @@
       }
     });
   }
+
+  /* Панель «Купить билет» внизу экрана на странице события (телефон).
+     Видна, пока основная кнопка покупки за пределами экрана: выше — уже
+     прокрутили её, ниже — ещё не дошли. Над панелью поднимается «Наверх». */
+  var buybar = document.querySelector("[data-buybar]");
+  var deal = document.querySelector(".event__deal");
+  if (buybar && deal && "IntersectionObserver" in window) {
+    var narrow = window.matchMedia("(max-width: 860px)");
+    var dealVisible = true;
+    var syncBuybar = function () {
+      var show = narrow.matches && !dealVisible;
+      buybar.hidden = !show;
+      document.body.classList.toggle("has-buybar", show);
+    };
+    new IntersectionObserver(function (entries) {
+      dealVisible = entries[0].isIntersecting;
+      syncBuybar();
+    }).observe(deal);
+    if (narrow.addEventListener) narrow.addEventListener("change", syncBuybar);
+  }
+
+  /* Пауза бегущей ленты баннеров */
+  document.querySelectorAll("[data-marquee-pause]").forEach(function (btn) {
+    var strip = btn.parentNode.querySelector(".partners");
+    if (!strip) return;
+    btn.addEventListener("click", function () {
+      var paused = strip.classList.toggle("is-paused");
+      btn.textContent = paused ? "Запустить ленту" : "Остановить ленту";
+    });
+  });
 
   /* Пересчёт по прокрутке — не чаще одного раза за кадр */
   function onScrollFrame(el, fn) {
@@ -461,6 +557,21 @@
     });
   }
 
+  /* Яндекс Метрика: номер счётчика — из «Настроек» атрибутом body.
+     Подключается здесь, а не встроенным кодом: встроенные скрипты запрещены
+     политикой безопасности. Визиты сотрудников не считаются (атрибута нет).
+     Вебвизор (запись действий посетителя) выключен: это персональные данные. */
+  var metrikaId = +document.body.getAttribute("data-metrika");
+  if (metrikaId) {
+    window.ym = window.ym || function () { (window.ym.a = window.ym.a || []).push(arguments); };
+    window.ym.l = Date.now();
+    var ymScript = document.createElement("script");
+    ymScript.async = true;
+    ymScript.src = "https://mc.yandex.ru/metrika/tag.js";
+    document.head.appendChild(ymScript);
+    window.ym(metrikaId, "init", { clickmap: true, trackLinks: true, accurateTrackBounce: true });
+  }
+
   /* Музыкальный маршрут: вопросы по одному, подборка без перезагрузки.
      Без скрипта видны все три вопроса, и форма уходит на главную обычным запросом. */
   var routeForm = document.querySelector("[data-route]");
@@ -532,8 +643,32 @@
     });
   }
 
-  /* Автоотправка фильтров афиши */
+  /* Панель «Фильтры» афиши на телефоне */
+  var filtersToggle = document.querySelector("[data-filters-toggle]");
+  var filtersMore = document.querySelector("[data-filters-more]");
+  if (filtersToggle && filtersMore) {
+    filtersToggle.addEventListener("click", function () {
+      var open = filtersMore.classList.toggle("is-open");
+      filtersToggle.setAttribute("aria-expanded", open ? "true" : "false");
+      if (open) {
+        var first = filtersMore.querySelector("select, input");
+        if (first) first.focus();
+      }
+    });
+  }
+
+  /* Автоотправка фильтров афиши. На телефоне в раскрытой панели поля
+     отправляются кнопкой «Показать»: иначе каждый выбор перезагружал бы
+     страницу и сворачивал панель. Даты — только когда заполнены обе:
+     выбор первой не должен перезагружать страницу до выбора второй. */
   document.querySelectorAll("[data-autosubmit]").forEach(function (el) {
-    el.addEventListener("change", function () { el.form.submit(); });
+    el.addEventListener("change", function () {
+      if (filtersMore && filtersMore.classList.contains("is-open")) return;
+      if (el.type === "date") {
+        var pair = el.form.elements[el.name === "from" ? "to" : "from"];
+        if (pair && !pair.value) return;
+      }
+      el.form.submit();
+    });
   });
 })();

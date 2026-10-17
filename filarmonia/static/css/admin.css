@@ -202,6 +202,7 @@ th.is-sorted .sortable__arrow { opacity: 1; color: var(--a-brick); }
 .link-btn { padding: 0; border: 0; background: none; font: inherit; color: var(--a-brick); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 .link-btn:hover { color: var(--a-brick-dark); }
 .hint--warn { color: #8a5a00; }
+.hint--error { color: #b3261e; font-weight: 600; }
 
 /* Адрес страницы: начало адреса сайта перед полем */
 .slug-input { display: flex; align-items: stretch; }
