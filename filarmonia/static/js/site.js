@@ -76,9 +76,12 @@
   }
   applyStored();
 
-  /* Изменения в афише. Свёрнутая или закрытая плашка остаётся такой на всех
-     страницах, пока набор изменений тот же: новая или исправленная запись
-     меняет ключ, и плашка снова открыта. */
+  /* Изменения в афише — окно в правом нижнем углу. На главной плавно
+     выдвигается, когда на экран попадает блок с концертами (или страницу уже
+     прокрутили ниже него), в афише — вскоре после загрузки. Свёрнутое или
+     закрытое окно остаётся таким на всех страницах, пока набор изменений тот же:
+     новая или исправленная запись меняет ключ, и окно снова открыто.
+     Кнопка «Наверх» поднимается над окном на его высоту. */
   var notices = document.querySelector("[data-notices]");
   if (notices) {
     var noticesKey = notices.getAttribute("data-notices");
@@ -92,20 +95,47 @@
     var rememberNotices = function (state) {
       try { localStorage.setItem("notices", JSON.stringify({ key: noticesKey, state: state })); } catch (e) {}
     };
-    if (noticesState === "closed") {
-      notices.hidden = true;
-    } else {
+    var syncNoticesOffset = function () {
+      var shown = !notices.hidden;
+      document.body.classList.toggle("has-notices", shown);
+      if (shown) document.body.style.setProperty("--notices-h", notices.offsetHeight + "px");
+    };
+    var showNotices = function () {
+      notices.hidden = false;
+      syncNoticesOffset();   // заодно читает высоту — браузер фиксирует начальное положение
+      notices.classList.add("is-visible");
+    };
+
+    if (noticesState !== "closed") {
       if (noticesState === "folded") noticesBox.open = false;
       noticesClose.hidden = false;
+      notices.classList.add("is-pending");
       noticesBox.addEventListener("toggle", function () {
         rememberNotices(noticesBox.open ? "open" : "folded");
+        syncNoticesOffset();
       });
+      window.addEventListener("resize", syncNoticesOffset);
       noticesClose.addEventListener("click", function () {
         notices.hidden = true;
+        syncNoticesOffset();
         rememberNotices("closed");
         var main = document.getElementById("main");
         if (main) { main.setAttribute("tabindex", "-1"); main.focus({ preventScroll: true }); }
       });
+
+      var noticesAnchor = document.querySelector("[data-notices-anchor]");
+      if (noticesAnchor && "IntersectionObserver" in window) {
+        var noticesWatch = new IntersectionObserver(function (entries) {
+          var entry = entries[0];
+          if (entry.isIntersecting || entry.boundingClientRect.top < 0) {
+            noticesWatch.disconnect();
+            showNotices();
+          }
+        }, { rootMargin: "0px 0px -15% 0px" });
+        noticesWatch.observe(noticesAnchor);
+      } else {
+        setTimeout(showNotices, 600);
+      }
     }
   }
 

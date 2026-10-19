@@ -133,7 +133,7 @@ src="{{ url }}"{% set variants = url | srcset %}{% if variants %} srcset="{{ var
 {% endmacro %}
 
 {#- Календарь: лента дней со стрелками, как на билетных сайтах.
-    Под днём с концертами точка, дни без концертов серые и не нажимаются,
+    Дни с концертами яркие и нажимаются, дни без концертов серые,
     выходные красным, «сегодня» в рамке. Название месяца в шапке меняется при прокрутке. -#}
 {% macro daystrip(days, active=None, base='/afisha') %}
 <div class="cal" data-cal role="group" aria-label="Календарь концертов">
@@ -168,7 +168,6 @@ src="{{ url }}"{% set variants = url | srcset %}{% if variants %} srcset="{{ var
       {% if d.has_events %}</a>{% else %}</span>{% endif %}
     {% endfor %}
   </div>
-  <p class="cal__legend" aria-hidden="true">— дни с концертами, нажмите на дату</p>
 </div>
 {% endmacro %}
 

@@ -241,6 +241,12 @@ def notice_link(value: str) -> str:
 @bp.route("/notices", methods=["GET", "POST"])
 @login_required
 def notices():
+    if request.method == "POST" and "notices_title" in request.form:
+        Setting.set("notices_title", request.form["notices_title"].strip()[:120])
+        log("update", object_type="settings", details="заголовок окна «Изменения в афише»")
+        db.session.commit()
+        flash("Заголовок окна сохранён.", "ok")
+        return redirect(url_for("admin.notices"))
     if request.method == "POST":
         f = request.form
         item_id = utils.parse_int(f.get("id"))
@@ -248,7 +254,12 @@ def notices():
         item.kind = f.get("kind") if f.get("kind") in dict(NOTICE_KINDS) else "other"
         item.text = f.get("text", "").strip()[:500]
         item.url = notice_link(f.get("url"))
+        event_id = utils.parse_int(f.get("event_id"))
+        item.event = db.session.get(Event, event_id) if event_id else None
         until = utils.parse_date(f.get("show_until"))
+        # Срок не указан, но выбран концерт — запись видна до дня концерта
+        if not until and item.event:
+            until = item.event.starts_at.date()
         # «Показывать до» включительно: запись видна весь этот день
         item.show_until = datetime.combine(until, datetime.max.time().replace(microsecond=0)) if until else None
         item.sort = utils.parse_int(f.get("sort"), 100)
@@ -263,9 +274,15 @@ def notices():
         return redirect(url_for("admin.notices"))
 
     items = AfishaNotice.query.order_by(AfishaNotice.sort, AfishaNotice.id.desc()).all()
-    return render_template("admin/notices.html", items=items, kinds=NOTICE_KINDS,
+    edit = edited(AfishaNotice)
+    # Выбор концерта: предстоящие, плюс уже связанный, даже если он прошёл
+    today = datetime.combine(utils.now_msk().date(), datetime.min.time())
+    events = Event.query.filter(Event.starts_at >= today).order_by(Event.starts_at).all()
+    if edit and edit.event and edit.event not in events:
+        events.insert(0, edit.event)
+    return render_template("admin/notices.html", items=items, kinds=NOTICE_KINDS, events=events,
                            active_ids={n.id for n in AfishaNotice.active()},
-                           edit=edited(AfishaNotice))
+                           title=Setting.get("notices_title"), edit=edit)
 
 
 @bp.route("/notices/<int:item_id>/delete", methods=["POST"])

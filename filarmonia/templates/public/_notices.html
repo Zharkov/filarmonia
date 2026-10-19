@@ -1,28 +1,30 @@
-{#- Изменения в афише: отмены, переносы, смена площадки. Плашка под меню на главной
-    и в афише; когда изменений нет, её нет совсем. Свернуть — встроенный <details>,
-    работает и без скрипта. «Закрыть» добавляет скрипт: закрытая плашка не
-    появляется, пока редактор не добавит или не изменит запись — ключ собран
-    из номеров и времени правки. -#}
+{#- Изменения в афише: отмены, переносы, смена площадки. Окно в правом нижнем углу
+    на главной и в афише; когда изменений нет, его нет совсем. Скрипт держит окно
+    скрытым, пока на экране не появится блок с концертами (data-notices-anchor),
+    и тогда плавно выдвигает его; на странице без такого блока — сразу.
+    Окно скрыто уже в разметке, чтобы не мелькнуть до запуска скрипта; без
+    скрипта его открывает <noscript>. Свернуть — встроенный <details>.
+    «Закрыть» добавляет скрипт: закрытое окно не появляется, пока редактор
+    не добавит или не изменит запись — ключ собран из номеров и времени правки. -#}
 {% set key = notices | map(attribute='id') | join('-') ~ ':' ~ (notices | map(attribute='updated_at') | select | max | string) %}
-<aside class="notices" aria-labelledby="notices-title" data-notices="{{ key }}">
-  <div class="wrap">
-    <details class="notices__box" open data-notices-box>
-      <summary class="notices__head">
-        <span class="notices__title" id="notices-title">Изменения в афише</span>
-        <span class="notices__count">{{ notices | length }}</span>
-        <span class="notices__fold" aria-hidden="true"></span>
-      </summary>
-      <ul class="notices__list">
-        {% for n in notices %}
-          <li class="notice notice--{{ n.kind }}">
-            <span class="notice__kind">{{ n.kind_label }}</span>
-            <span class="notice__text">{{ n.text }}</span>
-            {% if n.url %}<a class="notice__more" href="{{ n.url }}">Подробнее</a>{% endif %}
-          </li>
-        {% endfor %}
-      </ul>
-    </details>
-    <button class="notices__close" type="button" data-notices-close hidden
-            aria-label="Закрыть уведомление об изменениях в афише" title="Закрыть">×</button>
-  </div>
+<noscript><style>.notices[hidden] { display: block; }</style></noscript>
+<aside class="notices" aria-labelledby="notices-title" data-notices="{{ key }}" hidden>
+  <details class="notices__box" open data-notices-box>
+    <summary class="notices__head">
+      <span class="notices__title" id="notices-title">{{ settings.get('notices_title') or 'Изменения в афише' }}</span>
+      <span class="notices__count" aria-label="записей: {{ notices | length }}">{{ notices | length }}</span>
+      <span class="notices__fold" aria-hidden="true"></span>
+    </summary>
+    <ul class="notices__list">
+      {% for n in notices %}
+        <li class="notice notice--{{ n.kind }}">
+          <span class="notice__kind">{{ n.kind_label }}</span>
+          <span class="notice__text">{{ n.text }}</span>
+          {% if n.link %}<a class="notice__more" href="{{ n.link }}">Подробнее</a>{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  </details>
+  <button class="notices__close" type="button" data-notices-close hidden
+          aria-label="Закрыть окно об изменениях в афише" title="Закрыть">×</button>
 </aside>

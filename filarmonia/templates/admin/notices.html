@@ -4,8 +4,20 @@
 {% block content %}
 <h1>Изменения в афише</h1>
 <p class="subtitle">Отмены, переносы концертов, смена площадки. Пока есть хотя бы одно действующее изменение,
-  на главной и в афише под меню показывается плашка «Изменения в афише»; посетитель может её свернуть или закрыть.
+  в правом нижнем углу всплывает окно: на главной — когда посетитель долистал до блока с концертами,
+  в афише — сразу. Окно можно свернуть или закрыть. Когда действующих изменений нет, окна на сайте нет.
   После даты «Показывать до» запись пропадает с сайта сама.</p>
+
+<section class="panel" style="margin-top:20px">
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="field"><label for="n-title">Заголовок окна</label>
+      <input id="n-title" type="text" name="notices_title" maxlength="120" value="{{ title }}"
+             placeholder="Изменения в афише">
+      <div class="hint">Пусто — «Изменения в афише».</div></div>
+    <button class="btn btn--primary" type="submit">Сохранить заголовок</button>
+  </form>
+</section>
 
 {% set e = edit %}
 <section class="panel {{ 'panel--editing' if e }}" style="margin-top:20px" id="form">
@@ -13,6 +25,17 @@
   <form method="post">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     {% if e %}<input type="hidden" name="id" value="{{ e.id }}">{% endif %}
+    <div class="field"><label for="n-event">Концерт из афиши</label>
+      <select id="n-event" name="event_id">
+        <option value="">— не выбран —</option>
+        {% for ev in events %}
+          <option value="{{ ev.id }}" {{ 'selected' if e and e.event_id == ev.id }}>
+            {{ ev.starts_at | ru_date }}, {{ ev.starts_at.strftime('%H:%M') }} — {{ ev.title }}{{ ' (скрыт с сайта)' if not ev.is_published }}
+          </option>
+        {% endfor %}
+      </select>
+      <div class="hint">«Подробнее» поведёт на страницу этого концерта. Если «Показывать до» не заполнено —
+        запись видна до дня концерта.</div></div>
     <div class="grid grid--4">
       <div class="field"><label for="n-kind">Вид</label>
         <select id="n-kind" name="kind">
@@ -20,10 +43,10 @@
         </select></div>
       <div class="field"><label for="n-until">Показывать до (включительно)</label>
         <input id="n-until" type="date" name="show_until" value="{{ e.show_until.date().isoformat() if e and e.show_until }}">
-        <div class="hint">Обычно — дата концерта. Пусто — пока не снимете.</div></div>
-      <div class="field"><label for="n-url">Ссылка «Подробнее»</label>
-        <input id="n-url" type="text" name="url" value="{{ e.url if e }}" placeholder="/afisha/…">
-        <div class="hint">Адрес страницы концерта на сайте или полный адрес с https://</div></div>
+        <div class="hint">Пусто — до дня выбранного концерта, а без концерта — пока не снимете.</div></div>
+      <div class="field"><label for="n-url">Другая ссылка «Подробнее»</label>
+        <input id="n-url" type="text" name="url" value="{{ e.url if e }}" placeholder="/novosti/…">
+        <div class="hint">Если концерт не выбран: адрес страницы на сайте или полный адрес с https://</div></div>
       <div class="field"><label for="n-sort">Порядок</label>
         <input id="n-sort" type="number" name="sort" value="{{ e.sort if e else 100 }}"></div>
     </div>
@@ -42,7 +65,10 @@
     {% for n in items %}
       <tr id="row-{{ n.id }}" class="{{ 'is-editing' if e and e.id == n.id }}">
         <td>{{ n.kind_label }}</td>
-        <td>{{ n.text }}{% if n.url %}<div class="hint"><a href="{{ n.url }}" target="_blank">{{ n.url | truncate(60) }}</a></div>{% endif %}</td>
+        <td>{{ n.text }}
+          {% if n.event %}<div class="hint">Концерт: <a href="{{ n.event.url }}" target="_blank">{{ n.event.title }}, {{ n.event.starts_at | ru_date }}</a>
+            {% if not n.event.is_published %}— скрыт с сайта, «Подробнее» не показывается{% endif %}</div>
+          {% elif n.url %}<div class="hint"><a href="{{ n.url }}" target="_blank">{{ n.url | truncate(60) }}</a></div>{% endif %}</td>
         <td>{{ n.show_until | ru_date if n.show_until else 'без срока' }}
           {% if n.is_published and n.id not in active_ids %}<div class="hint">срок истёк — на сайте не видно</div>{% endif %}</td>
         <td>{{ n.sort }}</td>
@@ -54,7 +80,7 @@
             <button class="btn btn--danger btn--sm" type="submit">Удалить</button></form>
         </div></td>
       </tr>
-    {% else %}<tr><td colspan="6">Изменений нет — плашка на сайте не показывается.</td></tr>{% endfor %}
+    {% else %}<tr><td colspan="6">Изменений нет — окно на сайте не показывается.</td></tr>{% endfor %}
   </table>
 </div>
 {% endblock %}

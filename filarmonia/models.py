@@ -218,8 +218,12 @@ class AfishaNotice(db.Model):
     """Изменение в афише: отмена, перенос концерта, смена площадки.
 
     Пока есть хотя бы одно действующее изменение, на главной и в афише
-    показывается плашка «Изменения в афише». После даты «показывать до»
+    всплывает окно «Изменения в афише». После даты «показывать до»
     запись пропадает с сайта сама, редактору не нужно её снимать.
+
+    Запись можно связать с концертом из афиши: тогда «Подробнее» ведёт
+    на его страницу и не ломается, если у концерта сменится адрес.
+    Удалили концерт — связь пропадает, остаётся ссылка, введённая вручную.
     """
 
     __tablename__ = "afisha_notices"
@@ -228,10 +232,21 @@ class AfishaNotice(db.Model):
     kind = db.Column(db.String(16), default="other", nullable=False)
     text = db.Column(db.String(500), nullable=False)
     url = db.Column(db.String(500), default="")
+    event_id = db.Column(db.Integer, db.ForeignKey("events.id", ondelete="SET NULL"))
     show_until = db.Column(db.DateTime)
     sort = db.Column(db.Integer, default=100)
     is_published = db.Column(db.Boolean, default=True, nullable=False)
     updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
+
+    event = db.relationship("Event", backref="notices")
+
+    @property
+    def link(self) -> str:
+        """Куда ведёт «Подробнее»: страница связанного концерта, иначе ссылка вручную.
+        Снятый с публикации концерт посетителю не открыть — на него не ведём."""
+        if self.event and self.event.is_published:
+            return self.event.url
+        return self.url or ""
 
     @property
     def kind_label(self) -> str:

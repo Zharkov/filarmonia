@@ -139,8 +139,6 @@
   </ul>
 </nav>
 
-{% if notices %}{% include "public/_notices.html" %}{% endif %}
-
 {% block hero %}{% endblock %}
 
 <main id="main">
@@ -218,6 +216,9 @@
     </div>
   </div>
 </footer>
+
+{#- Изменения в афише — окно в правом нижнем углу (главная и афиша) -#}
+{% if notices %}{% include "public/_notices.html" %}{% endif %}
 
 {#- Кнопка «Наверх»: появляется, когда страницу прокрутили на полтора экрана -#}
 <button class="to-top" type="button" data-to-top aria-label="Наверх" title="Наверх" hidden>

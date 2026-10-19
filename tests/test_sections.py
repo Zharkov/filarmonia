@@ -236,9 +236,41 @@ def test_afisha_notices(app, admin):
         html = text(client.get(page))
         assert "Изменения в афише" in html and "Концерт 20 октября отменён" in html
         assert 'href="/afisha/testovyy-koncert"' in html and "Отмена" in html
-    # На остальных страницах плашки нет
+    # На остальных страницах окна нет
     assert "Концерт 20 октября отменён" not in text(client.get("/novosti"))
     assert "Концерт 20 октября отменён" in text(admin.get("/admin/notices"))
+    # Окно всплывает, когда на экране блок с концертами
+    assert "data-notices-anchor" in text(client.get("/"))
+
+
+def test_afisha_notice_linked_to_event(app, admin):
+    from filarmonia.models import AfishaNotice
+    create_event(admin)
+    with app.app_context():
+        ev = Event.query.filter_by(slug="testovyy-koncert").first()
+        event_id, starts = ev.id, ev.starts_at
+    assert "Тестовый концерт" in text(admin.get("/admin/notices"))
+    add_notice(admin, event_id=str(event_id))
+    with app.app_context():
+        notice = AfishaNotice.query.first()
+        # Срок не указан — запись видна до дня концерта
+        assert notice.show_until.date() == starts.date()
+    assert 'href="/afisha/testovyy-koncert"' in text(app.test_client().get("/"))
+    # Удалили концерт — запись осталась, ссылка пропала
+    admin.post(f"/admin/events/{event_id}/delete")
+    with app.app_context():
+        assert AfishaNotice.query.first().event_id is None
+    assert "Подробнее</a>" not in text(app.test_client().get("/")).split("data-notices", 1)[1]
+
+
+def test_afisha_notices_title(app, admin):
+    add_notice(admin)
+    admin.post("/admin/notices", data={"notices_title": "Внимание: изменения"})
+    html = text(app.test_client().get("/"))
+    assert "Внимание: изменения" in html and "Изменения в афише" not in html
+    # Пустой заголовок — снова стандартный
+    admin.post("/admin/notices", data={"notices_title": ""})
+    assert "Изменения в афише" in text(app.test_client().get("/"))
 
 
 def test_afisha_notice_expires_and_hides(app, admin):

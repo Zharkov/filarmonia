@@ -301,7 +301,17 @@ html[data-theme] .header__phone:hover { color: var(--ink); text-decoration: unde
 .burger[aria-expanded="true"] { background: var(--menu-bg); border-color: var(--menu-bg); color: var(--on-menu); }
 
 /* Герой с видео */
-.hero { position: relative; background: var(--ink); color: var(--on-ink); overflow: hidden; }
+/* Блок в пропорции ролика 16:9 — видео и заставка видны целиком, без обрезки.
+   Если текст в эту высоту не помещается (узкий экран), блок растёт по тексту,
+   а картинка обрезается по краям. Текст — посередине по высоте. */
+.hero {
+  position: relative; background: var(--ink); color: var(--on-ink);
+  aspect-ratio: 16 / 9; display: flex; flex-direction: column; justify-content: center;
+}
+/* Обрезает только картинку: с overflow у самого блока он перестал бы расти по тексту */
+.hero__media { overflow: hidden; }
+/* В версии для слабовидящих видео и картинки нет — пустая высота не нужна */
+html[data-theme] .hero { aspect-ratio: auto; }
 .hero__media { position: absolute; inset: 0; }
 .hero__media video, .hero__media img { width: 100%; height: 100%; object-fit: cover; }
 /* Видео ложится поверх картинки, когда начинает играть */
@@ -358,17 +368,10 @@ a.cal__day:hover { background: var(--tint); text-decoration: none; }
 /* В этот день концертов нет: число видно, но нажать нечего. Серый цвет, а не
    прозрачность: у прозрачного числа контраст был 2:1, у серого 4.8:1 */
 .cal__day--off .cal__num, .cal__day--off .cal__wd { color: var(--off); font-weight: 400; }
-/* Точка под днём с концертами — видно, какие даты нажимаются */
-a.cal__day::after, .cal__legend::before {
-  content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--brick); flex: 0 0 auto;
-}
-a.cal__day::after { margin-top: 4px; }
 .cal__day--today { box-shadow: inset 0 0 0 1px var(--line); }
 .cal__day--today .cal__wd { color: var(--ink); }
 .cal__day--active { background: var(--ink); }
 .cal__day--active .cal__num, .cal__day--active .cal__wd { color: var(--on-ink); }
-.cal__day--active::after { background: var(--on-ink); }
-.cal__legend { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; font-size: .84rem; color: var(--muted); }
 /* Отметка месяца над первым числом и черта-разделитель между месяцами */
 .cal__mtag {
   position: absolute; top: -20px; left: 8px; font-size: .76rem; font-weight: 600;
@@ -543,17 +546,27 @@ html[data-theme] .nok__qr a { border: 2px solid var(--ink); }
   .nok__facts { grid-template-columns: 1fr; }
 }
 
-/* Изменения в афише: плашка под меню, сворачивается и закрывается */
-.notices { background: var(--tint); border-bottom: 1px solid var(--line); }
+/* Изменения в афише: окно в правом нижнем углу, сворачивается до заголовка
+   и закрывается. Скрипт выдвигает его снизу (is-visible); без скрипта оно
+   видно сразу. Ширина в rem — растёт в версии для слабовидящих. */
+.notices {
+  position: fixed; right: 24px; bottom: 24px; z-index: 41;
+  width: min(24rem, calc(100vw - 48px));
+  background: var(--paper); color: var(--ink);
+  border: 1px solid var(--line); border-top: 3px solid var(--brick); border-radius: var(--radius);
+  box-shadow: 0 14px 40px rgba(30, 36, 48, .22);
+}
 .notices[hidden] { display: none; }
-.notices .wrap { position: relative; }
-.notices__box { padding: 12px 48px 12px 0; }
+.notices.is-pending { opacity: 0; transform: translateY(24px); }
+.notices.is-pending.is-visible { opacity: 1; transform: none; transition: opacity .45s ease, transform .45s ease; }
+html[data-theme] .notices { border: 2px solid var(--ink); }
+.notices__box { padding: 12px 52px 12px 16px; }
 .notices__head {
   display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none;
   font-weight: 600; color: var(--brick);
 }
 .notices__head::-webkit-details-marker { display: none; }
-.notices__title { font-size: 1.02rem; }
+.notices__title { font-size: 1.02rem; line-height: 1.3; }
 .notices__count {
   min-width: 1.6em; padding: 1px 7px; border-radius: 20px; text-align: center;
   background: var(--brick); color: var(--on-brick); font-size: .8rem; line-height: 1.5;
@@ -563,8 +576,16 @@ html[data-theme] .nok__qr a { border: 2px solid var(--ink); }
   transform: rotate(-135deg) translate(-2px, -2px); transition: transform .2s;
 }
 .notices__box:not([open]) .notices__fold { transform: rotate(45deg); }
-.notices__list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
-.notice { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; color: var(--ink); }
+/* Длинный список прокручивается внутри окна, а не закрывает весь экран */
+.notices__list {
+  list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 10px;
+  max-height: min(50vh, 22rem); overflow-y: auto;
+}
+.notice {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; color: var(--ink);
+  font-size: .93rem; line-height: 1.45;
+}
+.notice + .notice { padding-top: 10px; border-top: 1px solid var(--line); }
 .notice__kind {
   font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
   color: var(--brick); border: 1px solid currentColor; border-radius: 20px; padding: 1px 9px;
@@ -572,12 +593,23 @@ html[data-theme] .nok__qr a { border: 2px solid var(--ink); }
 .notice--move .notice__kind, .notice--venue .notice__kind { color: var(--ink-soft); border-color: var(--gold); }
 .notice__more { font-weight: 600; white-space: nowrap; }
 .notices__close {
-  position: absolute; right: 12px; top: 8px; width: 2.2rem; height: 2.2rem; border: 0; border-radius: 50%;
+  position: absolute; right: 8px; top: 6px; width: 2.2rem; height: 2.2rem; border: 0; border-radius: 50%;
   background: transparent; color: var(--ink); font-size: 1.6rem; line-height: 1; cursor: pointer;
 }
 .notices__close:hover { background: var(--tint-deep); }
 .notices__close[hidden] { display: none; }
-@media (prefers-reduced-motion: reduce) { .notices__fold { transition: none; } }
+/* «Наверх» поднимается над окном: высоту окна скрипт кладёт в --notices-h */
+.to-top { transition: opacity .2s, transform .2s, bottom .2s; }
+body.has-notices .to-top { bottom: calc(24px + var(--notices-h, 0px) + 12px); }
+@media (max-width: 620px) {
+  .notices { right: 14px; bottom: 14px; width: calc(100vw - 28px); }
+  body.has-notices .to-top { bottom: calc(14px + var(--notices-h, 0px) + 10px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .notices__fold { transition: none; }
+  .notices.is-pending { transform: none; }
+  .notices.is-pending.is-visible { transition: opacity .2s; }
+}
 
 /* Афиша списком */
 .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 24px 0; }
