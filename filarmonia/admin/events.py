@@ -5,14 +5,14 @@ from flask import render_template, request, redirect, url_for, flash, g, abort
 
 from ..models import (
     db, Event, EventBadge, MediaItem, Collective, Venue, Category, Festival, AfishaNotice, NOTICE_KINDS,
-    Setting,
+    Setting, EVENT_STATUSES,
 )
 from .. import utils
 from . import bp
 from .common import (
-    after_save, delete_record, edited, get_or_404, log, login_required, paginated, publish_choice,
-    release_files, replace_file, rich, save, search_text, sorted_by, status_note, unique_slug,
-    uploaded_name,
+    BAD_URL_TEXT, CONTROL_CHARS, after_save, delete_record, edited, get_or_404, keep_old_address, log, login_required,
+    paginated, publish_choice, release_files, replace_file, rich, safe_url, save, search_text, set_seo, sorted_by,
+    status_note, touch, unique_slug, uploaded_name,
 )
 
 
@@ -68,6 +68,7 @@ def event_form(event_id=None):
     if request.method == "POST":
         f = request.form
         was_published = bool(ev.id and ev.is_published)
+        old_url = ev.url if ev.id else ""
         ev.title = f.get("title", "").strip()
         old_files = []
         try:
@@ -78,15 +79,27 @@ def event_form(event_id=None):
             ev.starts_at = utils.parse_dt(f.get("starts_at")) or ev.starts_at or utils.now_msk()
             ev.duration_min = utils.parse_int(f.get("duration_min"))
             ev.age_limit = f.get("age_limit", "").strip()
-            ev.price_min = utils.parse_int(f.get("price_min"))
-            ev.price_max = utils.parse_int(f.get("price_max"))
+            ev.is_free = bool(f.get("is_free"))
+            # Бесплатный концерт без цены: прежние цифры не должны спорить с отметкой
+            ev.price_min = None if ev.is_free else utils.parse_int(f.get("price_min"))
+            ev.price_max = None if ev.is_free else utils.parse_int(f.get("price_max"))
+            status = f.get("status") or ev.status or "scheduled"
+            if status not in dict(EVENT_STATUSES):
+                raise ValueError("Неизвестный статус концерта.")
+            ev.status = status
+            # Прежняя дата нужна только перенесённому концерту
+            ev.previous_starts_at = utils.parse_dt(f.get("previous_starts_at")) if status == "rescheduled" else None
+            set_seo(ev, f)
             ev.venue_id = utils.parse_int(f.get("venue_id"))
             ev.category_id = utils.parse_int(f.get("category_id"))
             ev.annotation = f.get("annotation", "").strip()
             ev.description = rich("description")
             ev.performers = rich("performers")
             ev.organizer = f.get("organizer", "").strip()
-            ev.ticket_url = f.get("ticket_url", "").strip()
+            ticket_url = safe_url(f.get("ticket_url"))
+            if ticket_url is None:
+                raise ValueError("Ссылка на билеты: " + BAD_URL_TEXT[0].lower() + BAD_URL_TEXT[1:])
+            ev.ticket_url = ticket_url
             ev.yandex_id = utils.yandex_session_id(f.get("yandex_id", ""),
                                                    Setting.get("yandex_session_prefix", utils.YANDEX_PREFIX))
             ev.tickets_left = f.get("tickets_left", "").strip()
@@ -106,6 +119,9 @@ def event_form(event_id=None):
             ev.collectives = Collective.query.filter(Collective.id.in_(chosen)).all() if chosen else []
             chosen = [utils.parse_int(i) for i in f.getlist("festivals")]
             ev.festivals = Festival.query.filter(Festival.id.in_(chosen)).all() if chosen else []
+            # Площадка и связи лежат в других таблицах: без этого updated_at мог бы не измениться
+            if ev.id:
+                ev.updated_at = utils.utcnow()
 
             for field in ("poster", "cover"):
                 old_files += replace_file(ev, field, uploaded_name(field))
@@ -113,7 +129,8 @@ def event_form(event_id=None):
             flash(str(exc), "error")
             return render_template("admin/event_form.html", ev=ev, unsaved=True, **_event_refs())
 
-        save(ev, "Событие сохранено." + status_note(ev, was_published))
+        moved = keep_old_address(ev, old_url, was_published)
+        save(ev, "Событие сохранено." + status_note(ev, was_published) + moved)
         release_files(old_files)
         return after_save(ev, url_for("admin.event_form", event_id=ev.id))
 
@@ -131,11 +148,12 @@ def _event_refs():
             ("bottom-left", "Снизу слева"), ("bottom-right", "Снизу справа"),
         ],
         "styles": [("brick", "Красный"), ("gold", "Золотой"), ("ink", "Тёмный"), ("light", "Светлый")],
+        "statuses": EVENT_STATUSES,
     }
 
 
 # Поля, которые не переносятся в копию события
-NOT_COPIED = {"id", "slug", "created_at", "is_published"}
+NOT_COPIED = {"id", "slug", "created_at", "updated_at", "is_published"}
 
 
 @bp.route("/events/<int:event_id>/copy", methods=["POST"])
@@ -152,6 +170,9 @@ def event_copy(event_id):
         c.name: getattr(ev, c.name) for c in Event.__table__.columns if c.name not in NOT_COPIED
     })
     copy.is_published = False
+    # Повторная программа — новый концерт «по плану», даже если оригинал отменили или перенесли
+    copy.status = "scheduled"
+    copy.previous_starts_at = None
     copy.slug = unique_slug(Event, ev.title, copy)
     copy.collectives = list(ev.collectives)
     copy.badges = [
@@ -187,20 +208,26 @@ def badge_add(event_id):
     if badge.event_id != ev.id:
         abort(404)
     text = f.get("text", "").strip()
-    if not text:
+    url = safe_url(f.get("url"))
+    if url is None:
+        flash(BAD_URL_TEXT, "error")
+        text = ""
+    elif not text:
         flash("У баннера должна быть надпись.", "error")
+    if not text:
         back = url_for("admin.event_form", event_id=ev.id, edit_badge=badge_id) if badge_id \
             else url_for("admin.event_form", event_id=ev.id)
         return redirect(back + "#badges")
     badge.text = text
     badge.hint = f.get("hint", "").strip()
-    badge.url = f.get("url", "").strip()
+    badge.url = url
     badge.position = f.get("position", "top-left")
     badge.style = f.get("style", "brick")
     badge.sort = utils.parse_int(f.get("sort"), badge.sort or 100)
     if badge_id is None:
         db.session.add(badge)
     log("update" if badge_id else "create", badge, details=f"событие «{ev.title}»")
+    touch(Event, ev.id)
     db.session.commit()
     flash("Баннер сохранён." if badge_id else "Баннер добавлен.", "ok")
     return redirect(url_for("admin.event_form", event_id=ev.id) + "#badges")
@@ -212,6 +239,7 @@ def badge_delete(badge_id):
     badge = get_or_404(EventBadge, badge_id)
     event_id = badge.event_id
     log("delete", badge)
+    touch(Event, event_id)
     db.session.delete(badge)
     db.session.commit()
     return redirect(url_for("admin.event_form", event_id=event_id) + "#badges")
@@ -231,11 +259,19 @@ def notice_link(value: str) -> str:
     посетителям на главной.
     """
     value = (value or "").strip()
+    if CONTROL_CHARS.search(value):
+        return ""
     if value.startswith("/") and not value.startswith(("//", "/\\")):
         return value
     if value.startswith(("https://", "http://")):
         return value
     return ""
+
+
+def notice_needs_status(notice) -> bool:
+    """Отмена или перенос привязаны к концерту, у которого статус всё ещё «По плану»."""
+    return bool(notice.kind in ("cancel", "move") and notice.event
+                and (notice.event.status or "scheduled") == "scheduled")
 
 
 @bp.route("/notices", methods=["GET", "POST"])
@@ -271,6 +307,10 @@ def notices():
         if f.get("url", "").strip() and not item.url:
             flash("Ссылка не сохранена: она должна начинаться с «/» или с «https://».", "error")
         save(item, "Изменение в афише сохранено.")
+        if notice_needs_status(item):
+            # Статус концерта молча не меняем: редактор решает сам
+            flash("Поменяйте статус концерта на странице события: сейчас он «По плану», "
+                  "и на странице концерта отмены или переноса не видно.", "error")
         return redirect(url_for("admin.notices"))
 
     items = AfishaNotice.query.order_by(AfishaNotice.sort, AfishaNotice.id.desc()).all()
@@ -282,6 +322,7 @@ def notices():
         events.insert(0, edit.event)
     return render_template("admin/notices.html", items=items, kinds=NOTICE_KINDS, events=events,
                            active_ids={n.id for n in AfishaNotice.active()},
+                           need_status={n.id for n in items if notice_needs_status(n)},
                            title=Setting.get("notices_title"), edit=edit)
 
 

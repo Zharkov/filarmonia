@@ -1,6 +1,6 @@
 {% extends "admin/base.html" %}
 {% from "admin/_media.html" import media_manager %}
-{% from "admin/_form.html" import slug_field, form_actions, file_input %}
+{% from "admin/_form.html" import slug_field, form_actions, file_input, seo_block %}
 {% block title %}{{ ev.title or 'Новое событие' }}{% endblock %}
 
 {% block content %}
@@ -41,6 +41,19 @@
         <input id="age_limit" type="text" name="age_limit" value="{{ ev.age_limit or '' }}" placeholder="6+"></div>
     </div>
 
+    {#- Статус концерта: отмена и перенос видны посетителям на странице события, в афише и в поиске -#}
+    <div class="grid grid--3">
+      <div class="field"><label for="status">Статус концерта</label>
+        <select id="status" name="status" data-status-select>
+          {% for value, label in statuses %}<option value="{{ value }}" {{ 'selected' if (ev.status or 'scheduled') == value }}>{{ label }}</option>{% endfor %}
+        </select>
+        <div class="hint">«Отменён» и «Отложен»: на сайте появляется пометка, кнопки покупки билета скрываются. «Перенесён»: укажите новую дату выше, а прежнюю — рядом.</div></div>
+      <div class="field" data-previous-date {{ 'hidden' if ev.status != 'rescheduled' }}><label for="previous_starts_at">Прежняя дата и время</label>
+        <input id="previous_starts_at" type="datetime-local" name="previous_starts_at"
+               value="{{ ev.previous_starts_at.strftime('%Y-%m-%dT%H:%M') if ev.previous_starts_at }}">
+        <div class="hint">Показывается посетителям и поисковикам вместе с пометкой «Перенесён».</div></div>
+    </div>
+
     <div class="grid grid--4">
       <div class="field"><label for="venue_id">Площадка</label>
         <select id="venue_id" name="venue_id">
@@ -57,6 +70,12 @@
       <div class="field"><label for="price_max">Цена до, ₽</label>
         <input id="price_max" type="number" name="price_max" value="{{ ev.price_max or '' }}"></div>
     </div>
+
+    <div class="checkline">
+      <input id="is_free" type="checkbox" name="is_free" {{ 'checked' if ev.is_free }}>
+      <label for="is_free">Бесплатный концерт (вход по бесплатным пригласительным билетам в кассе)</label>
+    </div>
+    <div class="hint" style="margin:-4px 0 16px">Если отметка не стоит, а цена не указана, на сайте будет написано «Цена уточняется». У бесплатного концерта цену указывать не нужно.</div>
 
     <div class="grid grid--3">
       {#- Приставка до «@» общая для всех концертов — вводится только номер сеанса.
@@ -147,6 +166,8 @@
       <input id="show_media" type="checkbox" name="show_media" {{ 'checked' if ev.show_media or not ev.id }}>
       <label for="show_media">Показывать блок «Фото и видео» на странице события</label>
     </div>
+
+    {{ seo_block(ev) }}
   </section>
 
   <!-- ------------- отключаемые блоки: льготы и Пушкинская карта ------------- -->

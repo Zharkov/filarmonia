@@ -21,8 +21,9 @@
     <textarea id="a-message" name="message" required></textarea></div>
   <div class="form-row checkbox">
     <input id="a-consent" type="checkbox" name="consent" value="1">
-    <label for="a-consent">Согласен на обработку персональных данных в соответствии с
-      <a href="{{ url_for('public.page', slug='politika-konfidencialnosti') }}">политикой конфиденциальности</a></label>
+    <label for="a-consent">Я даю
+      <a href="{{ url_for('public.page', slug='soglasie-na-obrabotku-personalnyh-dannyh') }}" target="_blank" rel="noopener">согласие на обработку персональных данных</a>.
+      Ознакомлен(а) с <a href="{{ url_for('public.page', slug='politika-konfidencialnosti') }}" target="_blank" rel="noopener">политикой конфиденциальности</a></label>
   </div>
   <button class="btn btn--primary" type="submit">Отправить обращение</button>
 </form>

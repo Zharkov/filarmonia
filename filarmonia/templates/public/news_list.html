@@ -1,6 +1,7 @@
 {% extends "public/base.html" %}
 {% from "public/_macros.html" import pagination, news_card, breadcrumbs %}
-{% block title %}Новости{% endblock %}
+{% block title %}Новости{% if items.page > 1 %} — страница {{ items.page }}{% endif %}{% endblock %}
+{% block description %}Новости Смоленской областной филармонии: анонсы концертов, события и жизнь коллективов{% if items.page > 1 %}, страница {{ items.page }}{% endif %}.{% endblock %}
 {% block breadcrumbs %}{{ breadcrumbs([('Главная', url_for('public.index')), ('Новости', None)]) }}{% endblock %}
 {% block content %}
 <div class="wrap">

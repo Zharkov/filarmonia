@@ -1,10 +1,10 @@
 """Галереи фото и видео у событий, новостей, коллективов и страниц."""
 from flask import request, redirect, url_for, flash, abort, jsonify
 
-from ..models import db, MediaItem
+from ..models import db, MediaItem, Event, Collective, News, Page
 from .. import utils
 from . import bp
-from .common import files_of, get_or_404, log, login_required, release_files
+from .common import files_of, get_or_404, log, login_required, release_files, touch
 
 
 # Медиа (общее)
@@ -14,6 +14,10 @@ OWNERS = {
     "news": ("news_id", "admin.news_form", "item_id"),
     "page": ("page_id", "admin.page_form", "item_id"),
 }
+
+
+# Модель владельца по полю MediaItem: у всех есть updated_at
+OWNER_MODELS = {"event_id": Event, "collective_id": Collective, "news_id": News, "page_id": Page}
 
 
 def media_owner(item):
@@ -57,6 +61,7 @@ def media_add():
                 flash("Выберите хотя бы один файл.", "error")
             else:
                 log("create", object_type="media", details=f"фотографий: {saved} ({owner} № {owner_id})")
+                touch(OWNER_MODELS[field], owner_id)
                 db.session.commit()
                 flash(f"Загружено фотографий: {saved}.", "ok")
         else:
@@ -78,6 +83,7 @@ def media_add():
                 item.preview = utils.save_upload(preview, ("image",))
             db.session.add(item)
             log("create", item, details=f"видео ({owner} № {owner_id})")
+            touch(OWNER_MODELS[field], owner_id)
             db.session.commit()
             flash("Видео добавлено.", "ok")
     except ValueError as exc:
@@ -91,9 +97,11 @@ def media_add():
 @login_required
 def media_delete(media_id):
     item = get_or_404(MediaItem, media_id)
-    _, _, back = media_owner(item)
+    field, owner_id, back = media_owner(item)
     names = files_of(item)
     log("delete", item)
+    if field:
+        touch(OWNER_MODELS[field], owner_id)
     db.session.delete(item)
     db.session.commit()
     release_files(names)
@@ -120,6 +128,7 @@ def media_move(media_id):
         # Перенумеровываем всех: у старых записей порядок мог совпадать
         for position, media in enumerate(siblings):
             media.sort = (position + 1) * 10
+        touch(OWNER_MODELS[field], owner_id)
         db.session.commit()
     # Скрипт панели администратора переставляет миниатюру на месте, без перезагрузки страницы
     if request.headers.get("X-Requested-With") == "fetch":

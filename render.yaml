@@ -17,11 +17,14 @@ services:
     region: frankfurt
     branch: main
     autoDeploy: true
-    healthCheckPath: /
+    # простой ответ без базы и без пароля стенда (STAND_USER/STAND_PASSWORD)
+    healthCheckPath: /healthz
 
+    # Seed при сборке идёт без боевых флагов (HTTPS-куки, прокси): на этапе сборки адреса
+    # сайта ещё нет, а проверка SITE_URL (check_site_url) нужна только при запуске gunicorn.
     # imageio-ffmpeg ставится только ради демо-роликов (видео на главной и в
     # галереях): на боевом сервере он не нужен, поэтому его нет в requirements.txt.
-    buildCommand: pip install -r requirements.txt imageio-ffmpeg==0.6.0 && python app.py seed
+    buildCommand: pip install -r requirements.txt imageio-ffmpeg==0.6.0 && TRUST_PROXY=0 SESSION_COOKIE_SECURE=0 python app.py seed
 
     # $PORT задаёт Render. Таймаут увеличен: через панель администратора загружают файлы до 64 МБ.
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
@@ -47,6 +50,17 @@ services:
       # в выдаче с будущим настоящим сайтом
       - key: SITE_NOINDEX
         value: "1"
+
+      # Адрес сайта берётся из RENDER_EXTERNAL_URL, который Render выставляет сам
+      # (SITE_URL при желании можно задать вручную: он главнее). Без адреса сайт
+      # с HTTPS-куками и прокси не запускается, см. check_site_url.
+
+      # Пароль стенда: весь тестовый сайт закрыт basic-auth. Без него приём
+      # обращений и анкет на стенде отключён (персональные данные за рубежом).
+      - key: STAND_USER
+        sync: false
+      - key: STAND_PASSWORD
+        sync: false
 
       # пароль администратора Render спросит при создании Blueprint
       - key: ADMIN_PASSWORD

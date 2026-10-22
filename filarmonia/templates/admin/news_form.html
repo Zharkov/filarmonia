@@ -1,6 +1,6 @@
 {% extends "admin/base.html" %}
 {% from "admin/_media.html" import media_manager %}
-{% from "admin/_form.html" import slug_field, form_actions, file_input %}
+{% from "admin/_form.html" import slug_field, form_actions, file_input, seo_block %}
 {% block title %}{{ item.title or 'Новая новость' }}{% endblock %}
 {% block content %}
 <div class="page-head">
@@ -38,6 +38,7 @@
       <textarea id="lead" name="lead" style="min-height:70px">{{ item.lead or '' }}</textarea></div>
     <div class="field"><label for="content">Текст</label>
       <textarea id="content" name="content" data-rich>{{ item.content or '' }}</textarea></div>
+    {{ seo_block(item) }}
   </section>
 </form>
 {% if item.id %}

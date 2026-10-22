@@ -11,8 +11,8 @@ from ..models import (
 from .. import utils
 from . import bp
 from .common import (
-    delete_record, edited, get_or_404, log, login_required, release_files, replace_file, rich,
-    save, search_text, sorted_by, unique_slug, uploaded_name,
+    BAD_URL_TEXT, delete_record, edited, get_or_404, log, login_required, release_files, replace_file,
+    rich, safe_url, save, search_text, sorted_by, unique_slug, uploaded_name,
 )
 
 
@@ -30,8 +30,12 @@ def menu():
         f = request.form
         item_id = utils.parse_int(f.get("id"))
         item = get_or_404(MenuItem, item_id) if item_id else MenuItem()
+        url = safe_url(f.get("url"))
+        if url is None:
+            flash(BAD_URL_TEXT, "error")
+            return redirect(url_for("admin.menu", edit=item_id) if item_id else url_for("admin.menu"))
         item.title = f.get("title", "").strip()
-        item.url = f.get("url", "").strip()
+        item.url = url
         item.page_id = utils.parse_int(f.get("page_id"))
         parent_id = utils.parse_int(f.get("parent_id"))
         # Пункт не может быть подпунктом самого себя
@@ -81,14 +85,18 @@ def documents():
         item = get_or_404(Document, item_id) if item_id else Document()
         if item.news_id:
             abort(404)
+        back = url_for("admin.documents", edit=item_id) if item_id else url_for("admin.documents")
+        url = safe_url(f.get("url"))
+        if url is None:
+            flash(BAD_URL_TEXT, "error")
+            return redirect(back)
         item.title = f.get("title", "").strip()
         item.category = f.get("category", "").strip() or "Прочее"
         item.year = utils.parse_int(f.get("year"))
         item.doc_date = utils.parse_date(f.get("doc_date"))
-        item.url = f.get("url", "").strip()
+        item.url = url
         item.sort = utils.parse_int(f.get("sort"), 100)
         item.is_published = bool(f.get("is_published"))
-        back = url_for("admin.documents", edit=item_id) if item_id else url_for("admin.documents")
         try:
             old_files = replace_file(item, "file", uploaded_name("file", ("doc", "image")))
             if old_files or (item.file and not item.size_kb):
@@ -144,12 +152,16 @@ def banners():
         f = request.form
         item_id = utils.parse_int(f.get("id"))
         item = get_or_404(Banner, item_id) if item_id else Banner()
+        back = url_for("admin.banners", edit=item_id) if item_id else url_for("admin.banners")
+        url = safe_url(f.get("url"))
+        if url is None:
+            flash(BAD_URL_TEXT, "error")
+            return redirect(back)
         item.title = f.get("title", "").strip()
-        item.url = f.get("url", "").strip()
+        item.url = url
         item.place = f.get("place") if f.get("place") in dict(BANNER_PLACES) else "partners"
         item.sort = utils.parse_int(f.get("sort"), 100)
         item.is_published = bool(f.get("is_published"))
-        back = url_for("admin.banners", edit=item_id) if item_id else url_for("admin.banners")
         try:
             old_files = replace_file(item, "image", uploaded_name("image"))
         except ValueError as exc:
@@ -190,6 +202,30 @@ def redirect_source(value: str) -> str:
     return path + ("?" + parts.query if parts.query else "")
 
 
+def redirect_loops(old_path: str, new_url: str, item) -> bool:
+    """Зациклится ли цепочка перенаправлений, если правило «old_path -> new_url» будет сохранено.
+
+    Идём по таблице так же, как сайт при запросе (сначала адрес без параметров, потом с ними);
+    чужие сайты («https://…») цепочку обрывают. Петля любой длины, в том числе уже
+    имеющаяся в таблице на пути, — отказ.
+    """
+    rules = {r.old_path: r.new_url for r in Redirect.query.all()}
+    if item.id:
+        rules.pop(item.old_path, None)
+    rules[old_path] = new_url
+    current, seen = new_url, {old_path}
+    while current.startswith("/"):
+        target = redirect_source(current)
+        path_only = target.split("?")[0]
+        if target in seen or path_only in seen:
+            return True
+        seen.add(target)
+        current = rules.get(path_only) or rules.get(target)
+        if current is None:
+            return False
+    return False
+
+
 @bp.route("/redirects", methods=["GET", "POST"])
 @login_required
 def redirects():
@@ -205,8 +241,11 @@ def redirects():
             flash("Укажите старый адрес страницы.", "error")
         elif not (new_url.startswith("/") and not new_url.startswith("//")) and not new_url.startswith("https://"):
             flash("Новый адрес должен начинаться с «/» или с «https://».", "error")
-        elif redirect_source(new_url) == old_path and new_url.startswith("/"):
-            flash("Старый и новый адреса совпадают: перенаправление зациклится.", "error")
+        elif safe_url(new_url) is None:
+            flash(BAD_URL_TEXT, "error")
+        elif new_url.startswith("/") and redirect_loops(old_path, new_url, item):
+            flash("Перенаправление зациклится: новый адрес сам ведёт обратно на старый "
+                  "(возможно, через другие правила).", "error")
         elif taken:
             flash(f"Для адреса «{old_path}» перенаправление уже есть.", "error")
         else:
@@ -259,6 +298,10 @@ def refs():
             # Адрес при правке не меняем: на него ведут ссылки фильтров афиши
             if not item.slug:
                 item.slug = unique_slug(model, item.name, item, f.get("slug"))
+            if is_venue and item.id:
+                # Адрес площадки выводится на страницах концертов — их отметка изменения обновляется
+                Event.query.filter_by(venue_id=item.id).update(
+                    {"updated_at": utils.utcnow()}, synchronize_session=False)
             save(item, {Venue: "Площадка сохранена.", Festival: "Фестиваль сохранён."}.get(
                 model, "Категория сохранена."))
         else:

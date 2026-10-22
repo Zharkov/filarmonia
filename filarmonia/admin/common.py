@@ -1,11 +1,13 @@
 """Общее для всех разделов панели: доступ, журнал, сохранение записей, файлы."""
+import re
 from functools import wraps
+from urllib.parse import urlsplit
 
 from flask import request, redirect, url_for, flash, g, abort
 
 from ..models import (
     db, User, Event, EventBadge, MediaItem, Collective, News, Page, MenuItem, Document, Banner,
-    Venue, Category, Festival, AfishaNotice, Appeal, Setting, ActionLog, Redirect, referenced_uploads,
+    Venue, Category, Festival, AfishaNotice, Appeal, Setting, ActionLog, Redirect, SurveyResponse, referenced_uploads,
 )
 from .. import reset_site_data, utils
 from . import bp
@@ -21,7 +23,7 @@ OBJECT_TYPES = {
     Festival: ("festival", "Фестиваль"), AfishaNotice: ("notice", "Изменение в афише"),
     User: ("user", "Сотрудник"), Appeal: ("appeal", "Обращение"), MediaItem: ("media", "Фото или видео"),
     EventBadge: ("badge", "Баннер на афише"), Setting: ("settings", "Настройки"),
-    Redirect: ("redirect", "Перенаправление"),
+    Redirect: ("redirect", "Перенаправление"), SurveyResponse: ("survey", "Ответ на анкету"),
 }
 OBJECT_LABELS = dict(OBJECT_TYPES.values())
 ACTION_LABELS = {
@@ -53,22 +55,59 @@ def admin_required(view):
     return wrapper
 
 
+# Управляющие символы: браузер выбрасывает табуляцию и переводы строк из адреса,
+# поэтому «java<TAB>script:» и «/<TAB>/evil.ru» превращаются в опасные ссылки
+CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029]")
+
+# Что можно поставить в поле «Ссылка»: страница сайта, внешний сайт, почта, телефон
+# и якорь на той же странице. Остальное (javascript:, data:, vbscript: ...) отбрасывается.
+URL_PREFIXES = ("https://", "http://", "mailto:", "tel:")
+BAD_URL_TEXT = "Ссылка должна начинаться с «/», «https://», «http://», «mailto:» или «tel:»."
+
+
+def safe_url(value) -> "str | None":
+    """Проверяет ссылку из поля формы. Возвращает её очищенной либо None, если она недопустима.
+
+    Пустая ссылка допустима (поля необязательные) и возвращается пустой строкой.
+    Ссылки выводятся посетителям в href, поэтому «javascript:» от редактора
+    выполнился бы в браузере администратора. Разрешены «/путь» (но не «//host»
+    и не «/\\host» — это чужой сайт), «#якорь», https://, http://, mailto: и tel:.
+    """
+    value = value or ""
+    if CONTROL_CHARS.search(value):
+        return None
+    value = value.strip()
+    if not value:
+        return ""
+    if value.startswith("/"):
+        return None if value.startswith(("//", "/\\")) else value
+    if value.startswith("#"):
+        return value
+    return value if value.lower().startswith(URL_PREFIXES) else None
+
+
 def safe_next(target: str) -> str:
     """Адрес возврата после входа — только внутри сайта.
 
     Без проверки ссылка `/admin/login?next=https://чужой-сайт` отправила бы
     сотрудника после ввода пароля на поддельную страницу. «//host» и «/\\host»
-    браузер тоже понимает как чужой сайт, поэтому отсекаем и их.
+    браузер тоже понимает как чужой сайт, поэтому отсекаем и их. Табуляцию и
+    переводы строк браузер из адреса выбрасывает («/<TAB>/evil.ru» -> «//evil.ru»),
+    поэтому адрес с управляющими символами не принимается вовсе.
     """
-    if target and target.startswith("/") and not target.startswith(("//", "/\\")):
-        return target
+    target = target or ""
+    if (target.startswith("/") and not target.startswith(("//", "/\\"))
+            and not CONTROL_CHARS.search(target)):
+        parts = urlsplit(target)
+        if not parts.scheme and not parts.netloc:
+            return target
     return url_for("admin.dashboard")
 
 
 @bp.context_processor
 def inject_counters():
     """Число необработанных обращений — для красного кружка в левом меню."""
-    if not g.get("user"):
+    if not g.get("user") or not g.user.is_admin:
         return {}
     return {"new_appeals": Appeal.query.filter_by(is_processed=False).count()}
 
@@ -95,6 +134,48 @@ def unique_slug(model, title: str, item, given: str = "") -> str:
         ).first() is not None
 
     return utils.slugify((given or "").strip() or title, taken)
+
+
+SEO_TITLE_MAX = 200
+SEO_DESCRIPTION_MAX = 300
+
+
+def seo_text(value, limit: int) -> str:
+    """Заголовок или описание для поисковиков: без управляющих символов и лишних пробелов, не длиннее limit."""
+    value = CONTROL_CHARS.sub(" ", value or "")
+    return " ".join(value.split())[:limit]
+
+
+def set_seo(item, form) -> None:
+    """Читает поля «Для поисковиков» (seo_title, seo_description) у события, коллектива или новости."""
+    item.seo_title = seo_text(form.get("seo_title"), SEO_TITLE_MAX)
+    item.seo_description = seo_text(form.get("seo_description"), SEO_DESCRIPTION_MAX)
+
+
+def keep_old_address(item, old_url: str, was_published: bool) -> str:
+    """Смена адреса опубликованной записи: старый адрес навсегда ведёт на новый.
+
+    Вызывается после установки нового slug и до save(): перенаправление
+    сохраняется тем же commit. Цепочек не создаём — правила, которые вели на
+    старый адрес, переписываются сразу на новый; правило, стоящее на новом
+    (живом) адресе, удаляется, иначе при возврате к прежнему адресу получилась бы петля.
+    Правило для старого адреса, которое вело в другое место (адрес успел занять другой записью,
+    а теперь освободился), переписывается на текущую запись: прежний адрес живёт именно на ней.
+    Возвращает пояснение для сообщения «Сохранено» либо пустую строку.
+    """
+    new_url = item.url
+    if not old_url or old_url == new_url:
+        return ""
+    Redirect.query.filter(Redirect.old_path == new_url).delete(synchronize_session=False)
+    if not was_published:
+        return ""
+    Redirect.query.filter(Redirect.new_url == old_url).update({"new_url": new_url}, synchronize_session=False)
+    existing = Redirect.query.filter(Redirect.old_path == old_url).first()
+    if existing is None:
+        db.session.add(Redirect(old_path=old_url, new_url=new_url, hits=0))
+    elif existing.new_url != new_url:
+        existing.new_url = new_url
+    return f" Со старого адреса {old_url} настроено перенаправление на новый."
 
 
 def publish_choice(item) -> bool:
@@ -170,6 +251,9 @@ def edited(model):
 
 
 def title_of(item) -> str:
+    # Персональные данные гражданина в журнал не попадают: только номер обращения
+    if isinstance(item, Appeal):
+        return f"Обращение № {item.id}"
     for attr in ("title", "name", "login", "text"):
         value = getattr(item, attr, None)
         if value:
@@ -193,6 +277,13 @@ def log(action: str, item=None, details: str = "", object_type: str = "") -> Non
         object_id=getattr(item, "id", None) if item is not None else None,
         title=title_of(item) if item is not None else "", details=details[:400],
     ))
+
+
+def touch(model, item_id) -> None:
+    """Отмечает запись изменённой (updated_at): галерея, баннеры и связи лежат в других таблицах,
+    и без этого отметка Last-Modified страницы не менялась бы. Сохраняется ближайшим commit."""
+    if item_id:
+        model.query.filter_by(id=item_id).update({"updated_at": utils.utcnow()}, synchronize_session=False)
 
 
 def save(item, message: str):

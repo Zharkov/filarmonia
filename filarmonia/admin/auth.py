@@ -1,18 +1,40 @@
 """Вход и выход сотрудников, защита от подбора пароля."""
+import secrets
 import time
 
 from flask import render_template, request, redirect, url_for, flash, session, current_app
 
+from werkzeug.security import check_password_hash, generate_password_hash
+
 from ..models import db, User
 from .. import throttle, utils
 from . import bp
-from .common import safe_next
+from .common import CONTROL_CHARS, safe_next
+
+
+# Предел длины логина в ключе счётчика: колонка throttles.key — 300 знаков, а логин присылает кто угодно
+LOGIN_KEY_MAX = 64
+_dummy_hash = None
+
+
+def spend_password_time(password: str) -> None:
+    """Проверка пароля «в пустоту» для несуществующего логина.
+
+    Без неё ответ на неизвестный логин приходит заметно быстрее: хеш не считается,
+    и по времени ответа можно узнать, какие логины есть. Заглушка строится тем же
+    алгоритмом, что и пароли сотрудников, и создаётся при первом использовании.
+    """
+    global _dummy_hash
+    if _dummy_hash is None:
+        _dummy_hash = generate_password_hash(secrets.token_hex(16))
+    check_password_hash(_dummy_hash, password)
 
 
 # Неудачные попытки входа считаются по паре «логин + адрес» в таблице throttles:
 # счётчик общий для всех процессов gunicorn и переживает перезапуск сайта.
 def _attempt_key() -> str:
-    return f"login:{request.form.get('login', '').strip().lower()}:{request.remote_addr or ''}"
+    login_name = request.form.get("login", "").strip().lower()[:LOGIN_KEY_MAX]
+    return f"login:{login_name}:{request.remote_addr or ''}"
 
 
 def login_locked_for() -> int:
@@ -39,8 +61,15 @@ def login():
                   f"{utils.plural(locked // 60 + 1, 'минуту', 'минуты', 'минут')}.", "error")
             return render_template("admin/login.html")
 
-        user = User.query.filter_by(login=request.form.get("login", "").strip()).first()
-        if user and user.is_active and user.check_password(request.form.get("password", "")):
+        user = User.query.filter_by(login=CONTROL_CHARS.sub("", request.form.get("login", "")).strip()).first()
+        password = request.form.get("password", "")
+        if user is None:
+            spend_password_time(password)
+            password_ok = False
+        else:
+            # Пароль проверяется и у отключённого сотрудника: время ответа не выдаёт отключение
+            password_ok = user.check_password(password)
+        if user and user.is_active and password_ok:
             throttle.reset(_attempt_key())
             session.clear()
             # Сеанс ограничен по времени (PERMANENT_SESSION_LIFETIME), а при

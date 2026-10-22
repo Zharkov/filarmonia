@@ -21,10 +21,14 @@
     <div class="side__group">Учреждение</div>
     <a href="{{ url_for('admin.pages') }}" class="{{ 'is-active' if (request.endpoint or '').startswith('admin.page') }}">Страницы</a>
     <a href="{{ url_for('admin.documents') }}" class="{{ 'is-active' if (request.endpoint or '').startswith('admin.document') }}">Документы</a>
+    {#- Обращения содержат персональные данные: только администратору -#}
+    {% if current_user and current_user.is_admin %}
     <a href="{{ url_for('admin.appeals') }}" class="side__link {{ 'is-active' if (request.endpoint or '').startswith('admin.appeal') }}">
       Обращения граждан
       {% if new_appeals %}<span class="counter" title="Новых обращений: {{ new_appeals }}">{{ new_appeals if new_appeals < 100 else '99+' }}<span class="visually-hidden"> новых</span></span>{% endif %}
     </a>
+    {% endif %}
+    <a href="{{ url_for('admin.survey_list') }}" class="{{ 'is-active' if (request.endpoint or '').startswith('admin.survey') }}">Анкеты НОК</a>
 
     <div class="side__group">Оформление</div>
     <a href="{{ url_for('admin.menu') }}" class="{{ 'is-active' if (request.endpoint or '').startswith('admin.menu') }}">Меню</a>

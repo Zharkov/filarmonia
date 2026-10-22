@@ -55,9 +55,9 @@ git push -u origin main
 
 | Адрес | Что там |
 |---|---|
-| `https<имя>.onrender.com/` | главная с афишей |
+| `https://<имя>.onrender.com/` | главная с афишей |
 | `/admin` | панель администратора, логин `admin`, пароль из шага 2.4 |
-| `/robots.txt` | `Disallow: /` — тестовый адрес закрыт от поисковиков |
+| `/robots.txt` | `Allow: /` — обход разрешён, индексация запрещена заголовком `X-Robots-Tag` |
 
 ---
 
@@ -106,7 +106,9 @@ git push -u origin main
 | `SECRET_KEY` | генерирует Render | подпись сессий |
 | `SESSION_COOKIE_SECURE` | `1` | cookie только по HTTPS |
 | `TRUST_PROXY` | `1` | брать протокол и адрес клиента из `X-Forwarded-*`, иначе в `sitemap.xml` попадёт `http://` |
-| `SITE_NOINDEX` | `1` | `noindex` в шаблоне и `Disallow: /` в `robots.txt` |
+| `SITE_NOINDEX` | `1` | `noindex` в шаблоне, заголовок `X-Robots-Tag: noindex, nofollow` на все ответы; обход в `robots.txt` разрешён, чтобы робот увидел запрет |
+| `STAND_USER`, `STAND_PASSWORD` | задаёте вы | логин и пароль на весь стенд (basic-auth). Без них стенд открыт всем, и приём обращений и анкет на нём отключён |
+| `SITE_URL` | не задаётся | берётся из `RENDER_EXTERNAL_URL`, которую Render выставляет сам; при запуске сайт без адреса не стартует. Наполнение базы при сборке (`seed`) идёт с `TRUST_PROXY=0` и `SESSION_COOKIE_SECURE=0`, адрес ему не нужен |
 | `ADMIN_PASSWORD` | задаёте вы | пароль администратора при создании базы |
 
 На боевом сервере `SITE_NOINDEX` не ставится (сайт должен индексироваться),

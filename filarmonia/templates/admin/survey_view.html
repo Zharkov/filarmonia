@@ -1,0 +1,29 @@
+{% extends "admin/base.html" %}
+{% block title %}Ответ на анкету{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Ответ от {{ item.created_at | msk | ru_datetime }}</h1>
+    <p class="subtitle">{{ survey.title if survey else item.survey }}</p></div>
+  <div style="display:flex;gap:10px">
+    <a class="btn btn--ghost" href="{{ url_for('admin.survey_list') }}">К списку</a>
+    {% if current_user and current_user.is_admin %}
+      {% if not item.is_emailed %}
+        <form method="post" action="{{ url_for('admin.survey_resend', item_id=item.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn--ghost" type="submit">Отправить ещё раз</button>
+        </form>
+      {% endif %}
+      <form method="post" action="{{ url_for('admin.survey_delete', item_id=item.id) }}" onsubmit="return confirm('Удалить ответ?')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn--ghost" type="submit">Удалить</button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+<section class="panel">
+  <p><strong>Письмо:</strong> {% if item.is_emailed %}отправлено{% else %}не отправлено{% if item.email_error %} ({{ item.email_error }}){% endif %}{% endif %}</p>
+  {% for label, value, note in rows %}
+    <p><strong>{{ label }}</strong><br>{{ value }}{% if note %}<br><em>Пожелания:</em> <span style="white-space:pre-wrap">{{ note }}</span>{% endif %}</p>
+  {% else %}<p>Описание этой анкеты больше не поддерживается.</p>{% endfor %}
+</section>
+{% endblock %}

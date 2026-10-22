@@ -1,4 +1,5 @@
-"""Обращения граждан из интернет-приёмной."""
+"""Обращения граждан из интернет-приёмной. Раздел только для администратора: в обращениях
+персональные данные граждан."""
 from datetime import timedelta
 
 from flask import render_template, request, redirect, url_for, flash
@@ -6,7 +7,7 @@ from flask import render_template, request, redirect, url_for, flash
 from ..models import db, Appeal, Setting
 from .. import utils
 from . import bp
-from .common import get_or_404, log, login_required, paginated, search_text, sorted_by
+from .common import admin_required, delete_record, get_or_404, log, paginated, search_text, sorted_by
 
 
 # Обращения
@@ -30,7 +31,7 @@ def purge_old_appeals() -> int:
 
 
 @bp.route("/appeals")
-@login_required
+@admin_required
 def appeals():
     purged = purge_old_appeals()
     if purged:
@@ -54,7 +55,7 @@ def appeals():
 
 
 @bp.route("/appeals/<int:item_id>", methods=["GET", "POST"])
-@login_required
+@admin_required
 def appeal_view(item_id):
     item = get_or_404(Appeal, item_id)
     if request.method == "POST":
@@ -68,7 +69,15 @@ def appeal_view(item_id):
 
 
 @bp.route("/appeals/<int:item_id>/print")
-@login_required
+@admin_required
 def appeal_print(item_id):
     """Обращение на отдельной странице для печати или сохранения в PDF."""
     return render_template("admin/appeal_print.html", item=get_or_404(Appeal, item_id))
+
+
+@bp.route("/appeals/<int:item_id>/delete", methods=["POST"])
+@admin_required
+def appeal_delete(item_id):
+    """Удаление обращения по требованию гражданина (отзыв согласия на обработку данных).
+    В журнале остаётся только номер обращения, без имени."""
+    return delete_record(Appeal, item_id, "admin.appeals", "Обращение удалено.")

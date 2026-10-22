@@ -6,9 +6,9 @@ from ..models import db, Event, Collective, News, Page, MenuItem, Document
 from .. import utils
 from . import bp
 from .common import (
-    after_save, delete_record, get_or_404, log, login_required, paginated, publish_choice,
-    release_files, replace_file, rich, save, search_text, sorted_by, status_note, unique_slug,
-    uploaded_name,
+    BAD_URL_TEXT, after_save, delete_record, get_or_404, keep_old_address, log, login_required, paginated,
+    publish_choice, release_files, replace_file, rich, safe_url, save, search_text, seo_text, set_seo, sorted_by,
+    status_note, unique_slug, uploaded_name,
 )
 
 
@@ -75,6 +75,7 @@ def collective_form(item_id=None):
     if request.method == "POST":
         f = request.form
         was_published = bool(item.id and item.is_published)
+        old_url = item.url if item.id else ""
         item.name = f.get("name", "").strip()
         old_files = []
         try:
@@ -86,12 +87,14 @@ def collective_form(item_id=None):
             item.description = rich("description")
             item.contacts = rich("contacts")
             item.sort = utils.parse_int(f.get("sort"), 100)
+            set_seo(item, f)
             item.is_published = publish_choice(item)
             old_files = replace_file(item, "logo", uploaded_name("logo"))
         except ValueError as exc:
             flash(str(exc), "error")
             return render_template("admin/collective_form.html", item=item, unsaved=True)
-        save(item, "Коллектив сохранён." + status_note(item, was_published))
+        moved = keep_old_address(item, old_url, was_published)
+        save(item, "Коллектив сохранён." + status_note(item, was_published) + moved)
         release_files(old_files)
         return after_save(item, url_for("admin.collective_form", item_id=item.id))
     return render_template("admin/collective_form.html", item=item)
@@ -124,6 +127,7 @@ def news_form(item_id=None):
     if request.method == "POST":
         f = request.form
         was_published = bool(item.id and item.is_published)
+        old_url = item.url if item.id else ""
         item.title = f.get("title", "").strip()
         old_files = []
         try:
@@ -131,6 +135,7 @@ def news_form(item_id=None):
                 raise ValueError("Укажите заголовок новости.")
             item.slug = unique_slug(News, item.title, item, f.get("slug"))
             item.lead = f.get("lead", "").strip()
+            set_seo(item, f)
             item.content = rich("content")
             item.published_at = (
                 utils.parse_dt(f.get("published_at")) or item.published_at or utils.now_msk()
@@ -141,7 +146,8 @@ def news_form(item_id=None):
         except ValueError as exc:
             flash(str(exc), "error")
             return render_template("admin/news_form.html", item=item, unsaved=True)
-        save(item, "Новость сохранена." + status_note(item, was_published))
+        moved = keep_old_address(item, old_url, was_published)
+        save(item, "Новость сохранена." + status_note(item, was_published) + moved)
         release_files(old_files)
         return after_save(item, url_for("admin.news_form", item_id=item.id))
     return render_template("admin/news_form.html", item=item)
@@ -189,6 +195,7 @@ def page_form(item_id=None):
     if request.method == "POST":
         f = request.form
         was_published = bool(item.id and item.is_published)
+        old_url = item.url if item.id else ""
         old_title = item.title
         item.title = f.get("title", "").strip()
         if not item.title:
@@ -201,13 +208,14 @@ def page_form(item_id=None):
         item.sort = utils.parse_int(f.get("sort"), 100)
         template = f.get("template", "page")
         item.template = template if template in dict(PAGE_TEMPLATES) else "page"
-        item.seo_description = f.get("seo_description", "").strip()
+        item.seo_description = seo_text(f.get("seo_description"), 400)  # колонка pages.seo_description — 400
         item.is_published = publish_choice(item)
         item.show_in_menu = bool(f.get("show_in_menu"))
         if old_title and old_title != item.title:
             # Документы находят страницу по её заголовку — переносим их вслед за ним
             Document.query.filter_by(category=old_title, news_id=None).update({"category": item.title})
-        save(item, "Страница сохранена." + status_note(item, was_published))
+        moved = keep_old_address(item, old_url, was_published)
+        save(item, "Страница сохранена." + status_note(item, was_published) + moved)
         return after_save(item, url_for("admin.page_form", item_id=item.id))
     return render_template("admin/page_form.html", item=item, parents=parents,
                            templates=PAGE_TEMPLATES)
@@ -238,8 +246,12 @@ def news_document_add(item_id):
     item = get_or_404(News, item_id)
     back = url_for("admin.news_form", item_id=item.id) + "#documents"
     f = request.form
+    url = safe_url(f.get("url"))
+    if url is None:
+        flash(BAD_URL_TEXT, "error")
+        return redirect(back)
     doc = Document(news_id=item.id, category="", is_published=True,
-                   title=f.get("title", "").strip(), url=f.get("url", "").strip(),
+                   title=f.get("title", "").strip(), url=url,
                    sort=utils.parse_int(f.get("sort"), (len(item.documents) + 1) * 10))
     try:
         doc.file = uploaded_name("file", ("doc", "image"))

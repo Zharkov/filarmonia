@@ -3,6 +3,7 @@
     python app.py thumbs              сделать уменьшенные копии для всех фото
     python app.py cleanup --dry-run   показать файлы, на которые никто не ссылается
     python app.py cleanup             удалить такие файлы
+    python app.py purge               удалить обращения и ответы анкет старше срока хранения
 """
 import os
 import re
@@ -54,3 +55,16 @@ def cleanup(app, dry_run: bool = False) -> list:
             except OSError as error:
                 print(f"Не удалось удалить {name}: {error}")
     return names
+
+
+def purge(app) -> dict:
+    """Удаляет по сроку хранения обработанные обращения и ответы анкет. Возвращает счётчики.
+
+    Сроки — в «Настройках» (appeals_retention_years, surveys_retention_years).
+    Предназначена для cron: сроки соблюдаются, даже если раздел обращений никто не открывает.
+    """
+    from .admin.appeals import purge_old_appeals
+    from .admin.surveys import purge_old_surveys
+
+    with app.app_context():
+        return {"appeals": purge_old_appeals(), "surveys": purge_old_surveys()}

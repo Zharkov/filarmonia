@@ -37,7 +37,7 @@
       <textarea id="content" name="content" data-rich>{{ item.content or '' }}</textarea>
       <div class="hint">Кнопка «&lt;/&gt;» на панели редактора переключает в режим HTML-кода.</div></div>
     <div class="field"><label for="seo_description">Описание для поисковых систем</label>
-      <input id="seo_description" type="text" name="seo_description" value="{{ item.seo_description or '' }}"></div>
+      <input id="seo_description" type="text" name="seo_description" maxlength="400" value="{{ item.seo_description or '' }}"></div>
     <div class="checkline"><input id="show_in_menu" type="checkbox" name="show_in_menu" {{ 'checked' if item.show_in_menu or not item.id }}>
       <label for="show_in_menu">Доступна для добавления в меню</label></div>
   </section>

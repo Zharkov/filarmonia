@@ -415,7 +415,7 @@
      и стрелки откладывают следующий шаг. При «уменьшить движение» в системе —
      не листает вовсе. */
   var reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  function autoplay(box, advance, delay) {
+  function autoplay(box, advance, delay, extra) {
     if (reducedMotion) return;
     var hovered = false, focused = false, onScreen = true, timer = null;
     function restart() {
@@ -424,12 +424,16 @@
         if (!hovered && !focused && onScreen && !document.hidden) advance();
       }, delay);
     }
-    box.addEventListener("mouseenter", function () { hovered = true; });
-    box.addEventListener("mouseleave", function () { hovered = false; restart(); });
-    box.addEventListener("focusin", function () { focused = true; });
-    box.addEventListener("focusout", function () { focused = false; });
-    box.addEventListener("pointerdown", restart);
-    box.addEventListener("click", restart);
+    // extra — стрелки вне ленты (в заголовке раздела): они ставят паузу и сбрасывают таймер так же
+    [box, extra].forEach(function (el) {
+      if (!el) return;
+      el.addEventListener("mouseenter", function () { hovered = true; });
+      el.addEventListener("mouseleave", function () { hovered = false; restart(); });
+      el.addEventListener("focusin", function () { focused = true; });
+      el.addEventListener("focusout", function () { focused = false; });
+      el.addEventListener("pointerdown", restart);
+      el.addEventListener("click", restart);
+    });
     if ("IntersectionObserver" in window) {
       new IntersectionObserver(function (entries) {
         onScreen = entries[0].isIntersecting;
@@ -466,8 +470,11 @@
      подгружаются следующие концерты; пустой ответ — афиша кончилась. */
   document.querySelectorAll("[data-ecarousel]").forEach(function (box) {
     var track = box.querySelector("[data-ecarousel-track]");
-    var prev = box.querySelector("[data-ecarousel-prev]");
-    var next = box.querySelector("[data-ecarousel-next]");
+    // Стрелки стоят в заголовке раздела и связаны с лентой по id; запасной путь — внутри ленты
+    var nav = (box.id && document.querySelector('[data-ecarousel-nav="' + box.id + '"]')) || box;
+    var prev = nav.querySelector("[data-ecarousel-prev]");
+    var next = nav.querySelector("[data-ecarousel-next]");
+    if (!prev || !next) return;
     var moreUrl = box.getAttribute("data-more");
     var loading = false;
 
@@ -511,6 +518,7 @@
     prev.addEventListener("click", function () { track.scrollBy({ left: -step(), behavior: "smooth" }); });
     next.addEventListener("click", function () { track.scrollBy({ left: step(), behavior: "smooth" }); });
     box.classList.add("is-ready");
+    if (nav !== box) nav.hidden = false;
     onScrollFrame(track, update);
 
     // Дошли до конца и больше подгружать нечего — возвращаемся к началу
@@ -521,7 +529,7 @@
       } else if (!atEnd) {
         track.scrollBy({ left: step(), behavior: "smooth" });
       }
-    }, 6000);
+    }, 6000, nav !== box ? nav : null);
   });
 
   /* Плавное появление разделов главной. Раздел, ушедший с экрана, снова
@@ -546,14 +554,32 @@
   }
 
   /* Яндекс Афиша: ключ и регион приходят из «Настроек» атрибутами body.
-     Скрипт продавца грузится один раз; кнопка с ID сеанса открывает окно
-     покупки, а без ключа остаётся обычной ссылкой. */
+     Скрипт продавца грузится один раз и только там, где есть что открывать:
+     кнопка с ID сеанса или встроенный виджет (на «Интернет-приёмной» и других
+     страницах он не нужен). Кнопка с ID открывает окно покупки, а без ключа
+     остаётся обычной ссылкой. Кнопки, подгруженные позже (подбор маршрута,
+     «Ещё концерты»), подключают скрипт в момент появления. */
   var yaKey = document.body.getAttribute("data-ya-key");
   var YA = "YandexTicketsDealer";
+  var dealerLoaded = false;
+
+  function loadDealer() {
+    if (dealerLoaded || !yaKey) return;
+    dealerLoaded = true;
+    var dealer = window[YA] = window[YA] || [];
+    dealer.push(["setDefaultClientKey", yaKey]);
+    dealer.push(["setDefaultRegionId", +document.body.getAttribute("data-ya-region") || 12]);
+    var yaScript = document.createElement("script");
+    yaScript.async = true;
+    yaScript.src = "https://widget.afisha.yandex.ru/dealer/dealer.js";
+    document.head.appendChild(yaScript);
+  }
 
   function bindYandex(scope) {
     if (!yaKey) return;
-    scope.querySelectorAll("[data-ya-session]:not([data-ya-bound])").forEach(function (btn) {
+    var buttons = scope.querySelectorAll("[data-ya-session]:not([data-ya-bound])");
+    if (buttons.length) loadDealer();
+    buttons.forEach(function (btn) {
       btn.setAttribute("data-ya-bound", "");
       btn.addEventListener("click", function (e) {
         e.preventDefault();
@@ -564,17 +590,13 @@
   }
 
   if (yaKey) {
-    var dealer = window[YA] = window[YA] || [];
-    dealer.push(["setDefaultClientKey", yaKey]);
-    dealer.push(["setDefaultRegionId", +document.body.getAttribute("data-ya-region") || 12]);
-    var yaScript = document.createElement("script");
-    yaScript.async = true;
-    yaScript.src = "https://widget.afisha.yandex.ru/dealer/dealer.js";
-    document.head.appendChild(yaScript);
     bindYandex(document);
+    // Код, вставленный редактором (схема зала, страницы), может обращаться к скрипту продавца напрямую
+    if (document.querySelector('[onclick*="' + YA + '"], #hall')) loadDealer();
 
     /* Встроенный виджет на странице события */
     document.querySelectorAll("[data-ya-widget]").forEach(function (section) {
+      loadDealer();
       var frame = section.querySelector("[data-ya-widget-frame]");
       section.hidden = false;
       window[YA].push(["getDealer", function (d) {
@@ -590,9 +612,14 @@
   /* Яндекс Метрика: номер счётчика — из «Настроек» атрибутом body.
      Подключается здесь, а не встроенным кодом: встроенные скрипты запрещены
      политикой безопасности. Визиты сотрудников не считаются (атрибута нет).
-     Вебвизор (запись действий посетителя) выключен: это персональные данные. */
+     Вебвизор (запись действий посетителя) выключен: это персональные данные.
+     Метрика ставит cookie, поэтому запускается только после «Принять» в плашке
+     внизу экрана. Выбор хранится в localStorage; пока выбора нет, ни скрипт
+     Метрики, ни её cookie не появляются. */
   var metrikaId = +document.body.getAttribute("data-metrika");
-  if (metrikaId) {
+  var CONSENT_KEY = "cookie-consent";
+
+  function startMetrika() {
     window.ym = window.ym || function () { (window.ym.a = window.ym.a || []).push(arguments); };
     window.ym.l = Date.now();
     var ymScript = document.createElement("script");
@@ -600,6 +627,30 @@
     ymScript.src = "https://mc.yandex.ru/metrika/tag.js";
     document.head.appendChild(ymScript);
     window.ym(metrikaId, "init", { clickmap: true, trackLinks: true, accurateTrackBounce: true });
+  }
+
+  if (metrikaId) {
+    var consent = null;
+    try { consent = localStorage.getItem(CONSENT_KEY); } catch (e) {}
+    var cookieBar = document.querySelector("[data-cookie]");
+    if (consent === "all") {
+      startMetrika();
+    } else if (consent !== "necessary" && cookieBar) {
+      cookieBar.hidden = false;
+      document.body.classList.add("has-cookie");
+      var answer = function (choice) {
+        try { localStorage.setItem(CONSENT_KEY, choice); } catch (e) {}
+        cookieBar.hidden = true;
+        document.body.classList.remove("has-cookie");
+        // Нажатая кнопка исчезла — фокус переносим к содержимому, а не теряем на body
+        var mainBlock = document.getElementById("main");
+        if (mainBlock) { mainBlock.setAttribute("tabindex", "-1"); mainBlock.focus({ preventScroll: true }); }
+        if (choice === "all") startMetrika();
+      };
+      cookieBar.querySelectorAll("[data-cookie-choice]").forEach(function (btn) {
+        btn.addEventListener("click", function () { answer(btn.getAttribute("data-cookie-choice")); });
+      });
+    }
   }
 
   /* Музыкальный маршрут: вопросы по одному, подборка без перезагрузки.
@@ -671,6 +722,47 @@
       e.preventDefault();
       submitRoute();
     });
+  }
+
+  /* Анкеты на странице НОК: раскрываются по ссылке #anketa-<ключ>, после ошибки
+     отправки прокручиваются к списку ошибок, считают отвеченные вопросы.
+     Без скрипта анкета раскрывается кнопкой (details), а ошибка видна в раскрытой форме. */
+  var surveyCards = document.querySelectorAll("[data-survey-card]");
+  function openSurvey() {
+    var target = document.getElementById((location.hash || "").slice(1));
+    if (!target || target.tagName !== "SECTION") return;
+    var card = target.querySelector("[data-survey-card]");
+    // Ссылка после отправки ведёт к «Спасибо»: форму заново не раскрываем
+    if (!card || card.hasAttribute("data-sent")) return;
+    card.open = true;
+    target.classList.add("is-open");
+    target.scrollIntoView();
+  }
+  surveyCards.forEach(function (card) {
+    card.addEventListener("toggle", function () {
+      card.parentNode.classList.toggle("is-open", card.open);
+    });
+    var form = card.querySelector("[data-survey-form]");
+    var progress = card.querySelector("[data-survey-progress]");
+    if (form && progress) {
+      var done = progress.querySelector("[data-done]");
+      var count = function () {
+        var names = {};
+        form.querySelectorAll("input[type=radio]:checked").forEach(function (r) { names[r.name] = 1; });
+        done.textContent = Object.keys(names).length;
+      };
+      form.addEventListener("change", count);
+      count();
+      progress.hidden = false;
+    }
+  });
+  var surveyErrors = document.querySelector("[data-survey-errors]");
+  if (surveyErrors) {
+    surveyErrors.scrollIntoView();
+    surveyErrors.focus();
+  } else if (surveyCards.length) {
+    openSurvey();
+    window.addEventListener("hashchange", openSurvey);
   }
 
   /* Панель «Фильтры» афиши на телефоне */

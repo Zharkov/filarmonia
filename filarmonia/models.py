@@ -321,12 +321,20 @@ class Event(db.Model, HasMedia):
     age_limit = db.Column(db.String(8), default="6+")
     price_min = db.Column(db.Integer)
     price_max = db.Column(db.Integer)
+    # Явный признак «бесплатно»: без него пустая цена означает «цена не указана»
+    is_free = db.Column(db.Boolean, default=False, nullable=False, server_default=db.false())
+    # scheduled | cancelled | rescheduled | postponed, см. EVENT_STATUSES
+    status = db.Column(db.String(16), default="scheduled", nullable=False, server_default="scheduled")
+    previous_starts_at = db.Column(db.DateTime)  # прежняя дата перенесённого концерта
     venue_id = db.Column(db.Integer, db.ForeignKey("venues.id"))
     category_id = db.Column(db.Integer, db.ForeignKey("categories.id"))
     annotation = db.Column(db.Text, default="")        # короткий анонс для карточки
     description = db.Column(db.Text, default="")       # основной текст
     performers = db.Column(db.Text, default="")        # «Исполнители»
     organizer = db.Column(db.String(300), default="")
+    # Заголовок и описание для поисковиков; пусто — берутся из названия и анонса
+    seo_title = db.Column(db.String(200), default="", server_default="")
+    seo_description = db.Column(db.String(300), default="", server_default="")
 
     ticket_url = db.Column(db.String(500), default="")  # ссылка билетной системы
     # ID сеанса в Яндекс Афише, например ticketsteam-825@496249: по нему
@@ -396,11 +404,43 @@ class Event(db.Model, HasMedia):
 
     @property
     def price_label(self) -> str:
+        if self.is_free:
+            return FREE_LABEL
         if self.price_min and self.price_max and self.price_max != self.price_min:
             return f"{self.price_min}–{self.price_max} ₽"
         if self.price_min:
             return f"от {self.price_min} ₽"
-        return "Вход свободный"
+        return PRICE_UNKNOWN_LABEL
+
+    @property
+    def status_label(self) -> str:
+        """Пометка для карточек: «Отменён», «Перенесён», «Отложен»; у концерта по плану — пусто."""
+        return "" if self.status in (None, "scheduled") else dict(EVENT_STATUSES).get(self.status, "")
+
+    @property
+    def is_cancelled(self) -> bool:
+        return self.status == "cancelled"
+
+    @property
+    def sells_tickets(self) -> bool:
+        """Продаются ли билеты по статусу: на отменённый и отложенный концерт — нет."""
+        return self.status not in ("cancelled", "postponed")
+
+    @property
+    def can_buy(self) -> bool:
+        """Показывать ли на странице события кнопку покупки и схему зала с покупкой."""
+        return bool(self.sells_tickets and not self.is_past and (self.yandex_id or self.ticket_url))
+
+
+# Статус концерта: ключ хранится в базе, подпись видит редактор (в форме события)
+EVENT_STATUSES = [
+    ("scheduled", "По плану"),
+    ("cancelled", "Отменён"),
+    ("rescheduled", "Перенесён"),
+    ("postponed", "Отложен"),
+]
+FREE_LABEL = "Бесплатные пригласительные билеты в кассе филармонии"
+PRICE_UNKNOWN_LABEL = "Цена уточняется"
 
 
 class EventBadge(db.Model):
@@ -467,6 +507,8 @@ class Collective(db.Model, HasMedia):
     annotation = db.Column(db.Text, default="")
     description = db.Column(db.Text, default="")
     contacts = db.Column(db.Text, default="")          # открывается в баннере
+    seo_title = db.Column(db.String(200), default="", server_default="")
+    seo_description = db.Column(db.String(300), default="", server_default="")
     sort = db.Column(db.Integer, default=100)
     is_published = db.Column(db.Boolean, default=True, nullable=False)
     updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
@@ -495,6 +537,8 @@ class News(db.Model, HasMedia):
     is_published = db.Column(db.Boolean, default=True, nullable=False)
     # Два вида новости: с фото и видео или только текст
     show_media = db.Column(db.Boolean, default=True, nullable=False)
+    seo_title = db.Column(db.String(200), default="", server_default="")
+    seo_description = db.Column(db.String(300), default="", server_default="")
     updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
 
     media = db.relationship(
@@ -582,9 +626,25 @@ class Appeal(db.Model):
     subject = db.Column(db.String(300), default="")
     message = db.Column(db.Text, nullable=False)
     consent = db.Column(db.Boolean, default=False, nullable=False)
+    # Версия текста согласия (настройка consent_version) и время, когда его дали
+    consent_version = db.Column(db.String(40), default="", server_default="")
+    consent_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=utcnow)
     is_processed = db.Column(db.Boolean, default=False, nullable=False)
     note = db.Column(db.Text, default="")
+
+
+class SurveyResponse(db.Model):
+    """Заполненная анкета «Независимой оценки качества». Анонимна: ни имени, ни контактов."""
+
+    __tablename__ = "survey_responses"
+
+    id = db.Column(db.Integer, primary_key=True)
+    survey = db.Column(db.String(40), nullable=False, index=True)   # ключ анкеты из surveys.py
+    answers = db.Column(db.Text, nullable=False, default="{}")      # JSON, см. surveys.dumps
+    created_at = db.Column(db.DateTime, default=utcnow, index=True)
+    is_emailed = db.Column(db.Boolean, default=False, nullable=False)
+    email_error = db.Column(db.String(400), default="")             # почему письмо не ушло
 
 
 class ActionLog(db.Model):

@@ -1,0 +1,9 @@
+{#- Переключатель разделов «Анкет НОК»: список, сводка и выгрузка. -#}
+{% macro tabs(all_surveys, current, active) %}
+<nav class="filters" aria-label="Разделы анкет" style="margin-top:20px">
+  <a class="btn btn--ghost btn--sm" href="{{ url_for('admin.survey_list') }}">Все ответы</a>
+  {% for s in all_surveys.values() %}
+    <a class="btn btn--ghost btn--sm" href="{{ url_for('admin.survey_summary', survey=s.key) }}">Сводка: {{ s.title }}</a>
+  {% endfor %}
+</nav>
+{% endmacro %}

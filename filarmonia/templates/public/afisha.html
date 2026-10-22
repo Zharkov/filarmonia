@@ -1,6 +1,10 @@
 {% extends "public/base.html" %}
 {% from "public/_macros.html" import event_row, daystrip, pagination, breadcrumbs %}
-{% block title %}Афиша{% endblock %}
+{#- Название учреждения вставлено в сам заголовок, чтобы номер страницы стоял перед ним -#}
+{% block title %}Афиша концертов в Смоленске{% if events.page > 1 %} — страница {{ events.page }}{% endif %} — {{ settings.get('site_name', 'Смоленская областная филармония') }}{% endblock %}
+{% block description %}Афиша концертов Смоленской областной филармонии{% if selected_day %} на {{ selected_day | ru_date }}{% endif %}
+  {%- set cat = categories | selectattr('slug', 'equalto', args.get('category')) | first -%}
+  {%- if cat %}: {{ cat.name | lower }}{% endif %}. Расписание, цены и покупка билетов онлайн{% if events.page > 1 %}, страница {{ events.page }}{% endif %}.{% endblock %}
 
 {% block breadcrumbs %}{{ breadcrumbs([('Главная', url_for('public.index')), ('Афиша', None)]) }}{% endblock %}
 

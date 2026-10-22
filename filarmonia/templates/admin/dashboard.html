@@ -8,15 +8,19 @@
 </div>
 
 {#- Каждый счётчик — ссылка в свой раздел, сразу с нужным фильтром -#}
+{% set stats = [
+     (counts.upcoming, 'предстоящих событий', url_for('admin.events', scope='upcoming')),
+     (counts.news, 'новостей', url_for('admin.news')),
+     (counts.collectives, 'коллективов', url_for('admin.collectives')),
+     (counts.documents, 'документов', url_for('admin.documents')),
+     (counts.events, 'событий всего', url_for('admin.events', scope='all')),
+   ] %}
+{#- Обращения содержат персональные данные: счётчик и список — только администратору -#}
+{% if current_user.is_admin %}
+  {% set stats = stats + [(counts.appeals_new, 'новых обращений', url_for('admin.appeals', status='new'))] %}
+{% endif %}
 <div class="stats">
-  {% for num, label, href in [
-       (counts.upcoming, 'предстоящих событий', url_for('admin.events', scope='upcoming')),
-       (counts.news, 'новостей', url_for('admin.news')),
-       (counts.collectives, 'коллективов', url_for('admin.collectives')),
-       (counts.documents, 'документов', url_for('admin.documents')),
-       (counts.events, 'событий всего', url_for('admin.events', scope='all')),
-       (counts.appeals_new, 'новых обращений', url_for('admin.appeals', status='new')),
-     ] %}
+  {% for num, label, href in stats %}
     <a class="stat {{ 'stat--alert' if label == 'новых обращений' and num }}" href="{{ href }}">
       <div class="stat__num">{{ num }}</div>
       <div class="stat__label">{{ label }} <span class="stat__go" aria-hidden="true">→</span></div>
@@ -42,6 +46,7 @@
   </table>
 </div>
 
+{% if current_user.is_admin %}
 <h2>Последние обращения</h2>
 <div class="table-wrap">
   <table>
@@ -58,4 +63,5 @@
     {% endfor %}
   </table>
 </div>
+{% endif %}
 {% endblock %}

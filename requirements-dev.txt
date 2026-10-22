@@ -1,3 +1,5 @@
 # Для разработки и проверок: pip install -r requirements-dev.txt
 -r requirements.txt
 pytest==9.1.1
+# проверки в несколько потоков: pytest -n auto
+pytest-xdist==3.8.0

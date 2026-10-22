@@ -122,6 +122,8 @@ textarea.code { font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
 
 .badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: .78rem; border: 1px solid var(--a-line); color: var(--a-muted); }
 .badge--on { background: #e8f2ec; border-color: #b9d8c7; color: var(--a-ok); }
+.badge--warn { background: #fbf3df; border-color: #d9b36c; color: #5e4210; font-weight: 600; }
+.badge--stop { background: #fbeceb; border-color: #d9a39f; color: var(--a-brick-dark); font-weight: 600; }
 .badge--off { background: #f2f3f5; }
 /* Статус-переключатель в списке: выглядит как метка, нажимается как кнопка */
 .inline-form { display: inline; margin: 0; }
@@ -202,6 +204,7 @@ th.is-sorted .sortable__arrow { opacity: 1; color: var(--a-brick); }
 .link-btn { padding: 0; border: 0; background: none; font: inherit; color: var(--a-brick); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 .link-btn:hover { color: var(--a-brick-dark); }
 .hint--warn { color: #8a5a00; }
+.seo-block summary { cursor: pointer; font-weight: 600; margin-bottom: 10px; }
 .hint--error { color: #b3261e; font-weight: 600; }
 
 /* Адрес страницы: начало адреса сайта перед полем */

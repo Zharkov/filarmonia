@@ -35,7 +35,9 @@
         {% endfor %}
       </select>
       <div class="hint">«Подробнее» поведёт на страницу этого концерта. Если «Показывать до» не заполнено —
-        запись видна до дня концерта.</div></div>
+        запись видна до дня концерта.</div>
+      <div class="hint">Запись об отмене или переносе статус концерта сама не меняет: поменяйте его
+        на странице события (поле «Статус концерта») — тогда на странице концерта появится пометка, а кнопки покупки скроются.</div></div>
     <div class="grid grid--4">
       <div class="field"><label for="n-kind">Вид</label>
         <select id="n-kind" name="kind">
@@ -68,6 +70,8 @@
         <td>{{ n.text }}
           {% if n.event %}<div class="hint">Концерт: <a href="{{ n.event.url }}" target="_blank">{{ n.event.title }}, {{ n.event.starts_at | ru_date }}</a>
             {% if not n.event.is_published %}— скрыт с сайта, «Подробнее» не показывается{% endif %}</div>
+          {% if n.id in need_status %}<div class="hint hint--warn">Статус концерта всё ещё «По плану».
+            <a href="{{ url_for('admin.event_form', event_id=n.event.id) }}#status">Поменяйте статус концерта на странице события</a>.</div>{% endif %}
           {% elif n.url %}<div class="hint"><a href="{{ n.url }}" target="_blank">{{ n.url | truncate(60) }}</a></div>{% endif %}</td>
         <td>{{ n.show_until | ru_date if n.show_until else 'без срока' }}
           {% if n.is_published and n.id not in active_ids %}<div class="hint">срок истёк — на сайте не видно</div>{% endif %}</td>

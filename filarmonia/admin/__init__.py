@@ -9,5 +9,5 @@ bp = Blueprint("admin", __name__)
 
 # Модули регистрируют свои маршруты в bp при импорте
 from . import (  # noqa: E402,F401
-    appeals, auth, common, content, dashboard, events, media, publishing, site, system,
+    appeals, auth, common, content, dashboard, events, media, publishing, site, surveys, system,
 )

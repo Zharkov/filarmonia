@@ -1,6 +1,8 @@
 {% extends "public/base.html" %}
-{% from "public/_macros.html" import event_carousel, daystrip, news_card, icon, img_src, buy_button %}
+{% from "public/_macros.html" import event_carousel, carousel_nav, daystrip, news_card, icon, img_src, buy_button %}
 {#- Карточка организации и строка поиска по сайту в поисковой выдаче -#}
+{#- Заголовок страницы для выдачи: город и «афиша/билеты» — то, что ищут -#}
+{% block title %}{{ settings.get('home_title') or 'Смоленская областная филармония — афиша концертов и билеты' }}{% endblock %}
 {% block head %}
 <script type="application/ld+json">{{ schema.organization(settings) | tojson }}</script>
 <script type="application/ld+json">{{ schema.website(settings) | tojson }}</script>
@@ -27,7 +29,9 @@
 
   <div class="wrap hero__inner">
     <div class="hero__kicker">{{ settings.get('hero_kicker', 'Сезон 2026 / 2027') }}</div>
-    <h1>{{ settings.get('hero_title', 'Музыка на все времена') }}</h1>
+    {#- Единственный h1 страницы — название учреждения (для поиска); слоган оформлен как заголовок, но не h1 -#}
+    <h1 class="visually-hidden">{{ settings.get('site_name', 'Смоленская областная филармония') }}</h1>
+    <p class="hero__title">{{ settings.get('hero_title', 'Музыка на все времена') }}</p>
     <p class="hero__lead">{{ settings.get('hero_lead', 'Симфонические программы, органные вечера, джаз и концерты для детей в зале на улице Глинки.') }}</p>
     {#- Первый шаг посетителя — сразу на первом экране -#}
     <div class="hero__actions">
@@ -55,12 +59,16 @@
   <div class="wrap">
     <div class="section__head">
       <h2>Ближайшие концерты</h2>
-      <a class="btn btn--ghost btn--sm" href="{{ url_for('public.afisha') }}">Вся афиша</a>
+      <div class="section__tools">
+        {% if upcoming %}{{ carousel_nav('home-events') }}{% endif %}
+        <a class="btn btn--ghost btn--sm" href="{{ url_for('public.afisha') }}">Вся афиша</a>
+      </div>
     </div>
     {% if upcoming %}
-      {{ event_carousel(upcoming, 'Ближайшие концерты', url_for('public.more_cards')) }}
+      {{ event_carousel(upcoming, 'Ближайшие концерты', url_for('public.more_cards'), 'home-events') }}
     {% else %}
-      <p class="empty">Ближайшие концерты пока не опубликованы. Добавьте события в разделе «Афиша» панели администратора.</p>
+      <p class="empty">Ближайшие концерты скоро появятся в афише.
+        {%- if g.user %} Добавьте события в разделе «Афиша» панели администратора.{% endif %}</p>
     {% endif %}
   </div>
 </section>
@@ -142,20 +150,6 @@
       <h2>{{ settings.get('history_title', 'Музыка в центре города') }}</h2>
       <div class="prose">{{ settings.get('history_text', '') | safe }}</div>
       {% if history %}<a class="btn btn--ghost" href="{{ history.url }}">Подробнее об истории</a>{% endif %}
-    </div>
-  </div>
-
-  <div class="wrap">
-    <div class="map map--wide">
-      {% if settings.get('history_map') %}
-        {{ settings.get('history_map') | safe }}
-      {% else %}
-        {#- Карта с меткой на здании. Без координат — поиск по адресу, но метки там нет -#}
-        {% set point = settings.get('map_point', '54.781496, 32.048407') | map_point %}
-        {% set address = settings.get('address', 'Смоленск, ул. Глинки, 3') %}
-        <iframe src="https://yandex.ru/map-widget/v1/?{% if point %}ll={{ point }}&amp;z=17&amp;pt={{ point }},pm2rdl{% else %}text={{ address | urlencode }}&amp;z=16{% endif %}"
-                title="Карта: {{ address }}" loading="lazy" allowfullscreen></iframe>
-      {% endif %}
     </div>
   </div>
 </section>

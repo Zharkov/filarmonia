@@ -1,0 +1,30 @@
+{% extends "admin/base.html" %}
+{% from "admin/_survey_tabs.html" import tabs %}
+{% block title %}Сводка по анкете{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Сводка: {{ survey.title }}</h1><p class="subtitle">Ответов: {{ count }}</p></div>
+  <div style="display:flex;gap:10px">
+    <a class="btn btn--primary" href="{{ url_for('admin.survey_export', survey=survey.key) }}">Скачать CSV</a>
+    <a class="btn btn--ghost" href="{{ url_for('admin.survey_list', survey=survey.key) }}">Все ответы</a>
+  </div>
+</div>
+{{ tabs(all_surveys, survey.key, 'summary') }}
+<div class="table-wrap" style="margin-top:20px">
+  <table>
+    <tr><th>Вопрос</th><th>Ответили</th><th>«Да»</th><th>Доля «Да»</th><th>Пожеланий</th><th>Средний балл</th></tr>
+    {#- Колонки общие, а заполняются по типу каждого вопроса -#}
+    {% for r in rows %}
+      {% set yn = r.question.kind == 'yesno' %}
+      <tr>
+        <td>{{ r.question.number }}. {{ r.question.text }}</td>
+        <td>{{ r.total }}</td>
+        <td>{{ r.yes if yn else '—' }}</td>
+        <td>{{ ((r.percent ~ ' %') if r.percent is not none else '—') if yn else '—' }}</td>
+        <td>{{ (r.notes or '—') if yn else '—' }}</td>
+        <td>{{ (r.average if r.average is not none else '—') if not yn else '—' }}</td>
+      </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

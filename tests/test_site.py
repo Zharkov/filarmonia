@@ -113,8 +113,11 @@ def test_static_versioned_and_cached(app):
 
 def test_pos_widget_on_home_page(app):
     html = text(app.test_client().get("/"))
-    assert 'Widget("https://pos.gosuslugi.ru/form", 243684)' in html
-    assert "https://pos.gosuslugi.ru/bin/script.min.js" in html
+    # Код виджета вставляет static/js/pos-widget.js, когда блок появляется на экране;
+    # параметры лежат в атрибутах контейнера
+    assert 'data-pos-id="243684"' in html and 'data-pos-form="https://pos.gosuslugi.ru/form"' in html
+    assert 'data-pos-script="https://pos.gosuslugi.ru/bin/script.min.js"' in html
+    assert "js/pos-widget.js" in html
 
 
 def test_hero_has_no_next_event_card(app, admin):

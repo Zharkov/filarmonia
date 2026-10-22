@@ -1,4 +1,5 @@
 """Вспомогательные функции: адреса страниц, даты, загрузка файлов, видео."""
+import html as htmllib
 import os
 import re
 import secrets
@@ -62,6 +63,12 @@ def utcnow() -> datetime:
     (начало концерта) приходит из формы тоже без пояса — смешивать нельзя.
     """
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def to_utc(value):
+    """Московское время без пояса (дата концерта, дата публикации новости) — в UTC без пояса,
+    в шкалу полей updated_at и заголовка Last-Modified."""
+    return value - timedelta(hours=3) if value else value
 
 
 def slugify(text: str, existing_check=None) -> str:
@@ -262,8 +269,9 @@ def check_image(path: str) -> None:
 # Уменьшенные копии фото. Карточка концерта на экране шириной около 400 px,
 # а оригинал ужат только до 2000: без копий браузер качал бы его целиком.
 # 1200 — для телефонов с плотным экраном (390 px × 3): без неё они брали
-# оригинал JPEG вместо WebP.
-VARIANT_WIDTHS = (400, 800, 1200)
+# оригинал JPEG вместо WebP. 1600 и 1920 — для широких экранов и главной картинки
+# страницы (LCP): иначе на большом мониторе браузер брал оригинал JPEG.
+VARIANT_WIDTHS = (400, 800, 1200, 1600, 1920)
 
 
 def variant_name(name: str, width: int) -> str:
@@ -272,7 +280,7 @@ def variant_name(name: str, width: int) -> str:
 
 
 def make_variants(path: str) -> int:
-    """Сохраняет рядом с фото копии шириной 400, 800 и 1200 px в WebP.
+    """Сохраняет рядом с фото копии шириной 400, 800, 1200, 1600 и 1920 px в WebP.
 
     Копию шире оригинала не делаем — она была бы просто тяжелее.
     GIF не трогаем, чтобы не потерять анимацию. Возвращает число созданных копий.
@@ -338,6 +346,32 @@ def srcset(url: str) -> str:
     except OSError:
         return ""
     return _srcset_for(name, mtime, folder)
+
+
+@lru_cache(maxsize=2048)
+def _size_for(name: str, mtime: float, folder: str):
+    try:
+        with _pil().open(os.path.join(folder, name), formats=IMAGE_FORMATS) as img:
+            return img.size
+    except Exception:
+        return None
+
+
+def image_size(url: str):
+    """Фильтр шаблона: (ширина, высота) фото из загрузок или None.
+
+    Нужен для width/height у <img> и для og:image:width/height: с размерами
+    браузер резервирует место до загрузки картинки, и страница не прыгает.
+    """
+    if not url or not url.startswith(UPLOADS_PREFIX):
+        return None
+    name = url[len(UPLOADS_PREFIX):]
+    folder = current_app.config["UPLOAD_FOLDER"]
+    try:
+        mtime = os.path.getmtime(os.path.join(folder, name))
+    except OSError:
+        return None
+    return _size_for(name, mtime, folder)
 
 
 def delete_uploads(names) -> int:
@@ -497,6 +531,7 @@ def video_embed(url: str) -> str:
         extra = f"&hash={video_hash}" if video_hash else ""
         return (
             f'<iframe src="https://vk.com/video_ext.php?oid={oid}&id={vid}{extra}&hd=2"'
+            ' title="Видео VK" loading="lazy"'
             ' allow="autoplay; encrypted-media; fullscreen" allowfullscreen frameborder="0"></iframe>'
         )
 
@@ -505,6 +540,7 @@ def video_embed(url: str) -> str:
         if m:
             return (
                 f'<iframe src="https://rutube.ru/play/embed/{m.group(1)}"'
+                ' title="Видео Rutube" loading="lazy"'
                 ' allow="clipboard-write; autoplay" allowfullscreen frameborder="0"></iframe>'
             )
         return ""
@@ -514,6 +550,7 @@ def video_embed(url: str) -> str:
         if m:
             return (
                 f'<iframe src="https://dzen.ru/embed/{m.group(1)}"'
+                ' title="Видео Дзен" loading="lazy"'
                 ' allow="autoplay; fullscreen" allowfullscreen frameborder="0"></iframe>'
             )
         return ""
@@ -530,6 +567,7 @@ def video_embed(url: str) -> str:
         if video_id:
             return (
                 f'<iframe src="https://www.youtube.com/embed/{video_id}"'
+                ' title="Видео YouTube" loading="lazy"'
                 ' allow="accelerometer; clipboard-write; encrypted-media; picture-in-picture"'
                 ' allowfullscreen frameborder="0"></iframe>'
             )
@@ -635,9 +673,24 @@ def plural(number, one: str, few: str, many: str) -> str:
     return f"{number} {word}"
 
 
+BLOCK_CLOSE = re.compile(r"</\s*(?:p|h[1-6]|li|div|tr|blockquote|section|article)\s*>|<\s*br\s*/?\s*>", re.I)
+
+
 def strip_tags(html: str, limit: int = 200) -> str:
-    text = re.sub(r"<[^>]+>", " ", html or "")
-    text = re.sub(r"\s+", " ", text).strip()
+    """Текст без разметки для описаний. Между блоками (абзацы, заголовки, пункты списка)
+    ставится точка, чтобы «О концерте» и следующий за ним абзац не склеивались в одну фразу."""
+    marked = BLOCK_CLOSE.sub(" ", html or "")
+    parts = (re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", part)).strip()
+             for part in marked.split(" "))
+    parts = [part for part in parts if part]
+    text = ""
+    for i, part in enumerate(parts):
+        text += part
+        if i < len(parts) - 1:
+            text = text.rstrip(",") + ("" if text.endswith((".", "!", "?", ":", ";", "…")) else ".") + " "
+    # Сущности («&amp;», «&nbsp;») — в обычные знаки, иначе в описание попадёт «&amp;amp;».
+    # Разметку после этого не вырезаем; вывод экранируется шаблоном (autoescape, tojson).
+    text = " ".join(htmllib.unescape(text).split())
     return text[:limit] + ("…" if len(text) > limit else "")
 
 

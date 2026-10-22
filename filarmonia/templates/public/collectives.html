@@ -1,6 +1,7 @@
 {% extends "public/base.html" %}
 {% from "public/_macros.html" import img_src, breadcrumbs %}
 {% block title %}Коллективы и артисты{% endblock %}
+{% block description %}Коллективы и артисты Смоленской областной филармонии: оркестры, ансамбли, солисты, фото, видео и афиша выступлений.{% endblock %}
 {% block breadcrumbs %}{{ breadcrumbs([('Главная', url_for('public.index')), ('Коллективы и артисты', None)]) }}{% endblock %}
 
 {% block content %}

@@ -1,5 +1,5 @@
 {% extends "public/base.html" %}
-{% from "public/_macros.html" import event_carousel, img_src, breadcrumbs, document_list, icon, section_icon %}
+{% from "public/_macros.html" import event_carousel, carousel_nav, img_src, breadcrumbs, document_list, icon, section_icon %}
 {% block title %}{{ pg.title }}{% endblock %}
 {% block description %}{{ pg.seo_description or pg.content | strip_tags(180) }}{% endblock %}
 {% block breadcrumbs %}
@@ -26,9 +26,21 @@
         {% if settings.get('work_hours') %}<div><dt>Режим работы</dt><dd>{{ settings.get('work_hours') }}</dd></div>{% endif %}
       </dl>
     </section>
+    <div class="map map--wide">
+      {% if settings.get('history_map') %}
+        {{ settings.get('history_map') | safe }}
+      {% else %}
+        {#- Карта с меткой на здании. Без координат — поиск по адресу, но метки там нет -#}
+        {% set point = settings.get('map_point', '54.781496, 32.048407') | map_point %}
+        {% set address = settings.get('address', 'Смоленск, ул. Глинки, 3') %}
+        <iframe src="https://yandex.ru/map-widget/v1/?{% if point %}ll={{ point }}&amp;z=17&amp;pt={{ point }},pm2rdl{% else %}text={{ address | urlencode }}&amp;z=16{% endif %}"
+                title="Карта: {{ address }}" loading="lazy" allowfullscreen></iframe>
+      {% endif %}
+    </div>
   {% endif %}
 
-  <div class="prose">{{ pg.content | safe }}</div>
+  {#- Пометка «Проект текста…» (согласие на обработку данных) — заметное предупреждение, пока её не уберут из текста -#}
+  <div class="prose{{ ' prose--draft' if 'Проект текста.' in (pg.content or '') }}">{{ pg.content | safe }}</div>
 
   {% set photos, videos = pg.photos, pg.videos %}
   {% if photos %}
@@ -60,9 +72,10 @@
     <section class="section">
       <div class="section__head">
         <h2>{{ 'Концерты по Пушкинской карте' if pg.template == 'pushkin' else 'Концерты со льготами' }}</h2>
+        {% if events %}{{ carousel_nav('page-events') }}{% endif %}
       </div>
       {% if events %}
-        {{ event_carousel(events, 'Концерты', url_for('public.more_cards', flag=pg.template)) }}
+        {{ event_carousel(events, 'Концерты', url_for('public.more_cards', flag=pg.template), 'page-events') }}
       {% else %}
         <p class="empty">Ближайшие концерты с этой отметкой пока не опубликованы.</p>
       {% endif %}
@@ -77,27 +90,6 @@
     {{ document_list(documents, by_year=pg.template in ('documents_years', 'nok')) }}
   {% elif pg.has_documents %}
     <p class="empty">Документы пока не загружены.</p>
-  {% endif %}
-
-  {#- Площадки карточками: без карты — без пустого места под ней, с кнопкой маршрута -#}
-  {% if venues %}
-    <section class="venues">
-      <h2>Площадки</h2>
-      <div class="venues__grid">
-        {% for v in venues %}
-          <article class="venue {{ 'venue--map' if v.map_embed }}">
-            <h3>{{ v.name }}</h3>
-            {% if v.address %}<p class="venue__addr">{{ v.address }}</p>{% endif %}
-            {% if v.description %}<div class="prose">{{ v.description | safe }}</div>{% endif %}
-            {% if v.map_embed %}<div class="map">{{ v.map_embed | safe }}</div>
-            {% elif v.address %}
-              <a class="btn btn--ghost btn--sm" href="https://yandex.ru/maps/?text={{ v.address | urlencode }}"
-                 rel="noopener" target="_blank">{{ icon('pin') }} Маршрут</a>
-            {% endif %}
-          </article>
-        {% endfor %}
-      </div>
-    </section>
   {% endif %}
 
   {% if pg.template == 'contacts' %}

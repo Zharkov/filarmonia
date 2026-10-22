@@ -1,6 +1,7 @@
 {% extends "public/base.html" %}
 {% from "public/_macros.html" import breadcrumbs %}
 {% block title %}Карта сайта{% endblock %}
+{% block description %}Карта сайта Смоленской областной филармонии: все разделы, афиша, коллективы и документы на одной странице.{% endblock %}
 {% block breadcrumbs %}{{ breadcrumbs([('Главная', url_for('public.index')), ('Карта сайта', None)]) }}{% endblock %}
 {% block content %}
 <div class="wrap">

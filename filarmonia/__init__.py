@@ -3,7 +3,7 @@ import os
 import time
 from types import SimpleNamespace
 
-from flask import Flask, render_template, g, session, url_for
+from flask import Flask, render_template, g, request, session, url_for
 from flask_wtf.csrf import CSRFError, CSRFProtect
 from markupsafe import Markup
 from sqlalchemy.orm import joinedload
@@ -26,6 +26,7 @@ JINJA_FILTERS = {
     "compact": utils.compact,
     "video_embed": lambda url: Markup(utils.video_embed(url)),
     "srcset": utils.srcset,
+    "image_size": utils.image_size,
     "msk": utils.to_moscow,
     "qr_svg": utils.qr_svg,
 }
@@ -34,6 +35,18 @@ JINJA_FILTERS = {
 # а к стилям и скриптам дописывается номер версии (см. asset_url).
 # Для версионных адресов web.cache_headers поднимает срок до года.
 STATIC_MAX_AGE = 30 * 24 * 3600
+
+# Предел тела запроса для адресов, куда пишут посетители и браузеры: остальной
+# сайт принимает до 64 МБ (загрузки в панели), а этим адресам столько не нужно.
+# Анкета — несколько коротких ответов; обращение — до 10 000 знаков, а кириллица
+# в форме занимает по 6 байт на букву (%D0%B0), поэтому запас вдвое больше;
+# отчёт браузера о нарушении политики безопасности — короткий JSON.
+SURVEY_MAX_BODY = 64 * 1024
+BODY_LIMITS = {
+    "public.survey_submit": SURVEY_MAX_BODY,
+    "public.appeals": 128 * 1024,
+    "csp_report": 16 * 1024,
+}
 
 # Настройки и меню нужны каждой странице. Чтобы не ходить за ними в базу
 # на каждый запрос, они хранятся в памяти процесса столько секунд. После
@@ -59,8 +72,9 @@ def site_data() -> dict:
         # сессии, и обращение к незагруженному полю обрывало бы страницу
         menu = [
             SimpleNamespace(
-                title=item.title, href=item.href, is_published=True,
-                children=[SimpleNamespace(title=c.title, href=c.href, is_published=True)
+                title=item.title, href=web.MOVED_PAGES.get(item.href, item.href), is_published=True,
+                children=[SimpleNamespace(title=c.title, href=web.MOVED_PAGES.get(c.href, c.href),
+                                          is_published=True)
                           for c in sorted(item.children, key=lambda c: (c.sort or 0, c.id))
                           if c.is_published],
             )
@@ -87,11 +101,22 @@ def create_app(**config_overrides) -> Flask:
     app.config.from_mapping(build_config(**config_overrides))
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
     check_secret_key(app)
+    check_site_url(app)
 
     if app.config["TRUST_PROXY"]:
         # Один прокси перед приложением: без этого sitemap.xml и robots.txt
         # подставляли бы http:// вместо https://
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
+    app.before_request(web.stand_auth)
+
+    @app.before_request
+    def limit_body():
+        """Ограничение размера запроса анкеты, обращения и отчёта браузера. Стоит раньше
+        проверки CSRF, которая читает форму: после неё ограничивать было бы уже нечего."""
+        limit = BODY_LIMITS.get(request.endpoint)
+        if limit:
+            request.max_content_length = limit
 
     db.init_app(app)
     csrf.init_app(app)
@@ -181,3 +206,25 @@ def check_secret_key(app: Flask) -> None:
         raise RuntimeError("SECRET_KEY не задан, а сайт настроен как боевой.\n" + HOWTO_SECRET_KEY)
     print("ВНИМАНИЕ: SECRET_KEY из репозитория — годится только для разработки.\n"
           + HOWTO_SECRET_KEY)
+
+
+def check_site_url(app: Flask) -> None:
+    """Не даёт выйти в интернет без адреса сайта.
+
+    Канонические ссылки, карта сайта и микроразметка без SITE_URL строятся из
+    заголовка Host: подставленный в запрос чужой домен попал бы в выдачу
+    поисковиков. Как и с ключом, боевое окружение определяется по HTTPS-кукам
+    и работе за прокси; на Render адрес подставляется из RENDER_EXTERNAL_URL.
+    """
+    if app.testing:
+        return
+    if not app.config["SITE_URL"]:
+        if app.config["SESSION_COOKIE_SECURE"] or app.config["TRUST_PROXY"]:
+            raise RuntimeError(
+                "SITE_URL не задан, а сайт настроен как боевой (SESSION_COOKIE_SECURE или TRUST_PROXY).\n"
+                "Передайте адрес сайта через переменную окружения SITE_URL, например\n"
+                "  SITE_URL=https://smolensk-filarmonia.ru")
+    elif app.config["SITE_NOINDEX"] and app.config["SITE_URL_EXPLICIT"]:
+        app.logger.warning(
+            "SITE_NOINDEX=1 вместе с заданным SITE_URL (%s): сайт закрыт от поисковиков. "
+            "Если это боевой сервер, уберите SITE_NOINDEX.", app.config["SITE_URL"])

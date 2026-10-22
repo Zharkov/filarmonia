@@ -1,19 +1,20 @@
 """Публичная часть сайта."""
+import math
 from datetime import datetime, timedelta, date
 
 from flask import (
     Blueprint, render_template, request, abort, redirect, url_for,
-    flash, make_response, current_app, g,
+    flash, make_response, current_app, g, send_from_directory,
 )
 from sqlalchemy import func, or_
 from sqlalchemy.orm import joinedload, selectinload
 
 from .models import (
     db, Event, Venue, Category, Collective, News, Page, Document, MenuItem,
-    Banner, Appeal, Setting, Festival, AfishaNotice, DOCUMENT_TEMPLATES,
+    Banner, Appeal, Setting, Festival, AfishaNotice, SurveyResponse, DOCUMENT_TEMPLATES,
 )
-from . import throttle, utils
-from .web import site_url
+from . import mailer, surveys, throttle, utils
+from .web import LOG_UNSAFE as CONTROL_CHARS, MOVED_PAGES, site_url, stand_closed
 
 bp = Blueprint("public", __name__)
 
@@ -27,6 +28,11 @@ SIMILAR_EVENTS = 8
 SITEMAP_ARCHIVE_DAYS = 365
 CALENDAR_DAYS = 60
 ROUTE_RESULTS = 6
+# Длина текста обращения, знаков; остальные поля обрезаются по размеру колонок
+APPEAL_MESSAGE_MAX = 10000
+# Адреса, закрытые для приёма на тестовом стенде без пароля (см. web.stand_closed)
+STAND_CLOSED_TEXT = ("Приём обращений и анкет на тестовой копии сайта отключён. "
+                     "Отправка работает на боевом сайте.")
 
 # «Музыкальный маршрут»: три вопроса и варианты ответа (ключ, подпись)
 ROUTE_QUESTIONS = [
@@ -288,6 +294,9 @@ def afisha():
 
     page = utils.parse_int(request.args.get("page"), 1)
     events = q.paginate(page=page, per_page=PER_PAGE_AFISHA, error_out=False)
+    if page > max(events.pages, 1):
+        # Пустая страница с кодом 200 для поисковика — «мягкая» 404
+        abort(404)
 
     return render_template(
         "public/afisha.html",
@@ -308,6 +317,12 @@ def afisha():
 def event(slug):
     ev = Event.query.filter_by(slug=slug).first_or_404()
     check_published(ev, url_for("admin.event_form", event_id=ev.id))
+    # Когда концерт начался, страница меняется (исчезает продажа): отметка не раньше начала
+    # (updated_at — UTC, starts_at — московское время). До начала будущую дату не берём.
+    changed = ev.updated_at or ev.created_at
+    if ev.is_past and ev.starts_at:
+        changed = max(filter(None, (changed, utils.to_utc(ev.starts_at))))
+    g.last_modified = changed
     similar = upcoming_cards().filter(Event.id != ev.id).limit(SIMILAR_EVENTS).all()
     return render_template("public/event.html", ev=ev, similar=similar)
 
@@ -366,6 +381,8 @@ def news_list():
         .order_by(News.published_at.desc())
         .paginate(page=page, per_page=PER_PAGE_NEWS, error_out=False)
     )
+    if page > max(items.pages, 1):
+        abort(404)
     return render_template("public/news_list.html", items=items)
 
 
@@ -373,6 +390,8 @@ def news_list():
 def news_item(slug):
     item = News.query.filter_by(slug=slug).first_or_404()
     check_published(item, url_for("admin.news_form", item_id=item.id))
+    # published_at — московское время, Last-Modified — UTC
+    g.last_modified = item.updated_at or utils.to_utc(item.published_at)
     other = (
         News.query.filter(News.is_published.is_(True), News.id != item.id)
         .order_by(News.published_at.desc())
@@ -394,25 +413,31 @@ FLAGGED_PAGES = {
 
 @bp.route("/info/<slug>")
 def page(slug):
+    if f"/info/{slug}" in MOVED_PAGES:
+        # Страница с обращениями живёт на своём адресе, дубль поисковику не нужен
+        return redirect(MOVED_PAGES[f"/info/{slug}"], 301)
+    return _render_page(slug)
+
+
+def _render_page(slug, survey_state=None):
+    """Страница раздела. survey_state — результат неудачной отправки анкеты на странице НОК:
+    {"key", "errors", "values"}; форма показывается заново с введёнными ответами."""
     pg = Page.query.filter_by(slug=slug).first_or_404()
     check_published(pg, url_for("admin.page_form", item_id=pg.id))
-    documents, venues, events, afisha_filter = [], [], [], None
+    documents, events, afisha_filter = [], [], None
     if pg.has_documents:
         documents = (
             Document.query.filter_by(is_published=True, category=pg.title, news_id=None)
             .order_by(Document.sort, Document.year.desc(), Document.id)
             .all()
         )
-    elif pg.template == "contacts":
-        # Страница «Контакты и схема проезда»: под текстом выводим площадки
-        # с адресами и картами, которые заданы в разделе «Площадки и жанры»
-        venues = Venue.query.order_by(Venue.name).all()
     elif pg.template in FLAGGED_PAGES:
         afisha_filter = FLAGGED_PAGES[pg.template][1]
         events = upcoming_cards(pg.template).limit(CAROUSEL_BATCH).all()
-    return render_template("public/page.html", pg=pg, documents=documents, venues=venues,
+    return render_template("public/page.html", pg=pg, documents=documents,
                            events=events, afisha_filter=afisha_filter,
-                           in_documents=_in_documents(pg))
+                           in_documents=_in_documents(pg),
+                           surveys=surveys.SURVEYS.values(), survey_state=survey_state)
 
 
 def _documents_menu():
@@ -470,7 +495,7 @@ def site_map():
     q = Page.query.filter(Page.is_published.is_(True))
     if linked:
         q = q.filter(Page.id.notin_(linked))
-    other = q.order_by(Page.title).all()
+    other = [p for p in q.order_by(Page.title).all() if p.url not in MOVED_PAGES]
     festivals = Festival.query.order_by(Festival.sort, Festival.name).all()
     return render_template("public/site_map.html", other=other, festivals=festivals)
 
@@ -489,9 +514,15 @@ def _appeal_back() -> str:
     превратилось бы в перенаправление на чужой сайт.
     """
     back = request.form.get("back", "")
-    if back.startswith("/info/") and "//" not in back and "\\" not in back:
+    if (back.startswith("/info/") and "//" not in back and "\\" not in back
+            and not CONTROL_CHARS.search(back)):
         return back + "#feedback"
     return url_for("public.appeals")
+
+
+def _field(name: str, limit: int) -> str:
+    """Поле формы обращения по длине колонки. Нулевой символ PostgreSQL в тексте не принимает."""
+    return request.form.get(name, "").replace("\x00", "").strip()[:limit]
 
 
 def appeal_too_soon() -> bool:
@@ -507,7 +538,9 @@ def appeals():
             # Отвечаем как при успехе, чтобы не подсказывать, что письмо не ушло.
             flash("Обращение принято. Ответ придёт в течение 30 дней.", "ok")
             return redirect(_appeal_back())
-        if appeal_too_soon():
+        if stand_closed():
+            flash(STAND_CLOSED_TEXT, "error")
+        elif appeal_too_soon():
             flash("Обращение уже отправлено. Следующее можно отправить через минуту.", "error")
         elif not request.form.get("consent"):
             flash("Без согласия на обработку персональных данных обращение отправить нельзя.", "error")
@@ -519,12 +552,15 @@ def appeals():
         else:
             db.session.add(
                 Appeal(
-                    name=request.form["name"].strip()[:300],
-                    email=request.form.get("email", "").strip()[:200],
-                    phone=request.form.get("phone", "").strip()[:80],
-                    subject=request.form.get("subject", "").strip()[:300],
-                    message=request.form["message"].strip(),
+                    name=_field("name", 300),
+                    email=_field("email", 200),
+                    phone=_field("phone", 80),
+                    subject=_field("subject", 300),
+                    message=_field("message", APPEAL_MESSAGE_MAX),
                     consent=True,
+                    # Какую редакцию текста согласия увидел гражданин и когда его дал
+                    consent_version=Setting.get("consent_version", "")[:40],
+                    consent_at=utils.utcnow(),
                 )
             )
             db.session.commit()
@@ -536,6 +572,48 @@ def appeals():
             return redirect(_appeal_back())
     pg = Page.query.filter_by(slug="internet-priemnaya").first()
     return render_template("public/appeals.html", pg=pg)
+
+
+# Анкеты «Независимой оценки качества»
+# Ответы анонимны. Пауза между отправками хранится в той же таблице throttles,
+# что и у обращений; поле-приманка «website» — тоже.
+def _survey_key(survey) -> str:
+    return f"survey:{survey.key}:{request.remote_addr or ''}"
+
+
+@bp.route("/info/<slug>/anketa/<key>", methods=["POST"])
+def survey_submit(slug, key):
+    pg = Page.query.filter_by(slug=slug, template="nok").first_or_404()
+    check_published(pg, url_for("admin.page_form", item_id=pg.id))
+    survey = surveys.get(key)
+    if survey is None:
+        abort(404)
+    back = f"{pg.url}#anketa-{survey.key}"
+    thanks = "Спасибо, ваши ответы отправлены."
+    if request.form.get("website"):
+        # Поле-приманка заполняют только роботы: отвечаем как при успехе
+        flash(thanks, f"survey-{survey.key}")
+        return redirect(back)
+    answers, errors = surveys.parse(survey, request.form)
+    if stand_closed():
+        errors = [STAND_CLOSED_TEXT]
+    if not errors:
+        interval = current_app.config["SURVEY_INTERVAL_SECONDS"]
+        wait = interval - throttle.seconds_since(_survey_key(survey))
+        if wait > 0:
+            errors = [f"Анкета уже отправлена. Попробуйте ещё раз через {math.ceil(wait)} с."]
+        else:
+            # Пауза отмечается до сохранения: так два одновременных запроса не пройдут оба
+            throttle.hit(_survey_key(survey), interval)
+    if errors:
+        state = {"key": survey.key, "errors": errors, "values": answers}
+        return _render_page(slug, survey_state=state)
+    row = SurveyResponse(survey=survey.key, answers=surveys.dumps(answers))
+    db.session.add(row)
+    db.session.commit()
+    mailer.deliver_survey_later(row.id)
+    flash(thanks, f"survey-{survey.key}")
+    return redirect(back)
 
 
 # Поиск
@@ -599,11 +677,26 @@ def sitemap():
         (News, "/novosti/", func.coalesce(News.updated_at, News.published_at), None),
         (Page, "/info/", Page.updated_at, None),
     )
+    # Страницы со списком документов без единого документа («Документы пока не загружены»)
+    # поисковику не нужны; страница анкет НОК нужна и без документов
+    with_documents = {
+        category for (category,) in db.session.query(Document.category).filter(
+            Document.is_published.is_(True), Document.news_id.is_(None)).distinct()
+    }
     for model, prefix, changed, condition in sources:
         q = db.session.query(model.slug, changed).filter(model.is_published.is_(True))
+        if model is Page:
+            q = db.session.query(Page.slug, changed, Page.template, Page.title).filter(
+                Page.is_published.is_(True))
         if condition is not None:
             q = q.filter(condition)
-        for slug, when in q:
+        for slug, when, *page in q:
+            if model is Page:
+                template, title = page
+                if prefix + slug in MOVED_PAGES:
+                    continue
+                if template in ("documents", "documents_years") and title not in with_documents:
+                    continue
             urls.append((prefix + slug, when))
     urls += [(f.url, None) for f in Festival.query.order_by(Festival.sort)]
     body = render_template("public/sitemap.xml", urls=urls, host=site_url())
@@ -612,11 +705,18 @@ def sitemap():
     return resp
 
 
+@bp.route("/favicon.ico")
+def favicon():
+    """Значок по привычному адресу: поисковики и старые браузеры просят его в корне сайта."""
+    return send_from_directory(current_app.static_folder, "favicon.ico", max_age=7 * 24 * 3600)
+
+
 @bp.route("/robots.txt")
 def robots():
     if current_app.config["SITE_NOINDEX"]:
-        # Тестовая копия сайта: закрыта от поисковиков целиком
-        body = "User-agent: *\nDisallow: /\n"
+        # Тестовая копия сайта: обход разрешён, чтобы робот увидел запрет индексации
+        # (заголовок X-Robots-Tag и meta robots); с «Disallow: /» он его не прочитал бы
+        body = "User-agent: *\nAllow: /\n"
     else:
         # Закрыты служебные адреса: панель, результаты поиска (бесконечное
         # число страниц) и куски разметки, которые подгружает скрипт
@@ -627,6 +727,9 @@ def robots():
             "Disallow: /kartochki-afishi\n"
             "Disallow: /marshrut\n"
             "Disallow: /csp-report\n"
+            # Яндекс склеивает адреса, отличающиеся только этими параметрами
+            "Clean-param: day&from&to&venue&category&price&sort&q&pushkin&benefits&new&archive /afisha\n"
+            "Clean-param: utm_source&utm_medium&utm_campaign&utm_content&utm_term&yclid&gclid\n"
             f"Sitemap: {site_url('/sitemap.xml')}\n"
         )
     resp = make_response(body)

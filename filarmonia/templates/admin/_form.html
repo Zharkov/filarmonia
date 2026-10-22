@@ -14,13 +14,29 @@
   </div>
   <div class="hint" data-slug-hint>
     {%- if item.id -%}
-      При изменении адреса ранее опубликованные ссылки на страницу перестанут работать.
+      Если запись опубликована, при смене адреса со старого адреса автоматически настроится перенаправление на новый.
     {%- else -%}
       Формируется автоматически из названия. При необходимости адрес можно изменить: допускаются латинские буквы, цифры и дефис.
     {%- endif -%}
   </div>
   {% if item.id %}<button class="btn btn--ghost btn--sm slug-reset" type="button" data-slug-reset>Сформировать по названию</button>{% endif %}
 </div>
+{% endmacro %}
+
+{#- Свёрнутый блок «Для поисковиков»: свой заголовок и описание страницы в выдаче.
+    Пусто — берутся название и анонс записи. Рекомендуемая длина: заголовок до 60 знаков,
+    описание 120–160; больше поисковик обрежет. -#}
+{% macro seo_block(item) %}
+<details class="field seo-block"{{ ' open' if item.seo_title or item.seo_description }}>
+  <summary>Для поисковиков</summary>
+  <div class="field"><label for="seo_title">Заголовок страницы в поиске</label>
+    <input id="seo_title" type="text" name="seo_title" maxlength="200" value="{{ item.seo_title or '' }}"
+           placeholder="По умолчанию — название">
+    <div class="hint">Рекомендуется до 60 знаков (максимум 200). Пусто — берётся название.</div></div>
+  <div class="field"><label for="seo_description">Описание страницы в поиске</label>
+    <textarea id="seo_description" name="seo_description" maxlength="300" style="min-height:70px">{{ item.seo_description or '' }}</textarea>
+    <div class="hint">Рекомендуется 120–160 знаков (максимум 300). Пусто — берётся анонс или начало текста.</div></div>
+</details>
 {% endmacro %}
 
 {#- Поле загрузки файла с ограничениями: типы, размер, разрешение. kinds — виды

@@ -1,10 +1,12 @@
 {% extends "public/base.html" %}
-{% from "public/_macros.html" import event_carousel, buy_button, img_src, breadcrumbs %}
-{% block title %}{{ ev.starts_at | ru_date }} — {{ ev.title }}{% endblock %}
-{% block description %}{{ ev.annotation or ev.description | strip_tags(180) }}{% endblock %}
+{% from "public/_macros.html" import event_carousel, carousel_nav, buy_button, img_src, img_dims, breadcrumbs %}
+{% from "public/_macros.html" import og_image with context %}
+{% block title %}{{ ev.seo_title or (ev.title ~ ' — ' ~ (ev.starts_at | ru_date) ~ ', Смоленск') }}{% endblock %}
+{% block description %}{{ ev.seo_description or ev.annotation or ev.description | strip_tags(180) }}{% endblock %}
 {% block og_type %}article{% endblock %}
 {% block og_image %}
-  {%- if ev.poster %}<meta property="og:image" content="{{ site_url('/static/uploads/' ~ ev.poster) }}">{% endif %}
+  {#- Горизонтальная картинка карточки (она же — афиша, если другой нет): в соцсетях и выдаче лучше вертикальной -#}
+  {{- og_image(ev.card_image) -}}
 {% endblock %}
 
 {% block head %}
@@ -19,12 +21,25 @@
 <div class="wrap">
   <h1>{{ ev.title }}</h1>
 
+  {#- Отменён, перенесён, отложен: плашка над афишей; оформление — site.css (.event__status) -#}
+  {% if ev.status_label %}
+    <div class="event__status event__status--{{ ev.status }}" role="status">
+      <strong>Концерт {{ ev.status_label | lower }}.</strong>
+      {% if ev.status == 'rescheduled' and ev.previous_starts_at %}
+        Прежняя дата: {{ ev.previous_starts_at | ru_date }}, {{ ev.previous_starts_at.strftime('%H:%M') }}.
+      {% elif ev.status == 'postponed' %}
+        Новая дата будет объявлена дополнительно.
+      {% endif %}
+    </div>
+  {% endif %}
+
   <div class="event">
     <div>
       <div class="event__posterwrap">
         {% if ev.poster %}
           <a href="#" data-photo="/static/uploads/{{ ev.poster }}" data-photo-alt="{{ ev.title }}">
-            <img class="event__poster" {{ img_src('/static/uploads/' ~ ev.poster, '(max-width: 860px) 100vw, 420px') }} alt="Афиша: {{ ev.title }}">
+            {#- Первая картинка экрана (LCP): грузится сразу и с высоким приоритетом, размеры заданы -#}
+            <img class="event__poster" {{ img_src('/static/uploads/' ~ ev.poster, '(max-width: 860px) 100vw, 420px') }}{{ img_dims('/static/uploads/' ~ ev.poster) }} alt="Афиша: {{ ev.title }}" fetchpriority="high">
           </a>
         {% endif %}
 
@@ -53,10 +68,12 @@
     <div>
       {#- Цена и покупка — первым делом, над фактами: так кнопка видна без прокрутки -#}
       <div class="event__deal">
-        <div class="event__price">{{ ev.price_label }}</div>
-        {% if not ev.is_past and (ev.yandex_id or ev.ticket_url) %}
+        <div class="event__price{{ ' event__price--text' if not ev.price_min }}{{ ' event__price--off' if ev.is_cancelled }}">{{ ev.price_label }}</div>
+        {% if ev.can_buy %}
           <div class="event__buy">{{ buy_button(ev, 'btn btn--gold') }}</div>
         {% endif %}
+        {#- Без кнопки правая колонка не выглядит оборванной: коротко объясняем, почему билетов нет -#}
+        {% if not ev.sells_tickets and not ev.is_past %}<p class="event__note event__note--stop">Продажа билетов остановлена.</p>{% endif %}
         {% if ev.tickets_left %}<p class="event__note">{{ ev.tickets_left }}</p>{% endif %}
       </div>
 
@@ -106,63 +123,19 @@
         </div>
         {% endif %}
       </div>
-
-      {#- Сначала о самом концерте и его участниках, затем условия: льготы и Пушкинская карта -#}
-      {% if ev.description %}
-        <div class="prose">{{ ev.description | safe }}</div>
-      {% endif %}
-
-      {% if ev.collectives %}
-        <p class="event__collectives"><span>Участвуют:</span>
-          {% for c in ev.collectives %}
-            <a href="{{ c.url }}">{{ c.name }}</a>{{ ", " if not loop.last }}
-          {% endfor %}
-        </p>
-      {% endif %}
-
-      {% if ev.show_benefits and ev.benefits_text %}
-        <div class="block">
-          <h2>Льготы</h2>
-          {{ ev.benefits_text | safe }}
-        </div>
-      {% endif %}
-
-      {% if ev.show_pushkin %}
-        <div class="block block--pushkin">
-          <h2>Оплата Пушкинской картой</h2>
-          {{ (ev.pushkin_text or settings.get('pushkin_default', '<p>Билет можно оплатить Пушкинской картой через приложение «Госуслуги Культура» или на сайте билетного оператора.</p>')) | safe }}
-        </div>
-      {% endif %}
     </div>
   </div>
 
   {#- Телефон: когда кнопка покупки уходит с экрана, внизу появляется панель
       «цена + Купить билет». Показывает и прячет её site.js; на компьютере её нет -#}
-  {% if not ev.is_past and (ev.yandex_id or ev.ticket_url) %}
+  {% if ev.can_buy %}
     <div class="buybar" data-buybar hidden>
       <div class="buybar__info">
-        <span class="buybar__price">{{ ev.price_label }}</span>
+        <span class="buybar__price{{ ' buybar__price--text' if not ev.price_min }}">{{ ev.price_label }}</span>
         <span class="buybar__when">{{ ev.starts_at | ru_date }}, {{ ev.starts_at.strftime('%H:%M') }}</span>
       </div>
       {{ buy_button(ev, 'btn btn--gold') }}
     </div>
-  {% endif %}
-
-  {#- Встроенный виджет покупки. Скрыт, пока скрипт его не покажет:
-      без ключа Яндекс Афиши в «Настройках» на странице не будет пустого блока -#}
-  {% if ev.yandex_id and not ev.is_past %}
-    <section class="section" id="bilety" data-ya-widget="{{ ev.yandex_id }}" hidden>
-      <h2>Купить билет</h2>
-      <div class="ya-widget" data-ya-widget-frame></div>
-    </section>
-  {% endif %}
-
-  {#- Со схемой Яндекс Афиши вторая схема зала была бы лишней -#}
-  {% if ev.hall_widget and not ev.yandex_id %}
-    <section class="section" id="hall">
-      <h2>Схема зала</h2>
-      <div class="hall-widget">{{ ev.hall_widget | safe }}</div>
-    </section>
   {% endif %}
 
   {% set photos, videos = ev.photos, ev.videos %}
@@ -196,6 +169,61 @@
     </section>
   {% endif %}
 
+  {#- О концерте и его участниках -#}
+  {% if ev.description or ev.collectives %}
+    <section class="section">
+      <h2>О концерте</h2>
+      {% if ev.description %}
+        <div class="prose">{{ ev.description | safe }}</div>
+      {% endif %}
+
+      {% if ev.collectives %}
+        <p class="event__collectives"><span>Участвуют:</span>
+          {% for c in ev.collectives %}
+            <a href="{{ c.url }}">{{ c.name }}</a>{{ ", " if not loop.last }}
+          {% endfor %}
+        </p>
+      {% endif %}
+    </section>
+  {% endif %}
+
+  {#- Схема зала. Со встроенной схемой Яндекс Афиши вторая была бы лишней: она же и
+      покупка билета. Скрыт, пока скрипт не покажет: без ключа Яндекс Афиши в
+      «Настройках» на странице не будет пустого блока -#}
+  {% if ev.yandex_id and not ev.is_past and ev.sells_tickets %}
+    <section class="section" id="bilety" data-ya-widget="{{ ev.yandex_id }}" hidden>
+      <h2>Схема зала и покупка билетов</h2>
+      <div class="ya-widget" data-ya-widget-frame></div>
+    </section>
+  {% elif ev.hall_widget and ev.sells_tickets %}
+    <section class="section" id="hall">
+      <h2>Схема зала</h2>
+      <div class="hall-widget">{{ ev.hall_widget | safe }}</div>
+    </section>
+  {% endif %}
+
+  {#- Условия: льготы и Пушкинская карта, рядом друг с другом -#}
+  {% set show_benefits = ev.show_benefits and ev.benefits_text %}
+  {% if show_benefits or ev.show_pushkin %}
+    <section class="section">
+      <div class="event__terms {{ 'event__terms--pair' if show_benefits and ev.show_pushkin }}">
+        {% if show_benefits %}
+          <div class="block">
+            <h2>Льготы</h2>
+            {{ ev.benefits_text | safe }}
+          </div>
+        {% endif %}
+
+        {% if ev.show_pushkin %}
+          <div class="block block--pushkin">
+            <h2>Оплата Пушкинской картой</h2>
+            {{ (ev.pushkin_text or settings.get('pushkin_default', '<p>Билет можно оплатить Пушкинской картой через приложение «Госуслуги Культура» или на сайте билетного оператора.</p>')) | safe }}
+          </div>
+        {% endif %}
+      </div>
+    </section>
+  {% endif %}
+
   {% if ev.venue and ev.venue.map_embed %}
     <section class="section">
       <h2>Как добраться</h2>
@@ -206,8 +234,8 @@
 
   {% if similar %}
     <section class="section">
-      <div class="section__head"><h2>Ближайшие концерты</h2></div>
-      {{ event_carousel(similar, 'Ближайшие концерты') }}
+      <div class="section__head"><h2>Ближайшие концерты</h2>{{ carousel_nav('event-similar') }}</div>
+      {{ event_carousel(similar, 'Ближайшие концерты', cid='event-similar') }}
     </section>
   {% endif %}
 </div>

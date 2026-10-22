@@ -1,6 +1,13 @@
 {% extends "public/base.html" %}
-{% from "public/_macros.html" import event_carousel, img_src, breadcrumbs %}
-{% block title %}{{ item.name }}{% endblock %}
+{% from "public/_macros.html" import event_carousel, carousel_nav, img_src, breadcrumbs %}
+{% from "public/_macros.html" import og_image with context %}
+{% block title %}{{ item.seo_title or item.name }}{% endblock %}
+{#- lead у коллектива — художественный руководитель, поэтому описание берём из аннотации или рассказа -#}
+{% block description %}{{ item.seo_description or (item.annotation | strip_tags(180)) or (item.description | strip_tags(180)) or (item.name ~ ' — коллектив Смоленской областной филармонии: афиша выступлений, фото и видео.') }}{% endblock %}
+{% block og_image %}
+  {%- set first_photo = item.photos | first -%}
+  {%- if first_photo %}{{ og_image(first_photo.src) }}{% elif item.logo %}{{ og_image('/static/uploads/' ~ item.logo) }}{% endif %}
+{% endblock %}
 {% block breadcrumbs %}{{ breadcrumbs([('Главная', url_for('public.index')), ('Коллективы и артисты', url_for('public.collectives')), (item.name, None)]) }}{% endblock %}
 
 {% block content %}
@@ -60,8 +67,8 @@
 
   {% if events %}
     <section class="section">
-      <div class="section__head"><h2>Ближайшие выступления</h2></div>
-      {{ event_carousel(events, 'Ближайшие выступления') }}
+      <div class="section__head"><h2>Ближайшие выступления</h2>{{ carousel_nav('collective-events') }}</div>
+      {{ event_carousel(events, 'Ближайшие выступления', cid='collective-events') }}
     </section>
   {% endif %}
 </div>

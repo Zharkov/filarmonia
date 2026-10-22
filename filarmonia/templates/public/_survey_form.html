@@ -1,0 +1,87 @@
+{#- Одна анкета карточкой. Ждёт s (описание из surveys.py), pg и survey_state (неудачная отправка).
+    В свёрнутом виде видна только шапка (summary), форма раскрывается кнопкой: details работает и без скрипта.
+    После неудачной отправки форма раскрыта; по ссылке #anketa-<ключ> её раскрывает site.js.
+    «Спасибо» приходит с категорией survey-<ключ> и показывается только у своей анкеты: после редиректа
+    браузер прокручен к якорю, а общий список flash в base.html остался бы выше экрана (его категории
+    survey-* пропускают). -#}
+{% set failed = survey_state and survey_state.key == s.key %}
+{% set v = survey_state['values'] if failed else {} %}
+{% set kickers = {'snoc': 'Смоленский научно-образовательный центр', 'minkult_so': 'Минкультуры Смоленской области'} %}
+{% set total = s.choice_questions | length %}
+{% set messages = get_flashed_messages(category_filter=['survey-' ~ s.key]) %}
+<section class="survey {{ 'is-open' if failed }}" id="anketa-{{ s.key }}" aria-labelledby="anketa-{{ s.key }}-title">
+  {% for msg in messages %}
+    <div class="flash survey__thanks" role="status">{{ msg }}</div>
+  {% endfor %}
+  <details class="survey__card" {{ 'open' if failed }} {{ 'data-sent' if messages }} data-survey-card>
+    <summary class="survey__head">
+      <span class="survey__kicker">{{ kickers.get(s.key, 'Анкета') }}</span>
+      <h3 class="survey__title" id="anketa-{{ s.key }}-title">{{ s.title }}</h3>
+      <span class="survey__meta">Вопросов: {{ total }}{% if s.questions | length > total %} и поле для предложений{% endif %} · анонимно · около 3 минут</span>
+      <span class="btn btn--primary survey__toggle">
+        <span class="survey__toggle-open">Заполнить анкету</span>
+        <span class="survey__toggle-close">Свернуть анкету</span>
+      </span>
+    </summary>
+
+    <div class="survey__body">
+      <p class="survey__subtitle">{{ s.subtitle }}</p>
+      {% if s.intro %}<p>{{ s.intro }}</p>{% endif %}
+      {% if failed %}
+        <div class="flash flash--error survey__errors" role="alert" tabindex="-1" data-survey-errors>
+          <strong>Анкету не удалось отправить:</strong>
+          <ul>{% for e in survey_state.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+        </div>
+      {% endif %}
+      <form method="post" action="{{ url_for('public.survey_submit', slug=pg.slug, key=s.key) }}" novalidate
+            data-survey-form data-total="{{ total }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="visually-hidden" aria-hidden="true">
+          <label for="{{ s.key }}-website">Не заполняйте это поле</label>
+          <input id="{{ s.key }}-website" type="text" name="website" tabindex="-1" autocomplete="off">
+        </div>
+        {% for fid, label in s.header_fields %}
+          {% set default = settings.get('site_name', '') if fid == 'org' else settings.get('address', '') %}
+          <div class="form-row"><label for="{{ s.key }}-{{ fid }}">{{ label }}</label>
+            <input id="{{ s.key }}-{{ fid }}" type="text" name="{{ fid }}" maxlength="300"
+                   value="{{ v.get(fid, default) }}"></div>
+        {% endfor %}
+        {% if s.hint %}<p class="survey__hint">{{ s.hint }}</p>{% endif %}
+        <p class="survey__progress" data-survey-progress hidden>Отвечено <b data-done>0</b> из {{ total }}</p>
+        {% for q in s.questions %}
+          {% if q.kind == 'text' %}
+            <div class="form-row survey__text"><label for="{{ s.key }}-{{ q.id }}">{{ q.number }}. {{ q.text }}</label>
+              <textarea id="{{ s.key }}-{{ q.id }}" name="{{ q.id }}" maxlength="2000">{{ v.get(q.id, '') }}</textarea></div>
+          {% else %}
+            {#- Бэкенд отдаёт ошибки общим списком; вопрос без ответа отмечаем по введённым значениям -#}
+            {% set bad = failed and q.required and not v.get(q.id) %}
+            <fieldset class="survey__question {{ 'is-invalid' if bad }}"
+                      {% if bad %}aria-invalid="true" aria-describedby="{{ s.key }}-{{ q.id }}-err"{% endif %}>
+              <legend><span class="survey__num">{{ q.number }}</span> {{ q.text }}</legend>
+              <div class="survey__choices survey__choices--{{ q.kind }}">
+                {% for val, label in q.choices %}
+                  <label class="survey__choice"><input type="radio" name="{{ q.id }}" value="{{ val }}"
+                    {{ 'checked' if v.get(q.id) == val }} {{ 'required' if q.required }}><span>{{ label }}</span></label>
+                {% endfor %}
+              </div>
+              {% if q.kind == 'scale' %}
+                <p class="survey__ends" aria-hidden="true"><span>1 — плохо</span><span>5 — отлично</span></p>
+              {% endif %}
+              {% if bad %}<p class="survey__err" id="{{ s.key }}-{{ q.id }}-err">Выберите ответ на этот вопрос.</p>{% endif %}
+              {% if q.note %}
+                <div class="survey__note"><label for="{{ s.key }}-{{ q.id }}-note">Ваши пожелания <span class="hint">(необязательно)</span></label>
+                  <textarea id="{{ s.key }}-{{ q.id }}-note" name="{{ q.id }}_note" maxlength="2000" rows="2">{{ v.get(q.id ~ '_note', '') }}</textarea></div>
+              {% endif %}
+            </fieldset>
+          {% endif %}
+        {% endfor %}
+        <div class="survey__submit">
+          <button class="btn btn--primary" type="submit">Отправить анкету</button>
+          <p class="survey__fine">Анкета анонимная. Ответы получит филармония.</p>
+        </div>
+      </form>
+      {% if s.footnote %}<p class="survey__footnote">{{ s.footnote }}</p>{% endif %}
+      {% if s.outro %}<p>{{ s.outro }}</p>{% endif %}
+    </div>
+  </details>
+</section>

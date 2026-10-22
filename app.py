@@ -10,6 +10,7 @@
     python app.py db upgrade       обновить схему базы миграциями
     python app.py thumbs           уменьшенные копии для всех фото
     python app.py cleanup          удалить файлы, которые нигде не используются
+    python app.py purge            удалить обращения и ответы анкет старше срока хранения (для cron)
 
 На боевом сервере приложение поднимает gunicorn:
 
@@ -69,6 +70,8 @@ def main(argv=None) -> int:
     cleanup_cmd = commands.add_parser("cleanup", help="удалить загруженные файлы, которые нигде не используются")
     cleanup_cmd.add_argument("--dry-run", action="store_true", help="только показать, ничего не удалять")
 
+    commands.add_parser("purge", help="удалить обращения и ответы анкет старше срока хранения")
+
     # Без команды работает как `run`, чтобы хватало просто `python app.py`
     argv = list(sys.argv[1:] if argv is None else argv)
     if not argv or (argv[0].startswith("-") and argv[0] not in ("-h", "--help")):
@@ -117,6 +120,13 @@ def main(argv=None) -> int:
         for name in names:
             print(("  будет удалён: " if args.dry_run else "  удалён: ") + name)
         print(f"{'Найдено' if args.dry_run else 'Удалено'} неиспользуемых файлов: {len(names)}")
+        return 0
+
+    if args.command == "purge":
+        from filarmonia import maintenance
+
+        done = maintenance.purge(app)
+        print(f"Удалено обращений: {done['appeals']}, ответов на анкеты: {done['surveys']}")
         return 0
 
     # Локальный запуск сам доводит базу до последней версии: иначе после

@@ -33,3 +33,16 @@
 </ul>
 
 <p class="nok__thanks">Спасибо за внимание и время, которое вы уделите анкете!</p>
+
+
+{#- Анкеты, которые заполняют на сайте: описание вопросов — в filarmonia/surveys.py.
+    Ответ уходит письмом и сохраняется в базе; ничего личного не спрашиваем. -#}
+<section class="surveys" aria-labelledby="surveys-title">
+  <h2 id="surveys-title">Региональные анкеты</h2>
+  <p class="hint surveys__lead">Можно ответить прямо здесь, на сайте: имя и контакты не нужны.</p>
+  <div class="surveys__grid">
+    {% for s in surveys %}
+      {% include "public/_survey_form.html" %}
+    {% endfor %}
+  </div>
+</section>

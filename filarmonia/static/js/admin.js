@@ -321,6 +321,13 @@
     });
   });
 
+  /* Статус концерта: поле «Прежняя дата» нужно только перенесённому концерту */
+  document.querySelectorAll("select[data-status-select]").forEach(function (select) {
+    var field = document.querySelector("[data-previous-date]");
+    if (!field) return;
+    select.addEventListener("change", function () { field.hidden = select.value !== "rescheduled"; });
+  });
+
   /* Адрес страницы. У новой записи он идёт за названием, пока редактор
      не поправил его сам; стёр поле — адрес снова идёт за названием.
      Свободен ли адрес, спрашиваем у сервера: занятый получает хвост «-2». */

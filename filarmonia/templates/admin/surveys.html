@@ -1,0 +1,44 @@
+{% extends "admin/base.html" %}
+{% from "admin/_table.html" import sort_th, pager, keep_sort, reset_link %}
+{% from "admin/_survey_tabs.html" import tabs %}
+{% block title %}Анкеты НОК{% endblock %}
+{% block content %}
+<h1>Анкеты НОК</h1>
+<p class="subtitle">Анонимные ответы на анкеты со страницы «Независимая оценка качества». Каждый ответ также уходит письмом на адрес из «Настроек».</p>
+{{ tabs(all_surveys, current, 'list') }}
+{% if current_user and current_user.is_admin %}
+<form method="post" action="{{ url_for('admin.survey_resend_unsent') }}" style="margin-top:20px">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <button class="btn btn--ghost btn--sm" type="submit">Отправить неотправленные</button>
+</form>
+{% endif %}
+
+<form class="filters" method="get" style="margin-top:20px">
+  {{ keep_sort() }}
+  <select name="survey" data-autosubmit aria-label="Анкета">
+    <option value="">Все анкеты</option>
+    {% for s in all_surveys.values() %}<option value="{{ s.key }}" {{ 'selected' if current == s.key }}>{{ s.title }}</option>{% endfor %}
+  </select>
+  <button class="btn btn--ghost btn--sm" type="submit">Показать</button>
+  {{ reset_link(['survey']) }}
+</form>
+
+<div class="table-wrap">
+  <table>
+    <tr>
+      {{ sort_th('Дата', 'date', sorting) }}
+      {{ sort_th('Анкета', 'survey', sorting) }}
+      {{ sort_th('Письмо', 'mail', sorting) }}
+    </tr>
+    {% for r in items.items %}
+      <tr>
+        <td><a href="{{ url_for('admin.survey_view', item_id=r.id) }}">{{ r.created_at | msk | ru_datetime }}</a></td>
+        <td>{{ all_surveys[r.survey].title if r.survey in all_surveys else r.survey }}</td>
+        <td>{% if r.is_emailed %}<span class="badge badge--on">отправлено</span>{% else %}<span class="badge" title="{{ r.email_error }}">не отправлено</span>{% endif %}</td>
+      </tr>
+    {% else %}<tr><td colspan="3">Ответов пока нет.</td></tr>{% endfor %}
+  </table>
+</div>
+<p class="hint">Найдено: {{ items.total }}.</p>
+{{ pager(items) }}
+{% endblock %}

@@ -56,7 +56,8 @@
     {% for ev in items.items %}
       <tr id="row-{{ ev.id }}">
         <td>{{ ev.starts_at | ru_datetime }}</td>
-        <td><a href="{{ url_for('admin.event_form', event_id=ev.id) }}">{{ ev.title }}</a></td>
+        <td><a href="{{ url_for('admin.event_form', event_id=ev.id) }}">{{ ev.title }}</a>
+          {% if ev.status_label %}<span class="badge {{ 'badge--stop' if ev.is_cancelled else 'badge--warn' }}">{{ ev.status_label }}</span>{% endif %}</td>
         <td>{{ ev.venue.name if ev.venue else '—' }}</td>
         <td>{{ ev.price_label }}</td>
         <td>

@@ -1,6 +1,7 @@
 {% extends "public/base.html" %}
 {% from "public/_macros.html" import breadcrumbs, section_icon %}
 {% block title %}Документы{% endblock %}
+{% block description %}Документы Смоленской областной филармонии: учредительные и локальные акты, планы, отчёты, государственное задание.{% endblock %}
 {% block breadcrumbs %}{{ breadcrumbs([('Главная', url_for('public.index')), ('Документы', None)]) }}{% endblock %}
 {% block content %}
 <div class="wrap">

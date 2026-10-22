@@ -11,6 +11,9 @@
 <section class="panel">
   <p><strong>Контакты:</strong> {{ item.email or '—' }} · {{ item.phone or '—' }}</p>
   <p><strong>Тема:</strong> {{ item.subject or '—' }}</p>
+  <p><strong>Согласие на обработку данных:</strong>
+    {% if item.consent_at %}дано {{ item.consent_at | msk | ru_datetime }} (мск), версия текста {{ item.consent_version or '—' }}
+    {% elif item.consent %}дано (до введения учёта версий — дата и версия не записаны){% else %}не получено{% endif %}</p>
   <p style="white-space:pre-wrap">{{ item.message }}</p>
   <hr style="border:0;border-top:1px solid var(--a-line);margin:20px 0">
   <form method="post">
@@ -19,6 +22,11 @@
       <label for="pr">Обращение обработано</label></div>
     <div class="field"><label>Служебная отметка</label><textarea name="note" style="min-height:90px">{{ item.note or '' }}</textarea></div>
     <button class="btn btn--primary" type="submit">Сохранить</button>
+  </form>
+  <form method="post" action="{{ url_for('admin.appeal_delete', item_id=item.id) }}"
+        data-confirm="Удалить обращение безвозвратно? Это нужно, если гражданин отозвал согласие на обработку данных." style="margin-top:16px">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="btn btn--danger btn--sm" type="submit">Удалить обращение</button>
   </form>
 </section>
 {% endblock %}

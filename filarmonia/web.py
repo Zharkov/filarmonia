@@ -4,12 +4,14 @@
 перенаправления со старых адресов и абсолютный адрес сайта.
 """
 import gzip
+import hmac
 import logging
 import os
+import re
 import time
 from logging.handlers import RotatingFileHandler
 
-from flask import current_app, g, redirect, render_template, request, session
+from flask import Response, current_app, g, redirect, render_template, request, session
 from werkzeug.exceptions import MethodNotAllowed, NotFound
 from werkzeug.routing import RequestRedirect
 
@@ -61,6 +63,16 @@ PUBLIC_CSP_REPORT = "; ".join((
 # и результаты поиска по сайту
 NOINDEX_ENDPOINTS = {"public.more_cards", "public.route", "public.search", "csp_report"}
 
+# Страницы, переехавшие на другой адрес: старый отвечает 301, в карту сайта не попадает
+MOVED_PAGES = {"/info/internet-priemnaya": "/obrashcheniya"}
+
+# Служебный адрес для проверки «сайт жив» (healthCheckPath на Render): без пароля стенда
+HEALTH_PATH = "/healthz"
+
+# Всё, что строку журнала делает несколькими: переводы строк и прочие управляющие
+# символы, в том числе Unicode-разделители строк
+LOG_UNSAFE = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029]")
+
 # Что сжимать: текст. Картинки, видео и шрифты WOFF2 уже сжаты.
 COMPRESSIBLE = ("text/", "application/javascript", "application/json", "application/xml",
                 "image/svg+xml")
@@ -77,6 +89,35 @@ ERROR_TEXTS = {
     413: ("Файл слишком большой", "Размер загрузки — не больше 64 МБ. Уменьшите файл и повторите."),
     500: ("Ошибка на сайте", "Мы уже знаем о ней и исправим. Попробуйте обновить страницу позже."),
 }
+
+
+def stand_closed() -> bool:
+    """Тестовая копия (SITE_NOINDEX=1) без пароля: открыта всем, поэтому принимать
+    с неё персональные данные нельзя. Пароль стенда задают STAND_USER и STAND_PASSWORD."""
+    cfg = current_app.config
+    return bool(cfg["SITE_NOINDEX"] and not (cfg["STAND_USER"] and cfg["STAND_PASSWORD"]))
+
+
+def stand_auth():
+    """Basic-auth на весь тестовый стенд. Статика и /healthz проходят без пароля."""
+    cfg = current_app.config
+    if not (cfg["SITE_NOINDEX"] and cfg["STAND_USER"] and cfg["STAND_PASSWORD"]):
+        return None
+    if request.path == HEALTH_PATH or request.path.startswith("/static/"):
+        return None
+    auth = request.authorization
+    # Сравнение за постоянное время: по скорости ответа пароль не подобрать
+    if auth and auth.type == "basic":
+        user_ok = hmac.compare_digest((auth.username or "").encode("utf-8"),
+                                      cfg["STAND_USER"].encode("utf-8"))
+        pass_ok = hmac.compare_digest((auth.password or "").encode("utf-8"),
+                                      cfg["STAND_PASSWORD"].encode("utf-8"))
+        if user_ok and pass_ok:
+            return None
+    return Response("Тестовый стенд: нужен пароль.", 401, {
+        "WWW-Authenticate": 'Basic realm="Stand", charset="UTF-8"',
+        "Content-Type": "text/plain; charset=utf-8",
+    })
 
 
 def init_app(app) -> None:
@@ -101,7 +142,10 @@ def init_app(app) -> None:
 
     @app.after_request
     def finish(response):
-        if request.endpoint in NOINDEX_ENDPOINTS:
+        if current_app.config["SITE_NOINDEX"]:
+            # Тестовая копия: роботу разрешён обход, чтобы он увидел запрет индексации
+            response.headers["X-Robots-Tag"] = "noindex, nofollow"
+        elif request.endpoint in NOINDEX_ENDPOINTS:
             response.headers["X-Robots-Tag"] = "noindex"
         security_headers(response)
         cache_headers(response)
@@ -111,9 +155,16 @@ def init_app(app) -> None:
     @app.route("/csp-report", methods=["POST"])
     def csp_report():
         """Браузер сообщает, что ресурс нарушил бы политику безопасности."""
-        body = request.get_data(cache=False, as_text=True)[:2000]
+        # Тело приходит от кого угодно без входа и CSRF: размер ограничен в create_app,
+        # а переводы строк вычищаются, чтобы нельзя было подделать строки журнала
+        body = LOG_UNSAFE.sub(" ", request.get_data(cache=False, as_text=True)[:2000])
         app.logger.warning("CSP: %s", body)
         return "", 204
+
+    @app.route(HEALTH_PATH)
+    def healthz():
+        """Проверка «сайт жив» для хостинга: быстрый ответ без базы и без пароля стенда."""
+        return Response("ok", mimetype="text/plain")
 
     app.extensions["csrf"].exempt(csp_report)
 
@@ -139,6 +190,9 @@ def init_app(app) -> None:
 def error_page(error):
     code = getattr(error, "code", 500) or 500
     title, text = ERROR_TEXTS.get(code, ERROR_TEXTS[500])
+    if code == 413 and not request.path.startswith("/admin"):
+        # Публичные формы (обращения, анкеты, отчёты CSP): файлов в них нет
+        title, text = "Слишком большой объём данных", "Слишком большой объём данных формы. Сократите текст и повторите."
     return render_template("public/error.html", code=code, title=title, text=text), code
 
 
@@ -218,6 +272,10 @@ def cache_headers(response) -> None:
     # Страница сотрудника (ссылки «Редактировать», черновики) не должна попасть в общий кэш
     private = g.get("user") is not None or "_flashes" in session
     response.headers["Cache-Control"] = "private, no-cache" if private else "no-cache"
+    # Дата изменения записи (события, новости) — поисковик по If-Modified-Since не качает страницу заново
+    modified = g.get("last_modified")
+    if modified and not private:
+        response.last_modified = modified
     response.add_etag(weak=True)
     response.make_conditional(request)
 
