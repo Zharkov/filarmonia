@@ -104,7 +104,7 @@
           language: "ru",
           height: field.getAttribute("data-rich") === "small" ? 220 : 420,
           toolbarAdaptive: false,
-          buttons: "paragraph,bold,italic,underline,strikethrough,|,ul,ol,|,link,image,table,|," +
+          buttons: "paragraph,bold,italic,underline,strikethrough,|,ul,ol,|,align,|,link,image,table,|," +
                    "hr,eraser,|,undo,redo,|,source,fullsize",
           controls: {
             paragraph: { list: { p: "Обычный текст", h2: "Заголовок", h3: "Подзаголовок",

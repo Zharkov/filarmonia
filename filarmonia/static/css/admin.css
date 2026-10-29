@@ -5,8 +5,8 @@
   --a-ink: #1e2430;
   --a-muted: #6c7688;
   --a-line: #dfe2e8;
-  --a-brick: #a8332b;
-  --a-brick-dark: #8a271f;
+  --a-brick: #002f55;
+  --a-brick-dark: #001d33;
   --a-ok: #2f6f4f;
   --a-side: #1e2430;
 }
@@ -226,7 +226,7 @@ th.is-sorted .sortable__arrow { opacity: 1; color: var(--a-brick); }
 }
 .pick:hover { border-color: var(--a-ink); }
 .pick input { width: 16px; height: 16px; margin: 0; }
-.pick:has(input:checked) { background: #fbeceb; border-color: var(--a-brick); color: var(--a-brick-dark); }
+.pick:has(input:checked) { background: #e8f0f8; border-color: var(--a-brick); color: var(--a-brick); }
 
 /* Кнопки формы записи: прилипают к низу экрана, пока форма видна */
 .badge--draft { background: #fff4d6; border-color: #ecd28a; color: #7a5600; }

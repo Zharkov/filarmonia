@@ -1,7 +1,7 @@
 # Архитектура: карта проекта
 
 Справочник для агентов: читайте его вместо изучения кода. Установка, переменные окружения, деплой,
-nginx, команды — в `README.md` (не дублируется). История правок — `docs/PROGRESS.md`,
+nginx — в `docs/DEPLOY-SERVER.md`, команды — в `README.md` (не дублируется). История правок — `docs/PROGRESS.md`,
 находки аудита — `docs/AUDIT-2026-10-21.md`. Если код расходится с документом, верен код.
 
 ## 1. Стек и запуск
@@ -11,11 +11,11 @@ nginx, команды — в `README.md` (не дублируется). Исто
 - Фронтенд без сборки: ванильный JS и один CSS на часть. Визуальный редактор Jodit лежит в `static/vendor/jodit`.
 - БД: SQLite (`filarmonia.db`, рабочая — не трогать), на боевом PostgreSQL (`psycopg`, закомментирован в requirements).
 - Запуск: `pip install -r requirements-dev.txt`, `python app.py seed` (демо-данные, вход admin/filarmonia2026),
-  `python app.py` (порт 5000). Полный список команд (`run seed test db thumbs cleanup purge`) — README, «Быстрый запуск / Команды».
+  `python app.py` (порт 5000). Полный список команд (`run seed test db thumbs cleanup purge`) — README, «Команды».
 - Единая точка входа `app.py` (argparse), WSGI-объект `app:app` для gunicorn. Конфиг — `config.py::build_config(**overrides)`,
   всё из переменных окружения (образец `.env.example`).
 - CI: `.github/workflows/tests.yml` (`python app.py test` + `pip-audit`), `dependabot.yml`. Тестовый деплой — `render.yaml`
-  (демо-данные пересоздаются при каждой сборке), боевой — gunicorn+systemd+nginx по README.
+  (демо-данные пересоздаются при каждой сборке), боевой — gunicorn+systemd+nginx по docs/DEPLOY-SERVER.md.
 
 ## 2. Структура
 

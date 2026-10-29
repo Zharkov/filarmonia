@@ -80,6 +80,7 @@
 
   /* Полоса главного меню: глубокий синий по просьбе заказчика */
   --menu-bg: #002f55;
+  --menu-bg-dark: #001d33;
   --on-menu: #ffffff;
 
   /* Ночная палитра: карточки концертов и «Музыкальный маршрут» */
@@ -123,7 +124,7 @@ html[data-theme="bb"] {
 }
 /* Тёмные блоки в контрастных режимах сводятся к двум цветам темы */
 html[data-theme] {
-  --menu-bg: var(--ink); --on-menu: var(--paper);
+  --menu-bg: var(--ink); --menu-bg-dark: var(--ink); --on-menu: var(--paper);
   --night: var(--paper); --night-2: var(--paper); --night-line: var(--line);
   --night-text: var(--ink); --night-muted: var(--ink);
   --gold-soft: var(--ink); --on-gold: var(--paper);
@@ -154,7 +155,7 @@ body {
 }
 
 img { max-width: 100%; display: block; }
-a { color: var(--brick); text-decoration: none; }
+a { color: var(--menu-bg); text-decoration: none; }
 a:hover { text-decoration: underline; }
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 /* На тёмных блоках синяя рамка не видна — там она золотая */
@@ -172,7 +173,7 @@ html[data-theme] .nav, html[data-theme] .hero, html[data-theme] .footer { --focu
    топбар, панель слабовидящих, логотип и всё меню */
 .skip-link {
   position: absolute; left: 12px; top: -60px; z-index: 200;
-  background: var(--brick); color: var(--on-brick); padding: 10px 18px;
+  background: var(--menu-bg); color: var(--on-menu); padding: 10px 18px;
   transition: top .15s;
 }
 .skip-link:focus { top: 12px; text-decoration: none; }
@@ -220,8 +221,8 @@ p { margin: 0 0 1em; max-width: 72ch; }
   transition: background-color .15s, color .15s, border-color .15s, filter .15s;
 }
 .btn:hover { text-decoration: none; }
-.btn--primary { background: var(--brick); color: var(--on-brick); }
-.btn--primary:hover { background: var(--brick-dark); }
+.btn--primary { background: var(--menu-bg); color: var(--on-menu); }
+.btn--primary:hover { background: var(--menu-bg-dark); }
 .btn--ghost { border-color: var(--line); color: var(--ink); background: transparent; }
 .btn--ghost:hover { border-color: var(--ink); }
 .btn--light { background: var(--paper); color: var(--ink); }
@@ -346,6 +347,20 @@ html[data-theme] .hero { aspect-ratio: auto; }
 .hero__sound .icon { width: 22px; height: 22px; }
 .hero__sound span { display: grid; }
 .hero__sound span[hidden] { display: none; }
+/* Стрелка вниз на видео-блоке главной (как на artnight.culture.ru) */
+.hero__arrow {
+  position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 2;
+  width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+  background: rgba(15, 26, 46, .55); color: #fff; border: 1px solid rgba(255, 255, 255, .45);
+  cursor: pointer; backdrop-filter: blur(4px); animation: hero__arrow-bounce 2s infinite;
+}
+.hero__arrow:hover { background: rgba(15, 26, 46, .8); }
+.hero__arrow .icon { width: 22px; height: 22px; }
+@keyframes hero__arrow-bounce {
+  0%, 20%, 50%, 80%, 100% { transform: translateX(-50%) translateY(0); }
+  40% { transform: translateX(-50%) translateY(6px); }
+  60% { transform: translateX(-50%) translateY(3px); }
+}
 
 /* Календарь: лента дней под видео, без рамки и заголовка */
 .calendar { padding: 32px 0 0; }
@@ -548,7 +563,7 @@ body.has-buybar .to-top { bottom: 90px; }
    над списком, а метки ведут на страницы «Пушкинская карта», «Льготы», фестиваля */
 .card__pushkin {
   display: inline-flex; align-items: center; gap: 6px; margin: 8px 16px 0 0;
-  font-size: .86rem; font-weight: 600; color: var(--brick);
+  font-size: .86rem; font-weight: 600; color: var(--menu-bg);
 }
 .card__pushkin::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 a.card__pushkin:hover { text-decoration: underline; }
@@ -610,7 +625,7 @@ html[data-theme] .nok__qr a { border: 2px solid var(--ink); }
 }
 .survey__head { display: grid; gap: 8px; justify-items: start; padding: 22px 24px; cursor: pointer; list-style: none; }
 .survey__head::-webkit-details-marker { display: none; }
-.survey__head:hover .survey__toggle { background: var(--brick-dark); }
+.survey__head:hover .survey__toggle { background: var(--menu-bg-dark); }
 .survey__kicker { color: var(--gold-text); font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; }
 .survey__title { margin: 0; font-family: var(--f-display); font-size: 1.3rem; line-height: 1.25; }
 .survey__meta { color: var(--muted); font-size: .93rem; line-height: 1.45; }
@@ -663,7 +678,7 @@ html[data-theme] .survey__card { border: 2px solid var(--ink); }
 html[data-theme] .survey__choice span { border-color: var(--ink); }
 html[data-theme] .survey__choice input:checked + span { box-shadow: inset 0 0 0 3px var(--paper); }
 html[data-theme] .survey__kicker, html[data-theme] .survey__num { color: var(--ink); }
-html[data-theme] .survey__head:hover .survey__toggle { background: var(--brick); text-decoration: underline; }
+html[data-theme] .survey__head:hover .survey__toggle { background: var(--menu-bg); text-decoration: underline; }
 @media (max-width: 860px) {
   .surveys__grid { grid-template-columns: 1fr; }
   .survey__head { padding: 18px 16px; }
@@ -875,7 +890,7 @@ html[data-theme] .event__status--cancelled { border-style: double; border-width:
    чтобы не пропускать уровни h2-h3 ради внешнего вида */
 .block h2 { font-family: var(--f-text); font-size: 1rem; margin: 0 0 6px; }
 .block p:last-child { margin-bottom: 0; }
-.block--pushkin { border-left-color: var(--brick); }
+.block--pushkin { border-left-color: var(--menu-bg); }
 /* Условия под описанием: Пушкинская карта и льготы рядом, на узком экране друг под другом */
 .event__terms .block { margin: 0; }
 .event__terms--pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 26px; align-items: start; }
@@ -1179,9 +1194,9 @@ html[data-theme] .doc__icon { color: var(--ink); }
 html[data-theme] .doc__icon .doc__ext { background: var(--ink); color: var(--paper); }
 .doc__body { min-width: 0; }
 .doc__title { display: inline-block; font-weight: 500; color: var(--ink); line-height: 1.4; margin-bottom: 4px; }
-.doc__title:hover { color: var(--brick); }
+.doc__title:hover { color: var(--menu-bg); }
 .doc__meta { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: .86rem; color: var(--muted); }
-.doc__meta a { color: var(--brick); border-bottom: 1px dashed currentColor; }
+.doc__meta a { color: var(--menu-bg); border-bottom: 1px dashed currentColor; }
 .doc__meta a:hover { text-decoration: none; border-bottom-style: solid; }
 .doclist__year { font-size: 1.6rem; margin: 32px 0 0; }
 .doclist__year + .doclist { margin-top: 14px; }

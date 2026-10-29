@@ -170,6 +170,8 @@
 </nav>
 
 {% block hero %}{% endblock %}
+<!-- Счётчик прокультуры -->
+<script src="https://culturaltracking.ru/static/js/spxl.js" data-pixel-id="2503"></script>
 
 <main id="main">
   {% if g.draft %}
@@ -280,6 +282,19 @@
 </div>
 
 <script src="{{ asset_url('js/site.js') }}"></script>
-{% block scripts %}{% endblock %}
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const arrow = document.querySelector('.hero__arrow');
+      if (arrow) {
+        arrow.addEventListener('click', () => {
+          const calendar = document.querySelector('.calendar');
+          if (calendar) {
+            calendar.scrollIntoView({ behavior: 'smooth' });
+          }
+        });
+      }
+    });
+  </script>
+  {% block scripts %}{% endblock %}
 </body>
 </html>

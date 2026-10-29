@@ -197,7 +197,7 @@ def check_secret_key(app: Flask) -> None:
     только предупреждает, иначе разработка требовала бы лишних настроек.
 
     Признак боевого окружения — HTTPS-куки или работа за обратным прокси:
-    ровно это задают render.yaml и systemd-юнит из README. Опереться на
+    ровно это задают render.yaml и systemd-юнит из docs/DEPLOY-SERVER.md. Опереться на
     app.debug нельзя: в момент сборки приложения он ещё не выставлен.
     """
     if app.config["SECRET_KEY"] != INSECURE_SECRET_KEY or app.testing:

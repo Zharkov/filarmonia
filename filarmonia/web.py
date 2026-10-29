@@ -47,7 +47,7 @@ PUBLIC_CSP = "; ".join((
 # собрать по отчётам браузеров в журнале, а потом включить запрет.
 PUBLIC_CSP_REPORT = "; ".join((
     "default-src 'self'",
-    "script-src 'self' https://widget.afisha.yandex.ru https://*.yandex.ru https://*.yandex.net "
+    "script-src 'self' https://widget.afisha.yandex.ru https://*.yandex.ru https://*.yandex.net https://culturaltracking.ru "
     "https://pos.gosuslugi.ru https://*.gosuslugi.ru",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https:",
