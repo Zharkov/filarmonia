@@ -244,6 +244,60 @@ def test_yandex_session_id(app, admin):
     assert "Введите номер сеанса Яндекс Афиши" in text(r)
 
 
+def test_performers_collectives_linked(app, admin):
+    """Правка заказчика: названия коллективов филармонии в «Исполнителях» —
+    ссылки, приглашённые артисты остаются обычным текстом."""
+    from filarmonia.models import Collective
+
+    with app.app_context():
+        db.session.add(Collective(name="Камерный оркестр филармонии",
+                                  slug="kamernyy-orkestr-filarmonii"))
+        db.session.commit()
+    create_event(admin, performers="<p>Камерный оркестр филармонии; "
+                                   "солистка Анна Петрова (приглашённый артист)</p>")
+    html = text(admin.get("/afisha/testovyy-koncert"))
+    assert 'href="/kollektivy/kamernyy-orkestr-filarmonii"' in html
+    assert "Камерный оркестр филармонии</a>" in html
+    assert "Анна Петрова" in html and "Анна Петрова</a>" not in html
+
+
+def test_performers_checkbox_collectives_shown(app, admin):
+    """Правка заказчика: коллективы, выбранные галочками в форме события,
+    появляются в строке «Исполнители» на странице афиши — ссылками."""
+    from filarmonia.models import Collective
+
+    with app.app_context():
+        db.session.add(Collective(name="Духовой оркестр", slug="duhovoy-orkestr"))
+        db.session.commit()
+        cid = Collective.query.filter_by(slug="duhovoy-orkestr").first().id
+    # Только чекбоксы, поле «Исполнители» пустое
+    create_event(admin, title="Духовой концерт", collectives=[str(cid)])
+    html = text(admin.get("/afisha/duhovoy-koncert"))
+    assert 'href="/kollektivy/duhovoy-orkestr"' in html
+    assert "Духовой оркестр</a>" in html
+
+
+def test_performers_no_duplicates(app, admin):
+    """Коллектив есть и в чекбоксах, и в поле «Исполнители» — на странице
+    он показывается один раз (ссылкой), приглашённый артист остаётся текстом."""
+    from filarmonia.models import Collective
+
+    with app.app_context():
+        db.session.add(Collective(name="Народный хор", slug="narodnyy-hor"))
+        db.session.commit()
+        cid = Collective.query.filter_by(slug="narodnyy-hor").first().id
+    create_event(admin, title="Двойной концерт",
+                 collectives=[str(cid)],
+                 performers="<p>Народный хор; Пётр Сидоров (приглашённый артист)</p>")
+    html = text(admin.get("/afisha/dvoynoy-koncert"))
+    # Ссылка одна, приглашённый артист — не ссылка
+    assert html.count('href="/kollektivy/narodnyy-hor"') == 1
+    assert "Народный хор" in html
+    assert "Пётр Сидоров" in html and "Пётр Сидоров</a>" not in html
+    # После удаления дубля висячих разделителей не остаётся
+    assert "; ;" not in html and "<p>;</p>" not in html
+
+
 def test_yandex_session_number_only(app, admin):
     """Редактор вводит только номер после «@», приставка — из настроек."""
     create_event(admin, yandex_id="496249")

@@ -145,7 +145,8 @@ def test_only_pushkin_terms_single_block(app, admin):
     assert "event__terms--pair" not in html
 
 
-def test_collectives_only_shows_about_block(app, admin):
+def test_collectives_block_removed(app, admin):
+    """Правка заказчика: блок «Участвуют: …» на странице концерта не выводится."""
     create_event(admin)
     with app.app_context():
         c = Collective(name="Оркестр-тест", slug="orkestr-test")
@@ -155,7 +156,7 @@ def test_collectives_only_shows_about_block(app, admin):
         ev.collectives.append(c)
         db.session.commit()
     html = text(admin.get(SLUG_EV))
-    assert "О концерте" in html and "Участвуют:" in html and "Оркестр-тест" in html
+    assert "Участвуют:" not in html
     assert 'class="prose"' not in html
 
 

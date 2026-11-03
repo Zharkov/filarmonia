@@ -82,10 +82,11 @@
           <div class="fact__label">Дата и время</div>
           <div class="fact__value">{{ ev.starts_at | ru_date }}, {{ ev.starts_at | ru_weekday }}, {{ ev.starts_at.strftime('%H:%M') }}</div>
         </div>
-        {% if ev.performers %}
+        {% if ev.performers or ev.collectives %}
         <div class="fact">
           <div class="fact__label">Исполнители</div>
-          <div class="fact__value fact__value--rich">{{ ev.performers | safe }}</div>
+          {#- Чекбокс-коллективы + текст поля «Исполнители» без дублей -#}
+          <div class="fact__value fact__value--rich">{{ ev | performers_html }}</div>
         </div>
         {% endif %}
         {% if ev.venue %}
@@ -169,21 +170,11 @@
     </section>
   {% endif %}
 
-  {#- О концерте и его участниках -#}
-  {% if ev.description or ev.collectives %}
+  {#- О концерте. Список «Участвуют» убран: исполнители перечислены в фактах -#}
+  {% if ev.description %}
     <section class="section">
       <h2>О концерте</h2>
-      {% if ev.description %}
-        <div class="prose">{{ ev.description | safe }}</div>
-      {% endif %}
-
-      {% if ev.collectives %}
-        <p class="event__collectives"><span>Участвуют:</span>
-          {% for c in ev.collectives %}
-            <a href="{{ c.url }}">{{ c.name }}</a>{{ ", " if not loop.last }}
-          {% endfor %}
-        </p>
-      {% endif %}
+      <div class="prose">{{ ev.description | safe }}</div>
     </section>
   {% endif %}
 

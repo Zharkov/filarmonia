@@ -30,6 +30,9 @@ JINJA_FILTERS = {
     "image_size": utils.image_size,
     "msk": utils.to_moscow,
     "qr_svg": utils.qr_svg,
+    "link_collectives": lambda html: Markup(utils.link_collectives(html)),
+    # Чекбокс-коллективы + текст поля «Исполнители» одной строкой, без дублей
+    "performers_html": lambda ev: Markup(utils.performers_html(ev)),
 }
 
 # Статика кэшируется браузером надолго: имена загруженных файлов уникальны,

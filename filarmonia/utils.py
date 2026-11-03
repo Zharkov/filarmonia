@@ -422,6 +422,153 @@ def clean_html(html: str) -> str:
     ).strip()
 
 
+_TAG_RE = re.compile(r"(<[^>]+>)")
+
+
+def link_collectives(html: str) -> str:
+    """«Исполнители» концерта: названия коллективов филармонии становятся ссылками.
+
+    В поле «Исполнители» админка пишет что угодно: и свои коллективы, и
+    приглашённых артистов. Названия, совпадающие с коллективами из раздела
+    «Коллективы и артисты» (проверка без учёта регистра и «е/ё»), оборачиваются
+    в ссылку на страницу коллектива; всё остальное — приглашённые артисты —
+    остаётся обычным текстом. Разметку (теги, стили) не трогаем: замена идёт
+    только по тексту между тегами, а текст внутри уже готовых ссылок не
+    трогается вовсе.
+    """
+    if not html:
+        return ""
+    try:
+        from .models import Collective
+
+        rows = (
+            Collective.query.filter_by(is_published=True)
+            .order_by(func.length(Collective.name).desc())
+            .all()
+        )
+    except RuntimeError:  # нет контекста приложения (генерация писем и т.п.)
+        return html
+    # Длинные названия первыми: «Камерный оркестр» раньше «Оркестр»
+    items = [(c.name, c.url) for c in rows if c.name and len(c.name) >= 3]
+    if not items:
+        return html
+
+    def norm(text: str) -> str:
+        return text.lower().replace("ё", "е")
+
+    parts = _TAG_RE.split(html)
+    tags = _TAG_RE.findall(html)
+    # Чередование: текст, тег, текст, тег… Ссылки делаем только в текстовых частях
+    # и не внутри уже существующего <a>…</a>.
+    in_link = False
+    depth_tag = None
+    out = []
+    for i, part in enumerate(parts):
+        if i % 2 == 1:  # это тег
+            low = part.lower()
+            if low.startswith("<a"):
+                in_link = True
+            elif low.startswith("</a"):
+                in_link = False
+            out.append(part)
+            continue
+        text = part
+        if not in_link:
+            for name, url in items:
+                # Заменяем только цельные вхождения названия
+                pattern = re.compile(
+                    r"(?<![\wа-яёА-ЯЁ-])" + re.escape(name) + r"(?![\wа-яёА-ЯЁ-])",
+                    re.IGNORECASE,
+                )
+                matches = list(pattern.finditer(text))
+                if not matches:
+                    continue
+                result, pos = [], 0
+                for m in matches:
+                    result.append(text[pos:m.start()])
+                    result.append(f'<a href="{url}">{m.group(0)}</a>')
+                    pos = m.end()
+                result.append(text[pos:])
+                text = "".join(result)
+        out.append(text)
+    return "".join(out)
+
+
+def _clean_separators(part: str) -> str:
+    """Убирает «, , » и висячие запятые, оставшиеся после удалённых дублей."""
+    part = re.sub(r"(?:\s*[;,]){2,}(?=\s|$)", "", part)
+    part = re.sub(r"^\s*[;,]\s*", "", part)
+    part = re.sub(r"\s*[,;]\s*$", "", part)
+    return part
+
+
+def performers_html(ev) -> str:
+    """«Исполнители» концерта: чекбокс-коллективы + текст поля, без дублей.
+
+    Коллективы, выбранные галочками в форме события, показываются всегда:
+    опубликованные — ссылками на свои страницы, черновики — просто текстом
+    (ссылка на черновик дала бы посетителю 404). Затем показывается текст
+    из поля «Исполнители» (свои коллективы в нём тоже становятся ссылками),
+    но названия, уже показанные из чекбоксов, из него убираются — иначе
+    один коллектив выводился бы дважды.
+    """
+    shown = []
+    for c in (getattr(ev, "collectives", None) or []):
+        if not c.name:
+            continue
+        shown.append((c.url if c.is_published else None, c.name))
+
+    try:
+        html = link_collectives(ev.performers or "")
+    except RuntimeError:  # нет контекста приложения (генерация писем и т.п.)
+        html = ev.performers or ""
+
+    urls = {u for u, _ in shown if u}
+    if urls and html:
+        # Ссылки на уже показанные чекбокс-коллективы из текста убираем целиком
+        html = re.sub(
+            r'<a href="([^"]+)">([^<]*)</a>',
+            lambda m: "" if m.group(1) in urls else m.group(0),
+            html,
+        )
+
+    if shown and html:
+        # Длинные названия первыми: «Камерный оркестр» раньше «Оркестр»
+        names = sorted({n for _, n in shown}, key=len, reverse=True)
+        parts = _TAG_RE.split(html)
+        in_link = False
+        out = []
+        for i, part in enumerate(parts):
+            if i % 2 == 1:  # тег
+                low = part.lower()
+                if low.startswith("<a"):
+                    in_link = True
+                elif low.startswith("</a"):
+                    in_link = False
+                out.append(part)
+                continue
+            if not in_link:
+                for name in names:
+                    # Убираем только цельные вхождения названия
+                    pattern = re.compile(
+                        r"(?<![\wа-яёА-ЯЁ-])" + re.escape(name) + r"(?![\wа-яёА-ЯЁ-])",
+                        re.IGNORECASE,
+                    )
+                    part = pattern.sub("", part)
+                part = _clean_separators(part)
+            out.append(part)
+        html = "".join(out)
+
+    links = ", ".join(
+        f'<a href="{u}">{name}</a>' if u else name for u, name in shown
+    )
+    blocks = [b for b in (links, html) if b and b.strip()]
+    if len(blocks) == 2 and not html.lstrip().startswith("<"):
+        # Обычный текст без разметки: склеиваем через запятую
+        return links + ", " + html
+    return "".join(blocks)
+
+
 # Поиск без учёта регистра и без различия «е» и «ё»
 def search_norm(text: str) -> str:
     return (text or "").strip().lower().replace("ё", "е")
