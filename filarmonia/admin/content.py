@@ -216,9 +216,36 @@ def page_form(item_id=None):
             Document.query.filter_by(category=old_title, news_id=None).update({"category": item.title})
         moved = keep_old_address(item, old_url, was_published)
         save(item, "Страница сохранена." + status_note(item, was_published) + moved)
+        # После save(): у новой страницы id появляется только там, а по нему ищется её пункт меню
+        sync_menu_item(item)
         return after_save(item, url_for("admin.page_form", item_id=item.id))
     return render_template("admin/page_form.html", item=item, parents=parents,
                            templates=PAGE_TEMPLATES)
+
+
+def sync_menu_item(page) -> None:
+    """Пункт меню следует за страницей: галочка «в меню» работает без ручной записи в «Меню».
+
+    Порядок, название и вложенность редактор настраивает в «Меню», поэтому пункт
+    не удаляем и его sort не трогаем: при снятой галочке или черновике страницу
+    просто прячем (is_published=False), а при возврате публикации показываем снова.
+    """
+    item = MenuItem.query.filter_by(page_id=page.id).first()
+    if page.show_in_menu and page.is_published:
+        # Подпункт вешаем на пункт родительской страницы; нет такого — пункт верхнего уровня
+        parent = (MenuItem.query.filter_by(page_id=page.parent_id).order_by(MenuItem.sort).first()
+                  if page.parent_id else None)
+        if item is None:
+            item = MenuItem(page_id=page.id, sort=page.sort or 100)
+            db.session.add(item)
+        item.title = page.title
+        item.parent_id = parent.id if parent else None
+        item.is_published = True
+    elif item is not None:
+        item.is_published = False
+    else:
+        return
+    db.session.commit()
 
 
 def page_in_use(page) -> str:

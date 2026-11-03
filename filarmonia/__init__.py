@@ -4,7 +4,7 @@ import time
 from types import SimpleNamespace
 
 from flask import Flask, render_template, g, request, session, url_for
-from flask_wtf.csrf import CSRFError, CSRFProtect
+from flask_wtf.csrf import CSRFError
 from markupsafe import Markup
 from sqlalchemy.orm import joinedload
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -12,6 +12,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from config import build_config, INSECURE_SECRET_KEY
 from .models import db, Setting, MenuItem, User
 from . import schema, utils, web
+from .csrf_cookie import CookieCSRFProtect
 
 JINJA_FILTERS = {
     "ru_date": utils.ru_date,
@@ -91,7 +92,7 @@ def reset_site_data() -> None:
     """Сбросить настройки и меню в памяти — после их правки в панели."""
     _site_data["expires"] = 0.0
 
-csrf = CSRFProtect()
+csrf = CookieCSRFProtect()
 
 
 def create_app(**config_overrides) -> Flask:
@@ -176,7 +177,8 @@ def create_app(**config_overrides) -> Flask:
 
     @app.errorhandler(CSRFError)
     def csrf_expired(_error):
-        """Форму отправили со страницы, пролежавшей открытой слишком долго."""
+        """Форма пришла без токена защиты: страница лежала открытой дольше срока
+        подписи, либо браузер почистил cookie `csrf_token` (см. `csrf_cookie`)."""
         return render_template("public/csrf.html"), 400
 
     return app

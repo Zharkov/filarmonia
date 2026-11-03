@@ -36,6 +36,9 @@ filarmonia/static/uploads/*
 *.tmp
 *.swp
 ~$*
+pytest_output.txt
+dbout.txt
+dbstate.txt
 
 # Рабочие материалы: правки и документы заказчика, аудит дизайна со скриншотами
 /*.docx
@@ -45,6 +48,15 @@ filarmonia/static/uploads/*
 /дизайн.md
 /правки.md
 /правки/
+
+# Временные файлы и черновые скрипты прораба (проверки баз, разовые утилиты)
+/tmp/
+/scripts/check_*.py
+/scripts/dbcheck.py
+
+# Выкладка на CGI-хостинг без SSH — рабочие файлы сервера, живут только на хостинге
+/index.cgi
+/.htaccess
 
 # Редакторы
 .idea/
@@ -59,3 +71,11 @@ desktop.ini
 # Локальные настройки Claude Code
 .claude/settings.local.json
 .claude/settings.local.json.bak
+
+# Служебные папки AI-инструментов (инструкции и память агентов) — не относятся к сайту
+.koda/
+.tiermux/
+.claude/
+
+# Папка для релиза: собранный проект перед загрузкой на хостинг (не коммитить)
+release/

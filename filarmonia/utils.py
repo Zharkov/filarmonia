@@ -407,6 +407,7 @@ SAFE_ATTRS = {
     "img": {"src", "alt", "title", "width", "height"},
     "td": {"colspan", "rowspan"}, "th": {"colspan", "rowspan", "scope"},
     "col": {"span"}, "colgroup": {"span"},
+    "p": {"style"}, "div": {"style"}, "span": {"style"},
 }
 
 

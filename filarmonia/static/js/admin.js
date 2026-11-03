@@ -92,6 +92,9 @@
     var self = document.currentScript;
     var fields = document.querySelectorAll("textarea[data-rich]");
     if (!fields.length || !self || !self.getAttribute("data-jodit-js")) return;
+    // Загрузка идёт запросом вне формы, поэтому токен берётся из meta шаблона панели
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    var csrfToken = meta ? meta.getAttribute("content") : "";
     var css = document.createElement("link");
     css.rel = "stylesheet";
     css.href = self.getAttribute("data-jodit-css");
@@ -114,8 +117,20 @@
           askBeforePasteHTML: false,
           askBeforePasteFromWord: false,
           defaultActionOnPaste: "insert_clear_html",
-          // Картинки — только ссылкой: вставка файлом раздула бы базу
-          uploader: { insertImageAsBase64URI: false },
+          // Файл картинки грузится на сервер (/admin/upload), в текст попадает ссылка на
+          // /static/uploads: base64 раздул бы и страницу, и базу. Токен — в заголовке,
+          // потому что запрос идёт мимо формы. При HTTP-ошибке Jodit тело ответа не
+          // читает, поэтому текст подсказки задаём здесь.
+          uploader: {
+            url: self.getAttribute("data-upload-url") || "",
+            insertImageAsBase64URI: false,
+            headers: { "X-CSRFToken": csrfToken },
+            getMessage: function (response) {
+              var messages = response && response.data && response.data.messages;
+              return (messages && messages.join(" ")) ||
+                "Не удалось загрузить картинку: проверьте её тип и размер.";
+            }
+          },
           showCharsCounter: false, showWordsCounter: false, showXPathInStatusbar: false
         });
         // Форма следит за правками (ниже): редактор сообщает о каждой,

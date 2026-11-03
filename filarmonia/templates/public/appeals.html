@@ -5,7 +5,7 @@
 {% block breadcrumbs %}{{ breadcrumbs([('Главная', url_for('public.index')), ('Интернет-приёмная', None)]) }}{% endblock %}
 {% block content %}
 <div class="wrap">
-  <h1>Интернет-приёмная</h1>
+  <h2>Интернет-приёмная</h2>
   {% if pg and pg.content %}<div class="prose">{{ pg.content | safe }}</div>
   {% else %}
     <p class="lead">Обращение рассматривается в течение 30 дней со дня регистрации. Ответ направляется

@@ -37,6 +37,11 @@ def upgrade(app) -> None:
     cfg = alembic_config(app)
     with app.app_context():
         tables = set(inspect(db.engine).get_table_names())
+        if not tables:
+            db.create_all()
+            command.stamp(cfg, "head")
+            print("Создана пустая база, схема сгенерирована по моделям.")
+            return
         if tables and "alembic_version" not in tables:
             db.create_all()
             for column in upgrade_schema():

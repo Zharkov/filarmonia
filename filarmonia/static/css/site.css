@@ -416,8 +416,8 @@ a.cal__day:hover { background: var(--tint); text-decoration: none; }
 .ecard__media img { width: 100%; height: 100%; object-fit: cover; }
 .ecard__media::after {
   content: ""; position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(15, 26, 46, .15) 0%, rgba(15, 26, 46, 0) 30%,
-              rgba(15, 26, 46, .55) 72%, var(--night) 100%);
+  background: linear-gradient(180deg, rgba(15, 26, 46, .08) 0%, rgba(15, 26, 46, 0) 35%,
+              rgba(15, 26, 46, .35) 78%, rgba(15, 26, 46, .75) 100%);
 }
 .ecard__date {
   position: absolute; left: 14px; top: 14px; width: 66px; padding: 8px 0 7px; text-align: center;

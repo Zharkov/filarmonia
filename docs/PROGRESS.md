@@ -1,5 +1,46 @@
 # Прогресс
 
+## 2026-11-03 — пункт 6 правок: CSRF-токен в отдельной cookie
+- backend-dev: `filarmonia/csrf_cookie.py` (новый) — `CookieCSRFProtect`: случайная строка в cookie
+  `csrf_token`, токен в формах/meta — подпись `URLSafeTimedSerializer(SECRET_KEY, salt='filarmonia-csrf-cookie')`;
+  проверка — подпись, срок, `hmac.compare_digest` с cookie; сессия не участвует. Цель: вход в админку
+  работает, когда браузер (Яндекс.Браузер заказчика) теряет cookie сессии («Форма устарела»).
+- Доработки по аудиту: С-23 ротация токена при входе/выходе (`rotate_csrf_token`, `admin/auth.py`);
+  С-24 срок 90 дней из одного источника (`WTF_CSRF_TIME_LIMIT` в config.py = Max-Age cookie);
+  С-25 квантование подписи по 15 минут — стабильный ETag HTML (два GET → одинаковый ETag, 304).
+- security-auditor: PASS; Double Submit Cookie допустим (инъекция cookie даёт отказ форм, не обход);
+  в cookie только случайная строка, salt отдельный, host-only, Secure/SameSite=Lax; /csp-report —
+  единственный POST без токена; throttle и реферер-проверки не ослаблены. Побочный эффект ротации:
+  форма, открытая до перелогина в другой вкладке, один раз даёт «Форма устарела» (лечится F5).
+- tester: `tests/test_csrf_cookie.py` (19) + 5 тестов в `test_auth.py`; полный набор 500 passed. PASS.
+
+## 2026-11-03 — правки заказчика (пункты 5, 7, 8)
+- backend-dev: подводка страницы «Коллективы и артисты» — настройка `collectives_lead` (kind html,
+  группа «Страницы»; seed + миграция `0018_collectives_lead.py`, insert-if-missing, down_revision
+  `b7d1e6a39c42`), `collectives.html` берёт её с fallback на прежний текст.
+- backend-dev: автосинхронизация меню — `admin.content.sync_menu_item(page)` после `save()` в
+  `page_form`: при «показывать в меню» + публикации создаёт/обновляет MenuItem (title, parent_id
+  по пункту родительской страницы, sort не трогает); снятие галочки/публикации скрывает пункт,
+  не удаляя; черновик пункта не создаёт.
+- backend-dev: загрузка картинок в Jodit — `POST /admin/upload` (`admin/media.py`, login_required,
+  CSRF по `X-CSRFToken` из `meta[name=csrf-token]` в `admin/base.html`; `data-upload-url` на теге
+  admin.js), ответ в формате Jodit `{success, data:{baseurl, files, isImages}}`, ошибки 400
+  по-русски; `utils.save_upload` даёт копии `-NNNw.webp`; журнал и CSP без изменений;
+  `referenced_uploads` уже считает `<img>` в текстах — cleanup висячие текстовые картинки не трогает.
+- tester: `tests/test_customer_2026_11_03.py` (30 тестов), полный прогон 476 passed. PASS.
+
+## 2026-11-02 — роли субагентов Koda
+- Заведены 12 ролей в `.koda/agents/` (файлы с YAML-шапкой `name`/`description`/`tools`; папка в `.gitignore`,
+  это локальные настройки, а не код сайта): planner, project-mapper, triage, backend-dev, frontend-dev,
+  landing-builder, designer, tester, reviewer, security-auditor, seo-specialist, client-reporter.
+- Инструкции перенесены из команды Claude Code (`~/.claude/agents/*.md`) и переписаны под инструменты Koda
+  (`read_file`, `grep_search`, `run_terminal_command`, `create_new_file`, …) и под правила этого проекта:
+  общий набор помощников панели, `BODY_LIMITS`, миграция на каждое изменение схемы, `python -m pytest -q -n auto`.
+- Проверяющие (tester, reviewer, security-auditor, seo-specialist) заканчивают отчёт словом `PASS`/`FAIL`;
+  reviewer ведёт `.gitignore` и README; рабочая БД и git запрещены всем.
+- В ARCHITECTURE.md раздел «Корень» дополнен файлами CGI-выкладки (`index.cgi`, `.htaccess`,
+  `filarmonia/deploy_cgi.py`, `release/`, `scripts/_read_docx.py`).
+
 ## 2026-10-21 — правки заказчика
 - Баннер на главной: `.hero` в пропорции 1902×737 (было 16:9); поля `.hero__inner` теперь
   `clamp(...)` и сжимаются на средних ширинах, чтобы текст помещался в новую высоту.

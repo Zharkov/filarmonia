@@ -19,7 +19,7 @@
 
 {% block content %}
 <div class="wrap">
-  <h1>{{ ev.title }}</h1>
+  <h2>{{ ev.title }}</h2>
 
   {#- Отменён, перенесён, отложен: плашка над афишей; оформление — site.css (.event__status) -#}
   {% if ev.status_label %}
@@ -191,10 +191,14 @@
       покупка билета. Скрыт, пока скрипт не покажет: без ключа Яндекс Афиши в
       «Настройках» на странице не будет пустого блока -#}
   {% if ev.yandex_id and not ev.is_past and ev.sells_tickets %}
-    <section class="section" id="bilety" data-ya-widget="{{ ev.yandex_id }}" hidden>
-      <h2>Схема зала и покупка билетов</h2>
-      <div class="ya-widget" data-ya-widget-frame></div>
+    </div>
+    <section class="section section--flush" id="bilety" data-ya-widget="{{ ev.yandex_id }}" style="width:100%" hidden>
+      <div class="wrap">
+        <h2>Схема зала и покупка билетов</h2>
+      </div>
+      <div class="ya-widget ya-widget--full" data-ya-widget-frame></div>
     </section>
+    <div class="wrap">
   {% elif ev.hall_widget and ev.sells_tickets %}
     <section class="section" id="hall">
       <h2>Схема зала</h2>

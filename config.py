@@ -13,6 +13,29 @@ from datetime import timedelta
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
+# Загрузка .env (если есть) — настройки хостинга, локальный запуск.
+# Без зависимости от python-dotenv: читаем файл вручную. Уже заданные
+# переменные окружения не перезаписываем.
+def _load_dotenv(path):
+    if not os.path.isfile(path):
+        return
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key, _, val = line.partition("=")
+                    key = key.strip()
+                    val = val.strip().strip("\"'")
+                    if key and key not in os.environ:
+                        os.environ[key] = val
+    except Exception:
+        pass
+
+
+_load_dotenv(os.path.join(BASE_DIR, ".env"))
+del _load_dotenv
+
 # Значение-заглушка. Приложение отказывается работать с ним на боевом сервере,
 # см. filarmonia.check_secret_key.
 INSECURE_SECRET_KEY = "change-me-in-production"
@@ -47,9 +70,8 @@ def build_config(**overrides) -> dict:
         "SQLALCHEMY_TRACK_MODIFICATIONS": False,
         "SQLALCHEMY_ENGINE_OPTIONS": {"pool_pre_ping": True},
 
-        "UPLOAD_FOLDER": os.environ.get(
-            "UPLOAD_FOLDER", os.path.join(BASE_DIR, "filarmonia", "static", "uploads")
-        ),
+        "UPLOAD_FOLDER": os.environ.get("UPLOAD_FOLDER", "").strip()
+                or os.path.join(BASE_DIR, "filarmonia", "static", "uploads"),
         "MAX_CONTENT_LENGTH": 64 * 1024 * 1024,  # 64 МБ на одну отправку формы
         "ALLOWED_IMAGE_EXT": ALLOWED_IMAGE_EXT,
         "ALLOWED_VIDEO_EXT": ALLOWED_VIDEO_EXT,
@@ -93,6 +115,13 @@ def build_config(**overrides) -> dict:
         "SESSION_COOKIE_SAMESITE": "Lax",
         # На боевом сервере с HTTPS выставить SESSION_COOKIE_SECURE=1
         "SESSION_COOKIE_SECURE": bool(int(os.environ.get("SESSION_COOKIE_SECURE", "0"))),
+
+        # Срок токена защиты от подделки запросов (см. filarmonia/csrf_cookie.py):
+        # 90 дней. Задан здесь, а не только значением по умолчанию, потому что из этой
+        # же величины считается Max-Age cookie `csrf_token`: заданный извне срок подписи
+        # не должен расходиться со сроком cookie (С-24).
+        "WTF_CSRF_TIME_LIMIT": int(os.environ.get("WTF_CSRF_TIME_LIMIT", 90 * 24 * 3600)),
+
 
         # За обратным прокси (nginx, render.com) протокол и адрес клиента
         # приходят в заголовках X-Forwarded-*. Включать только там, где перед

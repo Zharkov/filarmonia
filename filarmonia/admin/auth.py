@@ -8,6 +8,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from ..models import db, User
 from .. import throttle, utils
+from ..csrf_cookie import rotate_csrf_token
 from . import bp
 from .common import CONTROL_CHARS, safe_next
 
@@ -79,6 +80,9 @@ def login():
             session["seen"] = time.time()
             user.last_login_at = utils.utcnow()
             db.session.commit()
+            # Новый токен при входе (С-23): прежний, оставленный в форме или журнале
+            # прокси, после смены пользователя перестаёт быть пригодным.
+            rotate_csrf_token()
             return redirect(safe_next(request.args.get("next", "")))
 
         note_login_failure()
@@ -91,4 +95,6 @@ def login():
 @bp.route("/logout", methods=["POST"])
 def logout():
     session.clear()
+    # Токен гостя не должен пережить сеанс сотрудника (С-23)
+    rotate_csrf_token()
     return redirect(url_for("public.index"))

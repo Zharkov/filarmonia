@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}Управление сайтом{% endblock %} — филармония</title>
+{#- Визуальный редактор грузит файлы запросом вне формы, токен он берёт отсюда -#}
+<meta name="csrf-token" content="{{ csrf_token() }}">
 <link rel="stylesheet" href="{{ asset_url('css/admin.css') }}">
 </head>
 <body>
@@ -66,7 +68,8 @@
 {#- Адреса визуального редактора: admin.js подгружает его только там, где есть поле с разметкой -#}
 <script src="{{ asset_url('js/admin.js') }}"
         data-jodit-js="{{ asset_url('vendor/jodit/jodit.min.js') }}"
-        data-jodit-css="{{ asset_url('vendor/jodit/jodit.min.css') }}"></script>
+        data-jodit-css="{{ asset_url('vendor/jodit/jodit.min.css') }}"
+        data-upload-url="{{ url_for('admin.upload') }}"></script>
 <link rel="stylesheet" href="{{ asset_url('css/admin-loading.css') }}">
 <script src="{{ asset_url('js/admin-loading.js') }}"></script>
 </body>

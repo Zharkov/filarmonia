@@ -158,6 +158,10 @@ SETTINGS = [
     ("benefits_default", "<p>Льготные билеты приобретаются в кассе филармонии при предъявлении "
                          "подтверждающего документа.</p>",
      "Текст о льготах по умолчанию", "Тексты по умолчанию", "html"),
+    # Подводка страницы коллективов: в шаблоне она внутри <p>, поэтому текст без разметки
+    ("collectives_lead", "Оркестры, ансамбли и солисты филармонии. У каждого коллектива — "
+                         "фото и видео, контакты для заявок и подробный рассказ.",
+     "Текст над списком на странице «Коллективы и артисты»", "Страницы", "html"),
 ]
 
 # Текст страницы «Независимая оценка качества» — под блоком с анкетой
@@ -489,11 +493,14 @@ def demo_document_files() -> int:
     return len(docs)
 
 
-def run(app, reset=False, rebuild_menu=False):
+def run(app, reset=False, rebuild_menu=False, structure_only=False):
     """Наполняет базу. При reset=True прежние данные удаляются.
 
     rebuild_menu=True пересобирает главное меню по списку MENU, не трогая
     остальное содержимое: так на рабочую базу переносится новая структура меню.
+    structure_only=True создаёт только обязательную структуру (администратор,
+    настройки, страницы, меню, площадки, жанры, фестивали) без демо-контента —
+    для автоинициализации на хостинге, где нет SSH.
     """
     with app.app_context():
         if reset:
@@ -509,6 +516,7 @@ def run(app, reset=False, rebuild_menu=False):
             admin = User(login=ADMIN_LOGIN, name="Администратор сайта", role="admin")
             admin.set_password(ADMIN_PASSWORD)
             db.session.add(admin)
+            db.session.commit()
 
         for key, value, title, group, kind in SETTINGS:
             if db.session.get(Setting, key) is None:
@@ -572,6 +580,9 @@ def run(app, reset=False, rebuild_menu=False):
                 # Фестиваль заведён до появления страниц фестивалей — даём описание
                 festival.description = description
         db.session.commit()
+
+        if structure_only:
+            return
 
         # Настройки
         demo.photo("hero-hall.jpg", "Концертный зал филармонии", 3, (1920, 1080))

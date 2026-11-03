@@ -5,7 +5,7 @@
 {% block breadcrumbs %}{{ breadcrumbs([('Главная', url_for('public.index')), ('Документы', None)]) }}{% endblock %}
 {% block content %}
 <div class="wrap">
-  <h1>Документы</h1>
+  <h2>Документы</h2>
   {#- Только названия подразделов: сами документы — на странице подраздела -#}
   {% if sections %}
     <ul class="sections">

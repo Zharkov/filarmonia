@@ -134,3 +134,33 @@ def media_move(media_id):
     if request.headers.get("X-Requested-With") == "fetch":
         return jsonify(moved=moved)
     return redirect(back)
+
+
+# Загрузка файла из визуального редактора Jodit
+@bp.route("/upload", methods=["POST"])
+@login_required
+def upload():
+    """Картинка из визуального редактора: файл грузится на сервер,
+    в текст вставляется ссылка — вставка base64 раздула бы страницу.
+
+    Jodit Uploader по умолчанию читает data.files и data.success
+    (isSuccess/process в Config.prototype.uploader).
+    Верхнеуровневые поля files и path оставляем для совместимости
+    с общим форматом загрузок панели.
+    """
+    uploaded = [f for f in request.files.values() if f and f.filename]
+    if not uploaded:
+        return jsonify(success=False, data={"messages": ["Выберите файл."]}), 400
+    saved = []
+    try:
+        for f in uploaded:
+            saved.append(utils.save_upload(f, ("image",)))
+    except ValueError as exc:
+        utils.delete_uploads(saved)
+        return jsonify(success=False, data={"messages": [str(exc)]}), 400
+    urls = [utils.UPLOADS_PREFIX + n for n in saved]
+    details = ", ".join(urls)
+    log("create", object_type="media", details=f"картинка в тексте: {details}")
+    db.session.commit()
+    base = {"baseurl": "", "files": urls, "isImages": [True] * len(urls)}
+    return jsonify(success=True, path=urls[0], data=base, **base)

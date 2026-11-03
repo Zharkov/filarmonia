@@ -20,8 +20,12 @@ nginx — в `docs/DEPLOY-SERVER.md`, команды — в `README.md` (не д
 ## 2. Структура
 
 ### Корень
-`app.py` CLI; `config.py` конфиг; `migrations/` Alembic (`versions/0001..0017`); `tests/`; `docs/`; `instance/` и
+`app.py` CLI; `config.py` конфиг; `migrations/` Alembic (`versions/0001..0018`); `tests/`; `docs/`; `instance/` и
 `filarmonia.db` — рабочие данные (не трогать); `DEPLOY-RENDER.md`, `render.yaml`.
+Выкладка на CGI-хостинг без SSH: `index.cgi` (точка входа Apache mod_cgi), `.htaccess` (роутинг статики мимо
+Python, закрытие служебных файлов), `filarmonia/deploy_cgi.py` (`auto_init_db` при `AUTO_INIT_DB=1` — миграции +
+администратор + структура без демо-контента), `release/` (собранный проект, в `.gitignore`), `scripts/_read_docx.py`
+(чтение правок заказчика из .docx). Образец переменных — `.env.example`; `config.py` сам читает `.env`, если он есть.
 
 ### Пакет `filarmonia/`
 | Модуль | За что отвечает |
@@ -43,7 +47,8 @@ nginx — в `docs/DEPLOY-SERVER.md`, команды — в `README.md` (не д
 ### `filarmonia/admin/` (blueprint `admin`, префикс `/admin`; объявлен в `__init__.py`, модули импортируются оттуда)
 `common.py` — общий инструментарий (см. раздел 5, 7); `auth.py` вход/выход; `dashboard.py` главная панели; `events.py` афиша,
 значки, копирование, «Изменения в афише»; `content.py` коллективы/новости/страницы/документы новости/`/slug`;
-`media.py` галереи (добавление, удаление, порядок); `publishing.py` быстрая публикация; `site.py` меню, документы, баннеры,
+`media.py` галереи (добавление, удаление, порядок) и загрузка картинки в текст визуального редактора (`/admin/upload`);
+`publishing.py` быстрая публикация; `site.py` меню, документы, баннеры,
 перенаправления, справочники; `appeals.py` обращения; `surveys.py` анкеты; `system.py` настройки, сотрудники, журнал.
 
 ### Статика (`filarmonia/static/`)
@@ -88,7 +93,7 @@ nginx — в `docs/DEPLOY-SERVER.md`, команды — в `README.md` (не д
 | Throttle | throttles | PK `key` вида `login:логин:адрес`, `appeal:адрес`, `survey:...`; `count`, `last_at` |
 | Redirect | redirects | `old_path` (unique) -> `new_url`, `hits` |
 
-### Миграции (`migrations/versions/NNNN_*.py`, ревизии цепочкой; последняя `b7d1e6a39c42`)
+### Миграции (`migrations/versions/NNNN_*.py`, ревизии цепочкой; последняя `c8f2a5d3e419`)
 Схему создают миграции, а не `create_all` (в тестах — `create_all`). Файлы 0001–0009: начальная схема, yandex_id, правки аудита и заказчика,
 страница НОК, контакты, hero/метрика. С 0010:
 - 0010 `a7d2b5e8f441` — данные: виджет ПОС встроен в шаблон, удалены его настройка и баннеры «main».
@@ -99,6 +104,7 @@ nginx — в `docs/DEPLOY-SERVER.md`, команды — в `README.md` (не д
 - 0015 `f4d8b3c1e207` — данные: срок хранения анкет (3 года).
 - 0016 `a5e9c4d2f318` — схема: `events.status/previous_starts_at/is_free/seo_*`, seo_* у collectives и news, `appeals.consent_version/consent_at`; страница согласия (проект текста).
 - 0017 `b7d1e6a39c42` — данные: обезличивание старых записей журнала по обращениям («Обращение № N»).
+- 0018 `c8f2a5d3e419` — данные: настройка `collectives_lead` (текст над списком коллективов).
 
 ## 4. Маршруты
 
@@ -133,7 +139,7 @@ nginx — в `docs/DEPLOY-SERVER.md`, команды — в `README.md` (не д
 | Панель | `/` | оба |
 | Афиша | `/events`, `/events/new`, `/events/<id>` (+`/copy`, `/badges`, `/delete`), `/badges/<id>/delete`, `/notices` (+`/<id>/delete`) | оба |
 | Контент | `/collectives`, `/news` (+`/<id>/documents`, `/documents/<id>/delete`), `/pages` — каждый со списком, `new`, `<id>`, `<id>/delete`; `/slug` (ajax-подсказка адреса) | оба |
-| Галереи | `/media/add`, `/media/<id>/delete`, `/media/<id>/move` | оба |
+| Галереи | `/media/add`, `/media/<id>/delete`, `/media/<id>/move`, `/upload` (POST, картинка в текст редактора) | оба |
 | Публикация | `/publish/<kind>/<id>` POST | оба |
 | Сайт | `/menu`, `/documents`, `/banners`, `/redirects`, `/refs` (+`/refs/<kind>/<id>/delete`), удаление `menu|documents|banners|redirects/<id>/delete` | оба |
 | Анкеты НОК | `/surveys`, `/surveys/summary`, `/surveys/export.csv`, `/surveys/<id>` | оба (просмотр) |
@@ -146,10 +152,10 @@ nginx — в `docs/DEPLOY-SERVER.md`, команды — в `README.md` (не д
 - **Настройки.** `Setting.get(key, default)` в коде, в шаблонах — словарь `settings` (context processor). `site_data()` держит настройки и меню в памяти процесса 30 с;
   `admin.common.log()` и `save()` сбрасывают (`reset_site_data()`), другие процессы gunicorn узнают не позже чем через 30 с. В тестах (`app.testing`) сброс на каждый запрос.
   **Новая настройка** = строка в `seed.SETTINGS` (ключ, значение, подпись, группа, kind) + миграция, вставляющая её только если ключа нет (образец — `0014`/`0015`: `sa.table(...)`, `select ... first() is None`, `insert`; `downgrade` удаляет). Редактор значение не затирается.
-- **Безопасность.** CSRF глобально (`CSRFProtect`; в тестах `WTF_CSRF_ENABLED=False`), `/csp-report` исключён. URL из форм — только через `admin.common.safe_url` (None = невалидно, `BAD_URL_TEXT` в flash), адрес возврата после входа — `safe_next`. HTML от редактора — `utils.clean_html`.
+- **Безопасность.** CSRF глобально (`CookieCSRFProtect` из `csrf_cookie.py`; токен хранится в отдельной cookie `csrf_token` сроком на 90 дней, а не в сессии, поэтому браузеры, чистящие cookie сессии, не теряют форму при входе; в тестах `WTF_CSRF_ENABLED=False`), `/csp-report` исключён. URL из форм — только через `admin.common.safe_url` (None = невалидно, `BAD_URL_TEXT` в flash), адрес возврата после входа — `safe_next`. HTML от редактора — `utils.clean_html`.
   `BODY_LIMITS` (по endpoint: анкета 64 КБ, обращение 128 КБ, csp_report 16 КБ; остальное 64 МБ) применяется в `limit_body` до CSRF. `throttle`: вход (`LOGIN_MAX_ATTEMPTS/LOCKOUT`), обращения и анкеты (`*_INTERVAL_SECONDS`), honeypot-поле `website` в анкете.
   Роли admin/editor (`login_required`/`admin_required`; права проверяются на каждом запросе в `load_user`, сеанс гаснет после `SESSION_IDLE_SECONDS`). CSP: админка — строгая и обязательная, сайт — `PUBLIC_CSP` + полная `PUBLIC_CSP_REPORT` только в режиме Report-Only. `stand_auth` — Basic-auth на тестовом стенде при `SITE_NOINDEX=1` + `STAND_USER/PASSWORD`; без пароля `stand_closed()` отключает приём обращений/анкет. `check_secret_key`/`check_site_url` обрывают запуск боевого окружения без `SECRET_KEY`/`SITE_URL`.
-- **Кэш.** `web.cache_headers`: версионная статика и `uploads/` — год immutable; страницы — слабый ETag + `Last-Modified` из `g.last_modified` (обработчики кладут `updated_at`; галереи/связи обновляют его через `common.touch`). `compress` — gzip, если нет nginx. Ссылки на CSS/JS — `asset_url('css/site.css')` (версия = mtime).
+- **Кэш.** `web.cache_headers`: версионная статика и `uploads/` — год immutable; страницы — слабый ETag + `Last-Modified` из `g.last_modified` (обработчики кладут `updated_at`; галереи/связи обновляют его через `common.touch`). Подпись CSRF-токена квантована до 15 минут, поэтому ETag меняется не чаще раза в 15 минут — общий кэш прокси работает. `compress` — gzip, если нет nginx. Ссылки на CSS/JS — `asset_url('css/site.css')` (версия = mtime).
 - **Картинки.** Загрузка `utils.save_upload` -> `check_image` (формат, лимит пикселей) -> `shrink_image` (`IMAGE_MAX_SIDE`) -> `make_variants` (копии `имя-400w/800w/1200w…webp` рядом с файлом). В шаблонах — макрос `img_src(url, sizes)` (srcset) и `img_dims`/`image_size`; миниатюры для старых фото — `python app.py thumbs`. Удаление файлов — `utils.delete_uploads` / `common.release_files`/`replace_file`; висячие файлы — `python app.py cleanup`.
 - **Flash-категории.** Панель: `ok` / `error`. Публичная часть: категория `survey-<key>` — сообщения анкеты выводятся только в своей форме (`_survey_form.html`, `category_filter`), иначе «Спасибо» попадёт в общий блок `base.html`; не переименовывать без правки обоих шаблонов.
 - **Журнал действий.** `common.log(action, item, details, object_type)` (+`OBJECT_TYPES`, `ACTION_LABELS`), коммитится вместе с правкой; `save()` пишет create/update сам, `delete_record()` — delete. Для Appeal в журнал идёт только «Обращение № N» (ПДн не попадают, `title_of`). Просмотр — `/admin/log`.
@@ -159,6 +165,11 @@ nginx — в `docs/DEPLOY-SERVER.md`, команды — в `README.md` (не д
 - **Сроки хранения.** Настройки `appeals_retention_years` (5), `surveys_retention_years` (3); удаление — `python app.py purge` (cron) и кнопка в панели.
 - **Slug.** `utils.slugify` (транслит) + `common.unique_slug`; авто-подсказка в форме — `/admin/slug`.
 - **Публикация.** Кнопки формы шлют `publish=1|0` (`common.publish_choice`); новая запись — черновик.
+- **Меню страниц.** При сохранении страницы (`page_form` в `content.py`) автоматически синхронизируется пункт меню:
+  если страница опубликована и стоит галочка «в меню» — создаётся (или обновляется) пункт с тем же названием и сортом страницы;
+  подпункт вешается на пункт родительской страницы (если родительской страницы нет — пункт верхнего уровня);
+  снятие галочки или черновик — пункт не удаляется, а становится скрытым (`is_published=False`);
+  порядок, вложенность и название пункта можно править вручную в «Меню».
 
 ## 6. Тесты
 
@@ -193,11 +204,12 @@ nginx — в `docs/DEPLOY-SERVER.md`, команды — в `README.md` (не д
 - Язык: комментарии, docstring, тексты интерфейса, имена тестов-описаний — по-русски. Комментарий объясняет «почему» (какую ошибку предотвращает, что решил заказчик), а не «что». Модули начинаются с docstring в одну-две строки.
 - Имена: код и поля — английские snake_case; адреса публичных страниц — транслит (`/afisha`, `/kollektivy`, `/novosti`, `/info/<slug>`).
 - Админ-маршруты — функции `bp.route` в модуле раздела, `@login_required` / `@admin_required`; запись — `get_or_404`, `unique_slug`, `safe_url`, `rich()` (HTML через clean_html), `set_seo`, `keep_old_address`, `save(item, "Сообщение.")`, `log(...)`; удаление — `delete_record`. Не изобретать свои аналоги.
-- Новая настройка = seed + миграция insert-if-missing. Изменение схемы = новая миграция `NNNN_кратко.py` (следующая 0018, `down_revision = 'b7d1e6a39c42'`), проверять upgrade/downgrade на временной SQLite; изменения схемы согласуются с пользователем.
+- Новая настройка = seed + миграция insert-if-missing. Изменение схемы = новая миграция `NNNN_кратко.py` (следующая 0019, `down_revision = 'c8f2a5d3e419'`), проверять upgrade/downgrade на временной SQLite; изменения схемы согласуются с пользователем.
 - HTML от редактора — только `clean_html`; URL-поля — только `safe_url`; новые POST-маршруты без CSRF не делать; публичные POST с телом от посетителей — добавлять в `BODY_LIMITS`.
 - Новый публичный маршрут: учесть черновики (`check_published`), `g.last_modified`, sitemap/noindex (`NOINDEX_ENDPOINTS`) и JSON-LD.
 - Картинки в шаблонах — через макрос `img_src`, стили/скрипты — через `asset_url`.
 - Правило проекта: не запускать `git` (пользователь делает сам), не изменять рабочую БД `filarmonia.db` — только временную SQLite в тестах/проверках. Секреты только в `.env`. Записи о проделанном — в `docs/PROGRESS.md`.
+- Роли субагентов Koda лежат в `.koda/agents/*.md` (в `AGENTS.md` — правила оркестрации). Папка локальная, в `.gitignore`; инструкции ролей повторяют разделы 5 и 7 этого документа, поэтому при изменении соглашений обновляй и их.
 
 ## 8. Известные ограничения и отложенное
 
