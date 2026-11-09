@@ -22,7 +22,7 @@ nginx — в `docs/DEPLOY-SERVER.md`, команды — в `README.md` (не д
 ### Корень
 `app.py` CLI; `config.py` конфиг; `migrations/` Alembic (`versions/0001..0018`); `tests/`; `docs/`; `instance/` и
 `filarmonia.db` — рабочие данные (не трогать); `DEPLOY-RENDER.md`, `render.yaml`.
-Выкладка на CGI-хостинг без SSH: `index.cgi` (точка входа Apache mod_cgi), `.htaccess` (роутинг статики мимо
+Выкладка на CGI-хостинг (SSH доступен, включается в панели): `index.cgi` (точка входа Apache mod_cgi), `.htaccess` (роутинг статики мимо
 Python, закрытие служебных файлов), `filarmonia/deploy_cgi.py` (`auto_init_db` при `AUTO_INIT_DB=1` — миграции +
 администратор + структура без демо-контента), `release/` (собранный проект, в `.gitignore`), `scripts/_read_docx.py`
 (чтение правок заказчика из .docx). Образец переменных — `.env.example`; `config.py` сам читает `.env`, если он есть.

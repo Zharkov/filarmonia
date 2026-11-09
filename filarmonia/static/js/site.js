@@ -273,7 +273,23 @@
         heroVideo.classList.add("is-playing");
         if (soundBtn) soundBtn.hidden = false;
       }, { once: true });
-      heroVideo.src = heroVideo.getAttribute("data-src");
+      var src = heroVideo.getAttribute("data-src");
+      // Видео по кусочкам (HLS): грузим библиотеку только здесь, когда ролик
+      // действительно запускается; Safari умеет HLS сам и обойдётся без неё
+      if (/\.m3u8($|\?)/.test(src) && !heroVideo.canPlayType("application/vnd.apple.mpegurl")) {
+        var lib = document.createElement("script");
+        lib.src = heroVideo.getAttribute("data-hls") || "/static/js/vendor/hls.light.min.js";
+        lib.onload = function () {
+          var hls = new Hls({ autoStartLoad: true });
+          hls.loadSource(src);
+          hls.attachMedia(heroVideo);
+          var played = heroVideo.play();
+          if (played && played.catch) played.catch(function () { /* автозапуск запрещён — остаётся картинка */ });
+        };
+        document.head.appendChild(lib);
+        return;
+      }
+      heroVideo.src = src;
       var played = heroVideo.play();
       if (played && played.catch) played.catch(function () { /* автозапуск запрещён — остаётся картинка */ });
     };

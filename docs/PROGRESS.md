@@ -1,5 +1,64 @@
 # Прогресс
 
+## 2026-11-03 — автонарезка видео главной при загрузке через панель настроек
+- Заказчик: «чтобы не в ручном виде» — загружают mp4/webm в «Настройках», а сервер сам
+  режет и подставляет HLS. Готово.
+- `filarmonia/hero_video.py` (новый): slug_for() — каталог по sha1 содержимого (геро-хэш,
+  новый URL обходит годовой кэш статики); find_ffmpeg() — статический бинарник из пакета
+  imageio-ffmpeg либо ffmpeg из PATH; spawn_encode() — detached-процесс ffmpeg, не виснет
+  в CGI-запросе; prepare() — возвращает путь плейлиста или "" если ffmpeg недоступен.
+- `filarmonia/admin/system.py`: в settings_page() после коммита — вызов hero_prepare(),
+  замена hero_video на HLS-путь, flash «видео нарезается»; исходник удаляется только после
+  успешной нарезки (если ffmpeg нет — оставляется как есть). Файл не выбран — значение
+  hero_video не сбрасывается (continue вместо replace_file).
+- requirements.txt: imageio-ffmpeg==0.6.0 (статический ffmpeg ~77 МБ внутри пакета; на
+  хостинге pip install его сам скачает с PyPI). Если пакет не поставится — видео сохраняется
+  одним файлом как раньше, без ошибки.
+- admin/settings.html: подсказка обновлена («до 60 секунд, само сожмётся и нарежется»),
+  строка «Видео нарезано: hero-hash».
+- Тесты: tests/test_hero_video.py (5 шт.): is_hls_value, slug_stable, prepare_without_ffmpeg,
+  settings_upload_autoslices (monkeypatch uploaded_name + hero_prepare),
+  settings_without_video_untouched. Полный набор 508 passed.
+- Релиз: system.py, hero_video.py, site.js, hls.light.min.js, settings.html, requirements.txt;
+  сверка MD5 — все совпадают.
+
+## 2026-11-03 — фоновое видео на главной: HLS-нарезка вместо 56 МБ webm
+- Исходник `filarmoniya-2fb3eadd.webm` (56,5 МБ, VP9 1902×736, со звуком) перекодирован
+  ffmpeg: H.264 1280×496 CRF 28, AAC 96k, нарезка HLS по ~6 с → `hero-v2/`
+  (12 файлов: master.m3u8 + seg*.ts), всего 9,5 МБ. Каталог hero-v2 (а не hero) —
+  чтобы обойти годовой кэш статики: у видео нет ?v=.
+- `filarmonia/static/js/vendor/hls.light.min.js` (290 КБ, локально — CSP `script-src 'self'`);
+  `site.js`: при источнике .m3u8 подгружает hls.js в момент старта; Safari/iOS играют
+  HLS нативно без библиотеки; обычный mp4/webm работает как раньше.
+- Тестировано локально (`run_dev.py`, временная база): видео и звук работают,
+  кнопка звука штатная. Настройка `hero_video` = `hero-v2/master.m3u8`.
+- Автоматизация для будущих роликов: `scripts/make_hero_video.py <исходник> [имя_каталога]` —
+  сам ищет ffmpeg (PATH или установка winget), режет в `uploads/hero-N` (или с указанным
+  именем), обновляет настройку hero_video в локальной базе, печатает готовый heredoc
+  для SSH-команды обновления боевой базы. Проверено на исходнике → hero-v3 (10 МБ).
+  `run_dev.py` переделан: запускается на РАБОЧЕЙ базе `filarmonia.db`, чтобы после
+  скрипта сразу видеть результат на http://127.0.0.1:5000/. В .gitignore добавлены
+  dev_tmp/, run_dev.py, hero-src.*, /hero/; исправлена строка про «без SSH».
+- Релиз: prepare_release.py взял site.js и hls.js; каталог uploads скрипт всегда
+  пропускает — hero-v2 скопирован в release вручную; сверка MD5 — все совпадают.
+- Урок: настройка «SSH нет» в DEPLOY-CGI.md была неверной — SSH есть (включается в
+  панели); документы поправлены.
+- Хвост: `hero-src.webm`, `hero/`, `hero/` в uploads, `run_dev.py`, `dev_tmp/` —
+  временные файлы локальной работы, убрать при очистке.
+
+## 2026-11-03 — редирект http -> https в .htaccess
+- Хостинг (Masterhost, CGI) терминирует SSL перед Apache: `%{HTTPS}` всегда off,
+  `SERVER_PORT` всегда 80 даже на https, `X-Forwarded-Proto` не передаётся — первые
+  варианты условий давали вечный цикл 301 («перенаправлено слишком много раз»).
+- Диагностика `check.cgi` (временный, удалён) показала рабочий признак:
+  `HTTP:X-Forwarded-Port` = 443 на https, 80/пусто на http.
+- Итоговое условие: `RewriteCond %{HTTP:X-Forwarded-Port} !^443$` +
+  `RewriteRule ^(.*)$ https://new.smolensk-filarmonia.ru/$1 [R=301,L,NE]` —
+  первым блоком после RewriteEngine On, до раздачи статики.
+- Урок: правило `%{REQUEST_FILENAME} !-f` на этом хостинге ломает раздачу CGI —
+  не применять; для исключения файлов из перехвата Flask'ом использовать
+  явные `RewriteCond %{REQUEST_URI} !^/файл`.
+
 ## 2026-11-03 — 500 на хостинге: испорченный csrf_cookie.py в release/
 - Симптом: после заливки релиза на хостинг все страницы дают 500, в логах Apache —
   `ImportError: cannot import name 'CookieCSRFProtect' from 'filarmonia.csrf_cookie'`.

@@ -22,11 +22,15 @@
           {% elif row.kind == 'file' %}
             {% if 'video' in row.key %}
               {{ file_input(row.key, 'f_' ~ row.key, ('video',),
-                            size='Рекомендуемое разрешение — 1920×1080, длительность — 10–30 секунд, размер файла — до 15 МБ. Видео воспроизводится без звука, звук включается кнопкой на странице.') }}
+                            size='Рекомендуемое разрешение — 1920×1080, длительность — до 60 секунд. Видео само сожмётся и нарежется на кусочки для быстрой загрузки; звук включается кнопкой на странице.') }}
             {% else %}
               {{ file_input(row.key, 'f_' ~ row.key, size='Рекомендуемый размер — 1920×1080 (16:9).') }}
             {% endif %}
-            {% if row.value %}<div class="hint">Загружено: {{ row.value }}</div>{% endif %}
+            {% if row.value and '/' in row.value %}
+              <div class="hint">Видео нарезано: {{ row.value.split('/')[0] }} ({{ row.value }}).</div>
+            {% elif row.value %}
+              <div class="hint">Загружено: {{ row.value }}</div>
+            {% endif %}
           {% elif row.kind == 'bool' %}
             <div class="checkline"><input type="checkbox" id="{{ row.key }}" name="{{ row.key }}" {{ 'checked' if row.value }}>
               <label for="{{ row.key }}">Включено</label></div>

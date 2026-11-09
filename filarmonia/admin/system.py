@@ -1,14 +1,15 @@
 """Только для администратора: настройки сайта, сотрудники, журнал действий."""
 from datetime import datetime, timedelta
 
-from flask import render_template, request, redirect, url_for, flash, g
+from flask import current_app, render_template, request, redirect, url_for, flash, g
 
 from ..models import db, User, Setting, ActionLog
 from .. import utils
+from ..hero_video import prepare as hero_prepare, is_hls_value
 from . import bp
 from .common import (
     ACTION_LABELS, OBJECT_LABELS, admin_required, edited, get_or_404, log, paginated,
-    release_files, replace_file, rich, save, search_text, sorted_by, uploaded_name,
+    referenced_uploads, release_files, replace_file, rich, save, search_text, sorted_by, uploaded_name,
 )
 
 
@@ -30,11 +31,22 @@ def settings_page():
     rows = Setting.query.order_by(Setting.group, Setting.title).all()
     if request.method == "POST":
         old_files = []
+        new_hero = ""  # имя загруженного исходника фонового видео — на нарезку
         for row in rows:
             if row.kind == "file":
                 kinds = ("video",) if "video" in row.key else ("image",)
                 try:
-                    old_files += replace_file(row, "value", uploaded_name("f_" + row.key, kinds))
+                    uploaded = uploaded_name("f_" + row.key, kinds)
+                    if uploaded and row.key == "hero_video":
+                        # Файл уже на диске; replace_file не запускаем, иначе
+                        # release_files удалит исходник до нарезки. Нарезка сама
+                        # удалит его, когда плейлист будет готов.
+                        new_hero = uploaded
+                    elif row.key == "hero_video":
+                        # Файл не выбран — не сбрасываем hero_video в пустоту
+                        continue
+                    else:
+                        old_files += replace_file(row, "value", uploaded)
                 except ValueError as exc:
                     flash(str(exc), "error")
             elif row.kind == "bool":
@@ -46,6 +58,23 @@ def settings_page():
         log("update", object_type="settings", details="настройки сайта")
         db.session.commit()
         release_files(old_files)
+        if new_hero:
+            target = hero_prepare(current_app._get_current_object(), new_hero)
+            if target:
+                row = db.session.get(Setting, "hero_video")
+                old_value = row.value or ""
+                row.value = target
+                db.session.commit()
+                # Нарезка в отдельном процессе: исходник больше не нужен, а без
+                # удаления он лежал бы в uploads двойником нарезки
+                to_release = [new_hero] + ([old_value] if old_value and old_value != target else [])
+                utils.delete_uploads(set(to_release) - referenced_uploads())
+                flash("Видео фоновой заставки нарезается на кусочки — главная "
+                      "начнёт его играть, когда обработка закончится.", "ok")
+            else:
+                row = db.session.get(Setting, "hero_video")
+                row.value = new_hero
+                db.session.commit()
         flash("Настройки сохранены.", "ok")
         return redirect(url_for("admin.settings_page"))
 
