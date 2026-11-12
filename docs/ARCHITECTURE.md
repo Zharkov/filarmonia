@@ -76,7 +76,7 @@ Python, закрытие служебных файлов), `filarmonia/deploy_cg
 |---|---|---|
 | User | users | `login`, `password_hash`, `role` (`admin`/`editor`), `is_active`, `is_admin`, `set_password/check_password` |
 | Setting | settings | PK `key`; `value`, `title`, `group`, `kind` (text/textarea/html/file/bool); `Setting.get(key, default)` (пустое значение = default), `Setting.set` |
-| Page | pages | `slug` (url `/info/<slug>`), `content`, `parent_id` (дерево), `is_published`, `show_in_menu`, `template` = page / documents / documents_years / nok / contacts / pushkin / benefits, `seo_description`; `has_documents` (`DOCUMENT_TEMPLATES`); media |
+| Page | pages | `slug` (url `/info/<slug>`), `content`, `parent_id` (дерево), `is_published`, `show_in_menu`, `show_in_footer`, `template` = page / documents / documents_years / nok / contacts / pushkin / benefits, `seo_description`; `has_documents` (`DOCUMENT_TEMPLATES`); media |
 | MenuItem | menu_items | `title`, `url` либо `page_id`, `parent_id`, `sort`, `href` |
 | Event | events | `slug`, `starts_at`, `status` (scheduled/cancelled/rescheduled/postponed), `previous_starts_at`, `is_free`, `price_min/max`, `ticket_url`, `yandex_id`, `hall_widget`, `show_pushkin/benefits(+_text)`, `show_media`, `is_published/is_new/is_featured`, `seo_title/description`; свойства `url`, `is_past`, `card_image`, `price_label`, `status_label`, `is_cancelled`, `sells_tickets`, `can_buy`, `age_number`; связи venue, category, collectives (M2M), festivals (M2M), media, badges |
 | EventBadge | event_badges | значок на афише: `text`, `hint`, `url`, `position`, `style` (brick/gold/ink/light), `icon` |

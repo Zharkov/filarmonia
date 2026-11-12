@@ -620,7 +620,7 @@
           target: frame,
           onRequestClose: function () { widget.unmount(); widget.destroy(); section.hidden = true; },
         });
-        widget.mount({ style: { height: "600px" } });
+        widget.mount({ style: { height: "950px" } });
       }]);
     });
   }

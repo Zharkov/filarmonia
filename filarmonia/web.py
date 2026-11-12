@@ -52,7 +52,7 @@ PUBLIC_CSP_REPORT = "; ".join((
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https:",
     "media-src 'self' https:",
-    "font-src 'self' data:",
+    "font-src 'self' data: https://pos.gosuslugi.ru",
     # 'self' — окно просмотра PDF из загрузок сайта
     "frame-src 'self' https:",
     "connect-src 'self' https:",

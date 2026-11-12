@@ -949,9 +949,9 @@ html[data-theme] .prose--draft > p:first-child { background: var(--paper); color
 
 /* Схема зала: виджет билетной системы задаёт свою высоту сам */
 .hall-widget { max-width: 100%; overflow-x: auto; }
-.hall-widget iframe { width: 100%; min-height: 560px; border: 0; }
+.hall-widget iframe { width: 100%; min-height: 950px; border: 0; }
 /* Встроенный виджет покупки Яндекс Афиши */
-.ya-widget { min-height: 600px; }
+.ya-widget { min-height: 950px; max-width: 80%; margin: 0 auto; }
 
 /* Музыкальный маршрут */
 .route { background: var(--night); color: var(--night-text); position: relative; overflow: hidden; }

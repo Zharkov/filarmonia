@@ -10,7 +10,7 @@ from sqlalchemy.orm import joinedload
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import build_config, INSECURE_SECRET_KEY
-from .models import db, Setting, MenuItem, User
+from .models import db, Setting, MenuItem, User, Page
 from . import schema, utils, web
 from .csrf_cookie import CookieCSRFProtect
 
@@ -57,7 +57,7 @@ BODY_LIMITS = {
 # сохранения в панели процесс, принявший правку, сбрасывает их сразу,
 # остальные процессы gunicorn — не позже чем через этот срок.
 SITE_DATA_TTL = 30
-_site_data = {"expires": 0.0, "settings": {}, "menu": []}
+_site_data = {"expires": 0.0, "settings": {}, "menu": [], "footer_pages": []}
 
 
 def site_data() -> dict:
@@ -83,10 +83,18 @@ def site_data() -> dict:
                           if c.is_published],
             )
             for item in items
+            # «Независимая оценка качества» выведена справа в меню отдельно
+            # (nav__item--aside), поэтому из общего меню убираем
+            if item.title != "Независимая оценка качества"
+        ]
+        footer_pages = [
+            SimpleNamespace(title=p.title, url=p.url)
+            for p in Page.query.filter_by(is_published=True, show_in_footer=True)
+            .order_by(Page.sort).all()
         ]
         _site_data.update(
             settings={row.key: row.value for row in Setting.query.all()},
-            menu=menu, expires=time.time() + SITE_DATA_TTL,
+            menu=menu, footer_pages=footer_pages, expires=time.time() + SITE_DATA_TTL,
         )
     return _site_data
 
@@ -150,6 +158,7 @@ def create_app(**config_overrides) -> Flask:
             # запросом вместе с меню. Иначе адрес каждого пункта подгружался
             # отдельно: 14 лишних запросов к базе на каждой странице сайта.
             "main_menu": data["menu"],
+            "footer_pages": data["footer_pages"],
             "now": utils.now_msk(),
             "current_user": g.get("user"),
             "asset_url": asset_url,

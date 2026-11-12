@@ -116,6 +116,7 @@ class Page(db.Model, HasMedia):
     sort = db.Column(db.Integer, default=100)
     is_published = db.Column(db.Boolean, default=True, nullable=False)
     show_in_menu = db.Column(db.Boolean, default=True, nullable=False)
+    show_in_footer = db.Column(db.Boolean, default=False, nullable=False)
     # page | documents | documents_years | nok | contacts | pushkin | benefits
     template = db.Column(db.String(32), default="page")
     seo_description = db.Column(db.String(400), default="")

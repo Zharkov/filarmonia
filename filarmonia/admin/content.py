@@ -3,7 +3,7 @@ from flask import render_template, request, redirect, url_for, flash, abort, jso
 from sqlalchemy.orm import aliased
 
 from ..models import db, Event, Collective, News, Page, MenuItem, Document
-from .. import utils
+from .. import utils, reset_site_data
 from . import bp
 from .common import (
     BAD_URL_TEXT, after_save, delete_record, get_or_404, keep_old_address, log, login_required, paginated,
@@ -211,6 +211,7 @@ def page_form(item_id=None):
         item.seo_description = seo_text(f.get("seo_description"), 400)  # колонка pages.seo_description — 400
         item.is_published = publish_choice(item)
         item.show_in_menu = bool(f.get("show_in_menu"))
+        item.show_in_footer = bool(f.get("show_in_footer"))
         if old_title and old_title != item.title:
             # Документы находят страницу по её заголовку — переносим их вслед за ним
             Document.query.filter_by(category=old_title, news_id=None).update({"category": item.title})
@@ -218,6 +219,7 @@ def page_form(item_id=None):
         save(item, "Страница сохранена." + status_note(item, was_published) + moved)
         # После save(): у новой страницы id появляется только там, а по нему ищется её пункт меню
         sync_menu_item(item)
+        reset_site_data()  # footer_pages и меню обновятся сразу, без 30-сек TTL
         return after_save(item, url_for("admin.page_form", item_id=item.id))
     return render_template("admin/page_form.html", item=item, parents=parents,
                            templates=PAGE_TEMPLATES)
@@ -264,6 +266,21 @@ def page_in_use(page) -> str:
 @login_required
 def collective_delete(item_id):
     return delete_record(Collective, item_id, "admin.collectives", "Коллектив удалён.")
+
+
+@bp.route("/collectives/<int:item_id>/logo-delete")
+@login_required
+def collective_logo_delete(item_id):
+    """Убирает логотип коллектива и удаляет файл с диска."""
+    item = get_or_404(Collective, item_id)
+    old = item.logo or ""
+    if old:
+        item.logo = ""
+        save(item, "Логотип удалён.")
+        release_files([old])
+    else:
+        flash("Логотип уже удалён.", "ok")
+    return redirect(url_for("admin.collective_form", item_id=item.id))
 
 
 # Документы, прикреплённые к новости

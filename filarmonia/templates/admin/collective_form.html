@@ -33,7 +33,13 @@
       <textarea id="contacts" name="contacts" data-rich="small">{{ item.contacts or '' }}</textarea></div>
     <div class="field"><label for="logo">Логотип или фото</label>
       {{ file_input('logo', 'logo', size='Рекомендуемый размер — от 800×800 (1:1).') }}
-      {% if item.logo %}<img src="/static/uploads/{{ item.logo }}" alt="" style="max-width:120px;margin-top:8px">{% endif %}</div>
+      {% if item.logo %}
+        <div style="margin-top:8px;display:flex;align-items:center;gap:10px">
+          <img src="/static/uploads/{{ item.logo }}" alt="" style="max-width:120px">
+          <a class="btn btn--ghost btn--sm" href="{{ url_for('admin.collective_logo_delete', item_id=item.id) }}"
+             data-confirm="Удалить логотип?">✕ Удалить логотип</a>
+        </div>
+      {% endif %}</div>
     {{ seo_block(item) }}
   </section>
 </form>

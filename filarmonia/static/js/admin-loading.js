@@ -13,18 +13,26 @@
     }
     function show(){ overlay.classList.add('is-active'); overlay.setAttribute('aria-hidden','false'); }
     function hide(){ overlay.classList.remove('is-active'); overlay.setAttribute('aria-hidden','true'); }
+
+    /* Считаем выбранные файлы формы для решения, показывать ли спиннер. */
+    function countFiles(form){
+      var count = 0;
+      form.querySelectorAll('input[type=file]').forEach(function(inp){
+        if (inp.files && inp.files.length) count += inp.files.length;
+      });
+      return count;
+    }
+
+    /* Спиннер — только при отправке формы с выбранным файлом. */
     document.querySelectorAll('form').forEach(function(form){
       form.addEventListener('submit', function(){
-        show();
-        setTimeout(hide, 120000);
+        if (countFiles(form) > 0){
+          show();
+        }
       });
     });
-    document.querySelectorAll('input[type=file]').forEach(function(inp){
-      inp.addEventListener('change', function(){
-        show();
-        setTimeout(hide, 60000);
-      });
-    });
+
+    /* Скрываем при загрузке страницы (вкл. навигацию через сохранённый стейт). */
     window.addEventListener('load', hide);
   });
 })();
